@@ -10,6 +10,7 @@ import (
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/safego"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 )
 
 // fanOutRetry is how long a reload that failed waits before its one retry:
@@ -17,6 +18,12 @@ import (
 // still hear the version well within their heartbeat, which catches up
 // whatever the retry misses.
 const fanOutRetry = time.Second
+
+// deafReload spaces the reloads of an environment's ruleset while the
+// listener is down, when no notification wakes its fan-out: as often as the
+// streams' heartbeats, which ask, so a version is found within a heartbeat
+// or two. Never per stream: that many streams would each materialize it.
+const deafReload = 15 * time.Second
 
 // RulesetStream offers each new ruleset version to the streams of its
 // environment once this replica has loaded it, so an SDK told of a version
@@ -28,9 +35,12 @@ const fanOutRetry = time.Second
 // then offers its version to every subscription. Notifications arriving
 // during a reload make one more cycle after it, however many they are. A
 // reload that fails is retried once after fanOutRetry; then the streams'
-// heartbeats catch up.
+// heartbeats catch up. While the listener is down no notification arrives,
+// so the heartbeats wake the fan-out themselves, at most once per deafReload
+// per environment.
 type RulesetStream struct {
 	cache    *RulesetCache
+	clock    clock.Clock
 	rulesets appdelivery.Rulesets
 	log      *slog.Logger
 
@@ -40,6 +50,8 @@ type RulesetStream struct {
 
 	mu     sync.Mutex
 	closed bool
+	// up is set while the listener listens.
+	up     bool
 	topics map[workspace.EnvironmentID]*topic
 }
 
@@ -56,6 +68,9 @@ type topic struct {
 	// after missing one, so the heartbeats look for it until a reload
 	// succeeds.
 	unsure bool
+	// reloadedAt is when the fan-out last began a cycle, or the topic was
+	// made.
+	reloadedAt time.Time
 }
 
 // NewRulesetStream returns the fan-out in front of cache, reloading
@@ -65,7 +80,7 @@ func NewRulesetStream(cache *RulesetCache, log *slog.Logger) *RulesetStream {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	s := &RulesetStream{cache: cache, rulesets: cache.Unmeasured(), log: log, topics: map[workspace.EnvironmentID]*topic{}}
+	s := &RulesetStream{cache: cache, clock: cache.clock, rulesets: cache.Unmeasured(), log: log, topics: map[workspace.EnvironmentID]*topic{}}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	return s
 }
@@ -84,11 +99,12 @@ func (s *RulesetStream) Close() {
 // down.
 func (s *RulesetStream) Listening(up bool) {
 	s.cache.Listening(up)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.up = up
 	if !up {
 		return
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	for environment, t := range s.topics {
 		s.wake(environment, t)
 	}
@@ -120,11 +136,18 @@ func (s *RulesetStream) Received(payload string) {
 
 // Latest returns the newest version of environment heard of while it has
 // streams, or above every version while its last reload failed, since the
-// version that reload was looking for may be known nowhere else.
+// version that reload was looking for may be known nowhere else. While the
+// listener is down it also wakes the environment's fan-out when it has not
+// reloaded for deafReload: no notification would tell of a version another
+// replica committed, and the fan-out offers what it loads to every stream,
+// so the one reload serves them all.
 func (s *RulesetStream) Latest(environment workspace.EnvironmentID) int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	t, ok := s.topics[environment]
+	if ok && !s.up && !t.running && s.clock.Now().Sub(t.reloadedAt) >= deafReload {
+		s.wake(environment, t)
+	}
 	switch {
 	case !ok:
 		return 0
@@ -141,7 +164,7 @@ func (s *RulesetStream) Subscribe(environment workspace.EnvironmentID) appdelive
 	defer s.mu.Unlock()
 	t, ok := s.topics[environment]
 	if !ok {
-		t = &topic{subs: map[*subscription]struct{}{}}
+		t = &topic{subs: map[*subscription]struct{}{}, reloadedAt: s.clock.Now()}
 		s.topics[environment] = t
 	}
 	sub := &subscription{stream: s, environment: environment, topic: t, changed: make(chan struct{}, 1)}
@@ -190,6 +213,7 @@ func (s *RulesetStream) fanOut(ctx context.Context, environment workspace.Enviro
 	for {
 		s.mu.Lock()
 		t.dirty = false
+		t.reloadedAt = s.clock.Now()
 		s.mu.Unlock()
 
 		loadCtx, cancel := context.WithTimeout(ctx, sharedLoadTimeout)

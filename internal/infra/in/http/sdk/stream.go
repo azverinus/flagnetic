@@ -118,7 +118,7 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 				}
 			}
 			ctx, cancel = context.WithTimeout(r.Context(), appdelivery.RulesetWait)
-			version, err := a.h.WatchRuleset.CatchUp(ctx, p.key, sent)
+			version, err := a.h.WatchRuleset.CatchUp(ctx, p.key, sub, sent)
 			cancel()
 			if err == nil {
 				send(version)

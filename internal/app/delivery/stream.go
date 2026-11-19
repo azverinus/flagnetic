@@ -61,15 +61,21 @@ func (h *WatchRuleset) Open(ctx context.Context, key delivery.SDKKey) (RulesetSu
 }
 
 // CatchUp returns the current version of key's environment when the
-// replica has heard of a version above sent, which a failed reload may
-// have left unoffered; otherwise sent.
-func (h *WatchRuleset) CatchUp(ctx context.Context, key delivery.SDKKey, sent int64) (int64, error) {
-	if h.streams.Latest(key.Environment) <= sent {
-		return sent, nil
+// replica has heard of a version above sent that sub has not been offered,
+// which a failed reload may have left unoffered; otherwise the newest of
+// sent and what sub holds. A version sub holds is returned without a load:
+// the fan-out's reload that offered it is the one every stream shares, and a
+// load per stream here would multiply it by the number of streams.
+func (h *WatchRuleset) CatchUp(ctx context.Context, key delivery.SDKKey, sub RulesetSubscription, sent int64) (int64, error) {
+	latest := h.streams.Latest(key.Environment)
+	// Read after the latest, so every version offered before it is counted.
+	have := max(sent, sub.Version())
+	if latest <= have {
+		return have, nil
 	}
 	rs, err := h.rulesets.Ruleset(ctx, key.Environment)
 	if err != nil {
-		return sent, err
+		return have, err
 	}
-	return max(rs.Version, sent), nil
+	return max(rs.Version, have), nil
 }
