@@ -136,11 +136,11 @@ func TestASignInHeldWhileLocalLoginIsSwitchedOffOpensNoSession(t *testing.T) {
 	}
 }
 
-// TestASingleSignOnSessionOpenedWhileItsDomainIsEnforcedToAnotherProviderIsRefusedOrEnded opens the session
+// TestASingleSignOnSessionOpenedWhileItsDomainIsEnforcedToAnotherProviderIsEnded opens the session
 // inside a unit of work that stays open while the settings change starts,
 // so the change waits on it and ends the session once it commits: with the
 // settings read from a cache that has not heard of the change.
-func TestASingleSignOnSessionOpenedWhileItsDomainIsEnforcedToAnotherProviderIsRefusedOrEnded(t *testing.T) {
+func TestASingleSignOnSessionOpenedWhileItsDomainIsEnforcedToAnotherProviderIsEnded(t *testing.T) {
 	pool := testkit.Pool(t)
 	const domain = "enforced-sso.example"
 	other := aProvider(t, domain)
@@ -177,8 +177,8 @@ func TestASingleSignOnSessionOpenedWhileItsDomainIsEnforcedToAnotherProviderIsRe
 	if enforced != nil {
 		t.Fatalf("enforcing the domain: %v", enforced)
 	}
-	if err != nil && codeOf(err) != "sso_required" {
-		t.Fatalf("the sign-in: %v, want it opened or refused sso_required", err)
+	if err != nil {
+		t.Fatalf("the sign-in, opened before the change began: %v", err)
 	}
 	if live := liveSessionsOf(t, member); len(live) != 0 {
 		t.Errorf("%d live sessions through provider a once the domain is enforced to b, want none", len(live))
@@ -212,5 +212,105 @@ func TestASingleSignOnSignInStartedUnderStaleSettingsIsRefusedOnceTheDomainIsEnf
 	}
 	if live := liveSessionsOf(t, member); len(live) != 0 {
 		t.Errorf("%d live sessions, want none", len(live))
+	}
+}
+
+// closeLocalLogin stores the settings in force with local login switched off,
+// as a change that commits after a handler read them does, and returns what
+// restores them; the test restores them too when it ends.
+func closeLocalLogin(t *testing.T) (open func()) {
+	t.Helper()
+	store := pgaccess.NewStore(testkit.Pool(t))
+	before, err := store.AuthSettings(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	open = func() {
+		if err := store.SaveAuthSettings(context.WithoutCancel(t.Context()), before); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(open)
+	closed := before
+	closed.LocalLoginEnabled = false
+	if err = store.SaveAuthSettings(t.Context(), closed); err != nil {
+		t.Fatal(err)
+	}
+	return open
+}
+
+func TestAPasswordResetCompletedUnderStaleSettingsIsRefusedOnceLocalLoginIsClosedAndStaysOpen(t *testing.T) {
+	pool := testkit.Pool(t)
+	c := clock.System{}
+	tx, store, audit, ids := postgres.NewTransactor(pool), pgaccess.NewStore(pool), testkit.Record(pool), id.NewSource(c)
+	m := testkit.NewMember(t, pool)
+	member := access.Member{ID: m.ID, Email: m.Email, Status: access.MemberActive}
+	admin := testkit.NewMember(t, pool, testkit.AsInstanceAdmin())
+	caller := access.Caller{Method: access.MethodSession, Member: &access.Member{ID: admin.ID, Email: admin.Email, Status: access.MemberActive, InstanceAdmin: true}}
+	issued, err := appaccess.NewIssuePasswordReset(tx, store, audit, c, ids, rand.Reader).Handle(t.Context(), appaccess.IssuePasswordResetCommand{
+		Caller: caller, Member: m.ID, Request: governance.Request{Actor: appaccess.ActorOf(caller)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.RecordSecret(issued.Secret.Reveal())
+	before, err := store.AuthSettings(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	complete := appaccess.NewCompletePasswordReset(appaccess.CompletePasswordResetDeps{
+		Tx: tx, Store: store, Settings: staleSettings{before}, Hasher: password.NewHasher(cheap), Audit: audit,
+		Clock: c, IDs: ids, Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32),
+	})
+	cmd := appaccess.CompletePasswordResetCommand{Secret: issued.Secret, Password: secret.New("harbour-lantern-quiet-4410"), ClientIP: anAddress()}
+	open := closeLocalLogin(t)
+
+	if _, err = complete.Handle(t.Context(), cmd); codeOf(err) != "local_login_disabled" {
+		t.Fatalf("completing the reset once local login is closed: %v, want local_login_disabled", err)
+	}
+	if live := liveSessionsOf(t, member); len(live) != 0 {
+		t.Errorf("%d live sessions of the member, want none", len(live))
+	}
+	open()
+	if _, err = complete.Handle(t.Context(), cmd); err != nil {
+		t.Errorf("completing the reset once local login is open again: %v, want it still open", err)
+	}
+}
+
+func TestAnInvitationAcceptedUnderStaleSettingsIsRefusedOnceLocalLoginIsClosedAndStaysOpen(t *testing.T) {
+	pool := testkit.Pool(t)
+	c := clock.System{}
+	tx, store, audit, ids := postgres.NewTransactor(pool), pgaccess.NewStore(pool), testkit.Record(pool), id.NewSource(c)
+	invited, err := appaccess.NewInviteMember(tx, store, audit, c, ids, rand.Reader, nil).Handle(t.Context(), appaccess.InviteMemberCommand{
+		Email: strings.ToLower(rand.Text()) + "@example.com", DisplayName: "Invited", Request: governance.Request{Actor: cli},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testkit.RecordSecret(invited.Invitation.Secret.Reveal())
+	before, err := store.AuthSettings(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	accept := appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
+		Tx: tx, Store: store, Settings: staleSettings{before}, Hasher: password.NewHasher(cheap), Audit: audit,
+		Clock: c, IDs: ids, Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32),
+	})
+	cmd := appaccess.AcceptInvitationCommand{Secret: invited.Invitation.Secret, Password: secret.New("harbour-lantern-quiet-4410"), ClientIP: anAddress()}
+	open := closeLocalLogin(t)
+
+	if _, err = accept.Handle(t.Context(), cmd); codeOf(err) != "local_login_disabled" {
+		t.Fatalf("accepting the invitation once local login is closed: %v, want local_login_disabled", err)
+	}
+	m, _, err := store.LockMember(t.Context(), invited.Member.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Status != access.MemberInvited {
+		t.Errorf("the member is %s once the acceptance was refused, want invited", m.Status)
+	}
+	open()
+	if _, err = accept.Handle(t.Context(), cmd); err != nil {
+		t.Errorf("accepting the invitation once local login is open again: %v, want it still open", err)
 	}
 }
