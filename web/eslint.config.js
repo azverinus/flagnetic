@@ -5,6 +5,28 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+// The class names a screen may not write, as regular expressions over a
+// class-name string: a token starts the string or follows a space, and may
+// carry variant prefixes (`md:`, `max-sm:`).
+const classToken = (name) => `/(^|\\s)([a-z0-9[\\]-]+:)*(${name})(\\s|$)/`;
+const screenClassRules = [
+  {
+    pattern: classToken("max-w-(?!full(\\s|$))[^\\s]+|mx-auto"),
+    message:
+      'A screen does not set its own width or centre itself: wrap it in <Page measure="full" | "form">, and put sections in <Card>.',
+  },
+  {
+    pattern: classToken("p-6|px-6|pt-6"),
+    message:
+      "A screen does not set page padding: <Page> owns it (24 px, 16 px under 640 px). Sections get their padding from <Card>/<CardContent>.",
+  },
+  {
+    pattern: classToken("uppercase"),
+    message:
+      "The console has no uppercase styling: write the label in sentence case, and use <PanelGroup label> or a card title for a group name.",
+  },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -104,6 +126,31 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // A screen does not set its own width, centring, page padding or
+    // casing: `Page` owns the measure and the padding, `Card` the section
+    // surface, and the type scale has no uppercase. Each screen choosing its
+    // own wrapper is what once left the content's left edge moving between
+    // a list and the object it opens. `max-w-full` only stops a child from
+    // outgrowing its parent, so it stays allowed. The kit (`components/ui/`)
+    // is where these decisions live.
+    files: ["apps/console/src/routes/**/*.{ts,tsx}", "apps/console/src/components/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "apps/console/src/components/ui/**"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...screenClassRules.flatMap(({ pattern, message }) => [
+          { selector: `Literal[value=${pattern}]`, message },
+          { selector: `TemplateElement[value.raw=${pattern}]`, message },
+        ]),
+      ],
+    },
+  },
+  {
+    // The signed-out pages are one centred card: tokens and type only.
+    files: ["apps/console/src/components/signed-out-card.tsx"],
+    rules: { "no-restricted-syntax": "off" },
   },
   {
     files: ["**/*.mjs", "**/*.js"],
