@@ -167,10 +167,7 @@ func (a *api) SignIn(ctx context.Context, req SignInRequestObject) (SignInRespon
 	if err != nil {
 		return nil, err
 	}
-	me, err := a.meOf(ctx, res.Caller)
-	if err != nil {
-		return nil, err
-	}
+	me := a.meAfterWrite(ctx, res.Caller)
 	cookie := sessionCookie(ctx, res.Cookie.Reveal())
 	return SignIn200JSONResponse{Body: me, Headers: SignIn200ResponseHeaders{SetCookie: &cookie}}, nil
 }
@@ -263,10 +260,7 @@ func (a *api) AcceptInvitation(ctx context.Context, req AcceptInvitationRequestO
 	if err != nil {
 		return nil, err
 	}
-	me, err := a.meOf(ctx, res.Caller)
-	if err != nil {
-		return nil, err
-	}
+	me := a.meAfterWrite(ctx, res.Caller)
 	cookie := sessionCookie(ctx, res.Cookie.Reveal())
 	return AcceptInvitation200JSONResponse{Body: me, Headers: AcceptInvitation200ResponseHeaders{SetCookie: &cookie}}, nil
 }
@@ -303,10 +297,7 @@ func (a *api) CompletePasswordReset(ctx context.Context, req CompletePasswordRes
 	if err != nil {
 		return nil, err
 	}
-	me, err := a.meOf(ctx, res.Caller)
-	if err != nil {
-		return nil, err
-	}
+	me := a.meAfterWrite(ctx, res.Caller)
 	cookie := sessionCookie(ctx, res.Cookie.Reveal())
 	return CompletePasswordReset200JSONResponse{Body: me, Headers: CompletePasswordReset200ResponseHeaders{SetCookie: &cookie}}, nil
 }
