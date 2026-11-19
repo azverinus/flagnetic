@@ -51,7 +51,7 @@ if command -v "$promtool" >/dev/null 2>&1; then
   echo "== promtool check rules"
   rules=$(mktemp)
   trap 'rm -f "$rules"' EXIT
-  "$helm" template flags "$chart" -f "$chart/ci/default-values.yaml" --set prometheusRule.enabled=true \
+  "$helm" template flags "$chart" -f "$chart/ci/default-values.yaml" --set prometheusRule.enabled=true --kube-version "${versions%%,*}" \
     --show-only templates/prometheusrule.yaml | sed -n '/^spec:/,$p' | sed '1d; s/^  //' >"$rules"
   "$promtool" check rules "$rules"
 elif [ -n "${CI:-}" ]; then
