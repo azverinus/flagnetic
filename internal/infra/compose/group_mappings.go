@@ -24,6 +24,10 @@ var _ appidentity.ProviderAccess = providerAccess{}
 
 func (a providerAccess) KnownRole(name string) bool { return a.svc.KnownRole(name) }
 
+func (a providerAccess) LockInstanceAdmins(ctx context.Context) error {
+	return a.svc.LockInstanceAdmins(ctx)
+}
+
 func (a providerAccess) ReplaceAccess(ctx context.Context, cmd appidentity.AccessCommand) (appidentity.AccessChange, error) {
 	grants := make([]appaccess.ProviderRole, len(cmd.Grants))
 	for i, g := range cmd.Grants {

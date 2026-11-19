@@ -99,7 +99,7 @@ func TestTheProvidersAcceptingAnInvitationVouchForItsEmail(t *testing.T) {
 // KELVIN SIGN to k, so an address written with it must not be taken for the
 // ASCII one.
 func TestEmailsFoldAsciiLettersOnly(t *testing.T) {
-	const kelvin = "K"
+	const kelvin = "\u212A"
 	for _, tc := range []struct {
 		a, b string
 		same bool

@@ -929,7 +929,7 @@ func TestAnEmailThatOnlyUnicodeFoldingEquatesLinksNoMember(t *testing.T) {
 	e := start(t)
 	slug := e.forged(t, idp, func(p *provider) { p.autoProvision, p.linkByEmail = false, true })
 	kate := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail("kate"+strings.ToLower(rand.Text()[:6])+"@example.com"))
-	forged := "K" + kate.Email[1:]
+	forged := "\u212A" + kate.Email[1:]
 
 	idp.NextClaims(map[string]any{"sub": "sub-forged", "email": forged, "email_verified": true})
 	b := testkit.NewBrowser(t, e.srv.URL)

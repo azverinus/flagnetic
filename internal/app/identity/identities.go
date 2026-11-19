@@ -193,11 +193,35 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		return errIdentityNotFound
 	}
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		// Taking back what a provider brought may demote the member, which
-		// takes the instance admins' lock; it is taken before the member's,
-		// the order every change of access takes, so an unlink and a change
-		// to the same member made at once never deadlock.
-		if err := h.d.Members.LockInstanceAdmins(ctx); err != nil {
+		// The provider of the identity is held first, then the instance
+		// admins, then the member: the order a sign-in through the identity
+		// and a replacement of the provider's group mappings take them in, so
+		// an unlink made at once with either never deadlocks, and a
+		// replacement cannot grant again from a claim this unlink deletes.
+		// Taking back what a provider brought may demote the member, which is
+		// why the admins come before the member's lock. The identity is
+		// looked for before anything is held, to know its provider, and again
+		// once the member is held.
+		held, err := h.d.Identities.MemberIdentities(ctx, cmd.Member)
+		if err != nil {
+			return err
+		}
+		slug := ""
+		for _, i := range held {
+			if i.ID == identityID {
+				slug = i.ProviderSlug
+			}
+		}
+		if slug == "" {
+			return errIdentityNotFound
+		}
+		if _, err = lockProvider(ctx, h.d.Providers, slug); err != nil {
+			if errors.Is(err, errProviderNotFound) {
+				return errIdentityNotFound
+			}
+			return err
+		}
+		if err = h.d.Members.LockInstanceAdmins(ctx); err != nil {
 			return err
 		}
 		m, found, err := h.d.Members.LockMember(ctx, cmd.Member)
@@ -207,8 +231,7 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		if !found {
 			return errMemberNotFound
 		}
-		held, err := h.d.Identities.MemberIdentities(ctx, cmd.Member)
-		if err != nil {
+		if held, err = h.d.Identities.MemberIdentities(ctx, cmd.Member); err != nil {
 			return err
 		}
 		var unlinking *LinkedIdentity

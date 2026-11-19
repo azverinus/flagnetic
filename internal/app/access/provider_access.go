@@ -82,6 +82,13 @@ type ProviderAccessResult struct {
 	KeptInstanceAdmin bool
 }
 
+// LockInstanceAdmins holds the instance admins until the unit of work ends,
+// the lock Replace takes first, for a caller that reads what Replace is given
+// from: the order is the provider, the instance admins, then the member.
+func (a *ProviderAccess) LockInstanceAdmins(ctx context.Context) error {
+	return a.store.LockInstanceAdmins(ctx)
+}
+
 // Replace makes the grants of the provider's mappings to the member those the
 // command lists, removing the provider's others, and makes them instance
 // admin or no longer, when the provider is the one that made them. Grants of
