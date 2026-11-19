@@ -276,6 +276,14 @@ func (s *SSO) record(ctx context.Context, now time.Time, req governance.Request,
 	return s.audit.Record(ctx, entry)
 }
 
+// HoldAuthSettings holds the auth settings against a change until the unit
+// of work ends, as OpenSession does: a sign-in takes it before locking
+// anything else, the order a change of the settings or of a provider takes.
+func (s *SSO) HoldAuthSettings(ctx context.Context) error {
+	_, err := s.store.ShareAuthSettings(ctx)
+	return err
+}
+
 // sessionRecord is the audit record of action, a sign-out, of m and the
 // session s they ended: it names the method s was opened by and, for an auth
 // provider's, the provider.

@@ -172,6 +172,14 @@ type Members interface {
 	// while it is open; identity.ErrMemberNotFound when they are no longer
 	// invited.
 	ActivateInvited(ctx context.Context, member identity.MemberID, kind identity.Kind, provider, requestID string) (MemberRecord, error)
+	// HoldAuthSettings holds the auth settings against a change until the
+	// unit of work ends. A sign-in takes it before any other lock: a change
+	// of the settings or of a provider locks the settings first and the
+	// provider after, so a sign-in that held the provider's row first (by
+	// locking it, or by linking an identity that refers to it) and the
+	// settings only when it opens its session would wait on that change
+	// while the change waits on it.
+	HoldAuthSettings(ctx context.Context) error
 	// OpenSession opens a session of member signed in through provider and
 	// returns the value of its cookie.
 	OpenSession(ctx context.Context, s SessionRequest) (secret.String, error)
@@ -591,6 +599,9 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 		linked identity.Identity
 		member MemberRecord
 	)
+	if err := h.d.Members.HoldAuthSettings(ctx); err != nil {
+		return secret.String{}, err
+	}
 	if claims.HasGroups {
 		// Replacing the mappings holds the provider until it has run them for
 		// every claim stored, so a sign-in waits for it and then applies the

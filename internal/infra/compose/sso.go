@@ -85,6 +85,10 @@ func (a ssoMembers) ActivateInvited(ctx context.Context, member identity.MemberI
 	return recordOf(m), err
 }
 
+func (a ssoMembers) HoldAuthSettings(ctx context.Context) error {
+	return a.sso.HoldAuthSettings(ctx)
+}
+
 func (a ssoMembers) OpenSession(ctx context.Context, s appidentity.SessionRequest) (secret.String, error) {
 	cookie, err := a.sso.OpenSession(ctx, appaccess.SSOSignIn{
 		Member: memberOf(s.Member), Method: signInMethodOf(s.Kind), Provider: s.Provider, ClientIP: s.ClientIP, UserAgent: s.UserAgent, RequestID: s.RequestID,

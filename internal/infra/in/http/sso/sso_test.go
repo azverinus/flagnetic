@@ -2,6 +2,7 @@ package sso_test
 
 import (
 	"cmp"
+	"context"
 	"crypto/rand"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,9 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -862,4 +866,48 @@ func (e env) signInAs(t *testing.T, b *testkit.Browser, slug string) *testkit.Br
 		t.Fatalf("the sign-in ended at %s", v.URL)
 	}
 	return b
+}
+
+// TestASignInCompletedWhileAProviderIsChangedWaitsForTheChange holds the auth
+// settings and then the provider, the order a change of a provider takes,
+// while a first sign-in through it completes: the sign-in waits for the
+// change, and neither is ended as a deadlock.
+func TestASignInCompletedWhileAProviderIsChangedWaitsForTheChange(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, nil)
+	email := uniqueEmail()
+	idp.NextClaims(map[string]any{"email": email, "groups": []string{"engineering"}})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	o := e.opts()
+	o.Stop = func(u *url.URL) bool { return strings.HasPrefix(u.Path, "/sso/complete/") }
+	held := e.signIn(t, b, slug, "", o)
+	if !strings.HasPrefix(held.URL.Path, "/sso/complete/") {
+		t.Fatalf("the sign-in reached %s before completing", held.URL)
+	}
+
+	var (
+		wg   sync.WaitGroup
+		done testkit.Visit
+	)
+	err := postgres.NewTransactor(e.pool).Within(t.Context(), func(ctx context.Context) error {
+		if _, err := pgaccess.NewStore(e.pool).LockAuthSettings(ctx); err != nil {
+			return err
+		}
+		wg.Go(func() { done = b.Visit(t, held.URL.String(), e.opts()) })
+		// The sign-in runs as far as it can before the provider is locked.
+		time.Sleep(300 * time.Millisecond)
+		_, err := pgidentity.NewStore(e.pool).LockProvider(ctx, slug)
+		return err
+	})
+	wg.Wait()
+	if err != nil {
+		t.Fatalf("the change of the provider: %v", err)
+	}
+	if done.URL.Path != "/" {
+		t.Fatalf("the sign-in ended at %s", done.URL)
+	}
+	if me := signedIn(t, b); me == nil || me.Member == nil || string(me.Member.Email) != email {
+		t.Errorf("signed in as %v, want %s", me, email)
+	}
 }
