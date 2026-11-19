@@ -7,10 +7,11 @@ module Flagnetic
     # ruleset, compiled once, and what the ruleset holds that this evaluator
     # does not know.
     class Index
-      # invalid_serves marks, by rule index, the experiment serves that
-      # break the invariants every experiment serve holds (see
-      # Compiler#valid_experiment?), so evaluation reaching one answers
-      # inconsistent_ruleset without checking them again.
+      # invalid_serves marks, by rule index, the rollout and experiment
+      # serves that break the invariants every such serve holds (see
+      # Compiler#valid_rollout? and Compiler#valid_experiment?), so
+      # evaluation reaching one answers inconsistent_ruleset without
+      # checking them again.
       CompiledFlag = Struct.new(:flag, :variations, :rules, :invalid_serves)
       # CompiledCondition is a condition prepared once at decode time. error
       # is set when it cannot be evaluated against this document; evaluating
@@ -78,7 +79,10 @@ module Flagnetic
       def flag(flag)
         variations = flag.variations.to_h { |v| [v.key, v.value] }.freeze
         rules = flag.rules.map { |r| r.conditions.map { |c| compile(c) }.freeze }.freeze
-        invalid_serves = flag.rules.map { |r| r.serve.kind == "experiment" && !valid_experiment?(r.serve, variations) }
+        invalid_serves = flag.rules.map do |r|
+          (r.serve.kind == "rollout" && !valid_rollout?(r.serve)) ||
+            (r.serve.kind == "experiment" && !valid_experiment?(r.serve, variations))
+        end
         Index::CompiledFlag.new(flag, variations, rules, invalid_serves.freeze).freeze
       end
 
@@ -121,6 +125,13 @@ module Flagnetic
 
       def add_invalid(found, compiled)
         found << compiled.error if compiled.error && !compiled.unsupported && !found.include?(compiled.error)
+      end
+
+      # valid_rollout? reports whether a rollout serve holds what bucketing
+      # a unit relies on: a unit type and a salt, and a percentage within 0
+      # to 10000. The variation is checked when it is served.
+      def valid_rollout?(serve)
+        !serve.unit_type.empty? && !serve.salt.empty? && (0..BUCKETS).cover?(serve.percentage)
       end
 
       # valid_experiment? reports whether an experiment serve holds what
@@ -179,6 +190,11 @@ module Flagnetic
 
         type = types[cond.attribute]
         return invalid(cond, "attribute #{cond.attribute.inspect} is not declared") unless type
+
+        unless Operators.known_type?(type)
+          return invalid(cond, "attribute #{cond.attribute.inspect}: unknown attribute type #{type.inspect}",
+                         construct(:attribute_type, type))
+        end
 
         match = Operators.compile(type, cond.op, cond.value)
         Index::CompiledCondition.new(cond.kind, nil, cond.attribute, units.key?(cond.attribute), match).freeze
@@ -260,7 +276,11 @@ module Flagnetic
           r = serve(cf, o.variation, reason: :override, override_influenced: true)
           return r if r.reason == :error
 
+          # The shadow runs while the flag is still on the prerequisite path, so
+          # what it memoizes through a cycle must not outlive it.
+          saved = @memo.dup
           shadow = body(cf)
+          @memo = saved
           return r unless shadow.reason == :experiment
 
           x = shadow.experiment.to_h.merge(variation: r.variation, override: true)

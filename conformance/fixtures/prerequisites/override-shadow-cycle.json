@@ -1,0 +1,132 @@
+{
+  "name": "prerequisites/override-shadow-cycle",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": false
+    },
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [],
+    "segments": [],
+    "flags": [
+      {
+        "key": "a",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [
+          {
+            "flag": "b",
+            "variation": "true"
+          }
+        ],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "u1",
+            "variation": "true"
+          }
+        ],
+        "rules": []
+      },
+      {
+        "key": "b",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "a",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a flag the override's shadow reached through a cycle is not left as a cycle for the flags after it",
+      "flag": "b",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "the overridden flag serves its override",
+      "flag": "a",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "without the override the cycle is an error",
+      "flag": "b",
+      "context": {
+        "units": {
+          "user": "u2"
+        },
+        "attributes": {}
+      },
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "prerequisite_cycle",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

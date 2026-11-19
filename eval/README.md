@@ -19,7 +19,11 @@ all := rs.EvaluateAll(ctx) // every flag, prerequisites memoized within the call
 
 A ruleset document has one scope, `server`: the whole configuration of an environment, private segments and overrides included. Only a server SDK holding a server key receives it, and `Decode` refuses any other scope. A client SDK (a browser or a mobile app) never receives a ruleset: it posts its context to the server's remote evaluation and receives the served values, so private segments never leave the server.
 
-`Decode` checks every experiment serve once: an experiment key, a unit type and both salts present; a traffic allocation within 0 to 10000; at least two weights, none negative, naming distinct variations of the flag and summing to exactly 10000. A flag whose evaluation reaches a serve breaking one of them is an `error` with `inconsistent_ruleset`, as an unsupported rule is, and an SDK serves the caller's default for it.
+`Decode` checks every rollout and experiment serve once. A rollout serve holds a unit type, a salt and a percentage within 0 to 10000. An experiment serve holds an experiment key, a unit type and both salts; a traffic allocation within 0 to 10000; and at least two weights, none negative, naming distinct variations of the flag and summing to exactly 10000. A flag whose evaluation reaches a serve breaking one of them (its rule matches) is an `error` with `inconsistent_ruleset`, as an unsupported rule is, and an SDK serves the caller's default for it.
+
+A decoded `Ruleset` is immutable and safe for concurrent use, and shares its data with every result: `Result.Value` is the variation's own bytes and `Flag` returns the flag the evaluator reads. A caller never modifies either; copy first.
+
+The unsupported-rule report names an operator, a condition kind, a serve kind or an attribute type the evaluator does not know. A flag type it does not know and a field it does not know are not reported.
 
 ## The result shape
 

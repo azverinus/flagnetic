@@ -1,0 +1,154 @@
+{
+  "name": "rollout/invalid-missing-unit-type",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": false
+    },
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "invalid",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "ios"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          },
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "rollout",
+              "variation": "true",
+              "percentage": 5000,
+              "salt": "k3f9s0d2m1x8q7wz"
+            }
+          }
+        ]
+      },
+      {
+        "key": "valid",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a rollout serve without a unit type is an inconsistent ruleset where evaluation reaches it",
+      "flag": "invalid",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a rule matching before the invalid serve still serves",
+      "flag": "invalid",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "ios"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "another flag of the document is unaffected",
+      "flag": "valid",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

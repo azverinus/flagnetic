@@ -45,9 +45,9 @@ module Flagnetic
     # ERROR_CODES say why a result has reason error.
     ERROR_CODES = %i[flag_not_found prerequisite_cycle inconsistent_ruleset].freeze
 
-    # Construct is an operator, a condition kind or a serve kind of a
-    # ruleset that this evaluator does not know. kind is :operator,
-    # :condition_kind or :serve_kind.
+    # Construct is an operator, a condition kind, a serve kind or an
+    # attribute type of a ruleset that this evaluator does not know. kind is
+    # :operator, :condition_kind, :serve_kind or :attribute_type.
     Construct = Struct.new(:kind, :name) do
       def as_json
         { "kind" => kind.to_s, "name" => name }

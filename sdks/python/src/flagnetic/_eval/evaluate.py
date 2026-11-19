@@ -88,7 +88,11 @@ class _Evaluation:
             result = self.serve(f, variation, Result(reason=REASON_OVERRIDE, override_influenced=True))
             if result.reason == REASON_ERROR:
                 return result
+            # The shadow runs while f is still on the prerequisite path, so what
+            # it memoizes through a cycle must not outlive it.
+            saved = dict(self.memo)
             shadow = self.body(f)
+            self.memo = saved
             if shadow.reason == REASON_EXPERIMENT and shadow.experiment is not None:
                 detail = shadow.experiment
                 result.experiment = ExperimentDetail(
