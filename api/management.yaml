@@ -25,7 +25,11 @@ info:
     the cookie, a read included, is refused `cross_origin` when the browser
     says it comes from another origin.
 
-    Errors are problem documents (RFC 9457) with a stable `code`.
+    Errors are problem documents (RFC 9457) with a stable `code`. Every
+    answer of this API carries `Cache-Control: no-store` (the change stream
+    `no-cache`), whatever its status, since what it holds belongs to one
+    caller and no shared cache may serve it to another. The SDK API's ruleset
+    is another document, with its own `ETag` and `If-None-Match`.
 
     A JSON request body that is not an object, or leaves out a member its
     schema lists as `required` (or sets one to `null` that may not be), is

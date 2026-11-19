@@ -284,11 +284,27 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 	for pattern := range operations.Table {
 		routes = append(routes, pattern)
 	}
+	// Every answer is about one caller's session or instance and may hold
+	// what only they may read (who they are, the full ruleset, a one-time
+	// secret), so no shared cache may store one, 404s and refusals included. A
+	// handler that must be cacheable sets its own Cache-Control, and is listed
+	// in TestOnlyListedHandlersSetTheirOwnCacheControl (the change stream, whose
+	// document says no-cache).
+	edge.Wrap(BaseURL+"/", noStore)
 	edge.Wrap(BaseURL+"/", deprecation.Middleware(BaseURL, Deprecated, routes...))
 	HandlerWithOptions(rawBodies{ServerInterface: strict, a: a}, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},
 		ErrorHandlerFunc: invalidRequest,
+	})
+}
+
+// noStore marks every answer of the API as one no cache may keep, before any
+// handler runs, so the handlers added later are covered too.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
 	})
 }
 
