@@ -135,7 +135,9 @@ func TestTheOperationsOpeningASessionAndCheckingAPasswordAreRead(t *testing.T) {
 func TestEveryWriteToMeAndEveryTokenCreationNeedsASession(t *testing.T) {
 	for pattern, e := range Table {
 		method, path, _ := strings.Cut(pattern, " ")
-		createsToken := method == "POST" && strings.HasSuffix(path, "/tokens")
+		// The last segment names the tokens created: /tokens, /scim-tokens.
+		last := path[strings.LastIndex(path, "/")+1:]
+		createsToken := method == "POST" && strings.HasSuffix(last, "tokens")
 		writesMe := method != "GET" && (path == "/me" || strings.HasPrefix(path, "/me/"))
 		if (createsToken || writesMe) && !e.SessionRequired {
 			t.Errorf("%s (%s) does not require a session", pattern, e.Name)
@@ -147,7 +149,9 @@ func TestEveryWriteToMeAndEveryTokenCreationNeedsASession(t *testing.T) {
 // would leave behind access that outlives the token's own revocation, so each
 // operation that creates or changes who can sign in needs a session.
 func TestEveryOperationCreatingAccessNeedsASession(t *testing.T) {
-	for _, name := range []string{"createGrant", "inviteMember", "reactivateMember", "updateMember", "issuePasswordReset", "reissueInvitation", "inviteProjectMember"} {
+	for _, name := range []string{"createGrant", "inviteMember", "reactivateMember", "updateMember", "issuePasswordReset", "reissueInvitation", "inviteProjectMember",
+		"replaceAuthProviderGroupMappings", "createAuthProvider", "updateAuthProvider", "enableAuthProvider",
+		"completeAuthProviderCertificateRotation", "updateAuthSettings"} {
 		found := false
 		for pattern, e := range Table {
 			if e.Name != name {
@@ -190,5 +194,13 @@ func TestTheOperationsAcceptingOnlyJSONAreRead(t *testing.T) {
 		if got := ops[pattern].JSONOnly; got != want {
 			t.Errorf("%s: JSON only = %v, want %v", pattern, got, want)
 		}
+	}
+}
+
+func TestAMisspeltExtensionOfAnOperationIsRefused(t *testing.T) {
+	doc := "paths:\n  /me:\n    patch:\n      operationId: updateMe\n      x-permission: member\n      x-session-requried: true\n"
+	_, err := Read([]byte(doc))
+	if err == nil || !strings.Contains(err.Error(), "x-session-requried") {
+		t.Errorf("Read = %v, want the misspelt extension named", err)
 	}
 }

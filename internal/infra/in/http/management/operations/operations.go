@@ -70,6 +70,16 @@ func Read(doc []byte) (map[string]Entry, error) {
 			if !slices.Contains(methods, method) {
 				continue // parameters, summary and the like
 			}
+			var keys map[string]yaml.Node
+			if err := node.Decode(&keys); err != nil {
+				errs = append(errs, fmt.Errorf("%s %s: %w", method, path, err))
+				continue
+			}
+			if unknown := unknownExtensions(keys); len(unknown) > 0 {
+				errs = append(errs, fmt.Errorf("%s %s: unknown extension %s; a misspelt one would silently leave the operation open",
+					strings.ToUpper(method), path, strings.Join(unknown, ", ")))
+				continue
+			}
 			var o struct {
 				OperationID     string `yaml:"operationId"`
 				Permission      string `yaml:"x-permission"`
@@ -112,6 +122,25 @@ func Read(doc []byte) (map[string]Entry, error) {
 		return nil, errors.Join(errs...)
 	}
 	return ops, nil
+}
+
+// extensions are the x- keys an operation may carry, each read by Read.
+var extensions = []string{
+	"x-permission", "x-session-required", "x-opens-session", "x-json-only", "x-checks-password", "x-max-body-bytes",
+}
+
+// unknownExtensions returns the x- keys among keys that Read does not read,
+// sorted: one misspelt (x-session-requried) would otherwise be ignored, and
+// the operation would stay open to what it was meant to refuse.
+func unknownExtensions(keys map[string]yaml.Node) []string {
+	var out []string
+	for k := range keys {
+		if strings.HasPrefix(k, "x-") && !slices.Contains(extensions, k) {
+			out = append(out, k)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // render returns the Go source of the operation table.

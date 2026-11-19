@@ -22,7 +22,7 @@ func freshInstance(t *testing.T, c clock.Clock) (*testkit.Server, *pgxpool.Pool,
 	t.Helper()
 	pool := testkit.FreshPool(t)
 	srv := testkit.StartServer(t, testkit.WithPool(pool), testkit.WithClock(c))
-	return srv, pool, testkit.Client(t, srv, testkit.Bootstrap(t, pool))
+	return srv, pool, testkit.InstanceAdminSessionOn(t, srv, pool)
 }
 
 // defaultSettings are a fresh instance's auth settings as the API answers
@@ -150,14 +150,19 @@ func TestEverythingUnderAuthSettingsNeedsAnInstanceAdmin(t *testing.T) {
 			t.Errorf("%s: GET = %v %s, %v; want 403 forbidden", name, get.StatusCode(), get.Body, err)
 		}
 		put, err := c.UpdateAuthSettingsWithResponse(t.Context(), defaultSettings)
-		if err != nil || put.ApplicationproblemJSON403 == nil || put.ApplicationproblemJSON403.Code != "forbidden" {
-			t.Errorf("%s: PUT = %v %s, %v; want 403 forbidden", name, put.StatusCode(), put.Body, err)
+		// A token never changes these settings, whatever its owner holds.
+		wantCode := "forbidden"
+		if name == "token" {
+			wantCode = "session_required"
+		}
+		if err != nil || put.ApplicationproblemJSON403 == nil || put.ApplicationproblemJSON403.Code != wantCode {
+			t.Errorf("%s: PUT = %v %s, %v; want 403 %s", name, put.StatusCode(), put.Body, err, wantCode)
 		}
 	}
 	read := testkit.Client(t, srv, testkit.MemberToken(t, testkit.Pool(t), access.ScopeRead))
 	if put, err := read.UpdateAuthSettingsWithResponse(t.Context(), defaultSettings); err != nil ||
-		put.ApplicationproblemJSON403 == nil || put.ApplicationproblemJSON403.Code != "insufficient_scope" {
-		t.Errorf("PUT with a read-only token = %v %s, %v; want 403 insufficient_scope", put.StatusCode(), put.Body, err)
+		put.ApplicationproblemJSON403 == nil || put.ApplicationproblemJSON403.Code != "session_required" {
+		t.Errorf("PUT with a read-only token = %v %s, %v; want 403 session_required", put.StatusCode(), put.Body, err)
 	}
 }
 

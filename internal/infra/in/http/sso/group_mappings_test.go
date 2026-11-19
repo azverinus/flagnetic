@@ -43,7 +43,7 @@ func adminMapping(group string) management.GroupMapping {
 // and returns what running them did.
 func (e env) mapGroups(t *testing.T, slug string, items ...management.GroupMapping) management.GroupMappingsRun {
 	t.Helper()
-	return mapGroupsAs(t, e.admin, slug, items...)
+	return mapGroupsAs(t, e.session(t), slug, items...)
 }
 
 func mapGroupsAs(t *testing.T, c *management.ClientWithResponses, slug string, items ...management.GroupMapping) management.GroupMappingsRun {
@@ -81,7 +81,7 @@ func TestAReplacementOfGroupMappingsNamesTheVersionItRead(t *testing.T) {
 	project := e.project(t)
 	put := func(ifMatch *string, items ...management.GroupMapping) *management.ReplaceAuthProviderGroupMappingsResponse {
 		t.Helper()
-		res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
+		res, err := e.session(t).ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
 			&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: ifMatch}, management.GroupMappings{Items: items})
 		if err != nil {
 			t.Fatal(err)
@@ -303,7 +303,7 @@ func TestSigningInThroughDexGrantsWhatTheMappedGroupsMapTo(t *testing.T) {
 		if me := signedIn(t, adaBrowser); me.Member.InstanceAdmin {
 			t.Error("Ada is still an instance admin after the mapping was removed")
 		}
-		updated := e.entries(t, "group_mappings.updated", management.ActorKindToken)
+		updated := e.entries(t, "group_mappings.updated", management.ActorKindMember)
 		if len(updated) == 0 || fieldsOf(t, updated[0].After)["revoked"] != float64(3) {
 			t.Errorf("group_mappings.updated = %+v", updated)
 		}
@@ -640,7 +640,7 @@ func TestGroupMappingsAreListedInOrderAndValidated(t *testing.T) {
 		"a blank group":                projectMapping("  ", alpha, "viewer"),
 	} {
 		t.Run(name, func(t *testing.T) {
-			res, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
+			res, err := e.session(t).ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
 				&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: mappingsVersion(t, e.admin, slug)}, management.GroupMappings{Items: []management.GroupMapping{m}})
 			if err != nil {
 				t.Fatal(err)
@@ -657,7 +657,7 @@ func TestGroupMappingsAreListedInOrderAndValidated(t *testing.T) {
 		if err != nil || res.StatusCode() != http.StatusNotFound {
 			t.Errorf("GET: %v, %d", err, res.StatusCode())
 		}
-		put, err := e.admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), "no-such-provider", &management.ReplaceAuthProviderGroupMappingsParams{}, management.GroupMappings{Items: []management.GroupMapping{}})
+		put, err := e.session(t).ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), "no-such-provider", &management.ReplaceAuthProviderGroupMappingsParams{}, management.GroupMappings{Items: []management.GroupMapping{}})
 		if err != nil || put.StatusCode() != http.StatusNotFound {
 			t.Errorf("PUT: %v, %d", err, put.StatusCode())
 		}

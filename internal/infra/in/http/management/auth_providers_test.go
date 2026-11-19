@@ -87,7 +87,7 @@ func providerEntry(t *testing.T, srv *testkit.Server, action string, p managemen
 
 func TestCreatingAnAuthProviderAnswersItWithoutItsSecretAndWithTheRedirectURIToRegister(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	slug := providerSlug()
 	body := corporate(slug)
 	body.Domains = []string{" Example.COM ", "corp.example.org"}
@@ -133,7 +133,7 @@ func TestCreatingAnAuthProviderAnswersItWithoutItsSecretAndWithTheRedirectURIToR
 
 func TestTheClientSecretIsSealedAndAnEditKeepsItUnlessItNamesANewOne(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	slug := providerSlug()
 	body := corporate(slug)
 	createProvider(t, admin, body)
@@ -180,7 +180,7 @@ func TestTheClientSecretIsSealedAndAnEditKeepsItUnlessItNamesANewOne(t *testing.
 
 func TestAnAuthProviderIsRefusedForEachRuleItBreaks(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	for name, tc := range map[string]struct {
 		change  func(*management.AuthProviderCreate)
 		code    string
@@ -217,7 +217,7 @@ func TestAnAuthProviderIsRefusedForEachRuleItBreaks(t *testing.T) {
 
 func TestAnAuthProviderSlugIsTakenOnce(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	slug := providerSlug()
 	createProvider(t, admin, corporate(slug))
 	res := do(admin.CreateAuthProviderWithResponse(t.Context(), corporate(slug)))
@@ -226,7 +226,7 @@ func TestAnAuthProviderSlugIsTakenOnce(t *testing.T) {
 
 func TestAnInstanceWithoutABaseURLConfiguresNoAuthProvider(t *testing.T) {
 	srv := testkit.StartServer(t)
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	res := do(admin.CreateAuthProviderWithResponse(t.Context(), corporate(providerSlug())))
 	assertProblem(t, "create", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "base_url_required")
 
@@ -236,7 +236,7 @@ func TestAnInstanceWithoutABaseURLConfiguresNoAuthProvider(t *testing.T) {
 	slug := providerSlug()
 	disabled := corporate(slug)
 	disabled.Enabled = ptr(false)
-	createProvider(t, testkit.Client(t, with, testkit.InstanceAdminToken(t)), disabled)
+	createProvider(t, testkit.InstanceAdminSession(t, with), disabled)
 	got := do(admin.GetAuthProviderWithResponse(t.Context(), slug))
 	if got.JSON200 == nil || got.JSON200.RedirectUri != nil {
 		t.Fatalf("GET without a base URL = %d: %s", got.StatusCode(), got.Body)
@@ -252,7 +252,7 @@ func TestAnInstanceWithoutABaseURLConfiguresNoAuthProvider(t *testing.T) {
 
 func TestEditingAnAuthProviderNeedsItsVersionAndRecordsWhatChanged(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	slug := providerSlug()
 	p := createProvider(t, admin, corporate(slug))
 
@@ -308,7 +308,7 @@ func TestEditingAnAuthProviderNeedsItsVersionAndRecordsWhatChanged(t *testing.T)
 
 func TestEnablingAndDisablingAnAuthProviderChangesWhatSignInOffers(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	anyone := testkit.Client(t, srv, "")
 	slug := providerSlug()
 	body := corporate(slug)
@@ -357,7 +357,7 @@ func TestEnablingAndDisablingAnAuthProviderChangesWhatSignInOffers(t *testing.T)
 
 func TestDeletingAnAuthProviderRemovesItAndIsAudited(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	slug := providerSlug()
 	p := createProvider(t, admin, corporate(slug))
 
@@ -382,7 +382,7 @@ func TestDeletingAnAuthProviderRemovesItAndIsAudited(t *testing.T) {
 func TestOnlyAnInstanceAdminManagesAuthProviders(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
 	slug := providerSlug()
-	createProvider(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), corporate(slug))
+	createProvider(t, testkit.InstanceAdminSession(t, srv), corporate(slug))
 	member := testkit.Client(t, srv, testkit.MemberToken(t, testkit.Pool(t)))
 	anonymous := testkit.Client(t, srv, "")
 	for name, c := range map[string]*management.ClientWithResponses{"a member": member, "nobody": anonymous} {
@@ -409,10 +409,49 @@ func TestOnlyAnInstanceAdminManagesAuthProviders(t *testing.T) {
 	}
 }
 
+// A leaked token that could map a group to instance_admin, add a provider it
+// controls or loosen the instance's auth settings would leave access behind
+// that revoking the token does not take away.
+func TestAnInstanceAdminsTokenChangesNeitherWhoSignsInNorWithWhatAccess(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
+	session := testkit.InstanceAdminSession(t, srv)
+	token := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProvider(t, session, corporate(providerSlug()))
+	mappings := management.GroupMappings{Items: []management.GroupMapping{}}
+	settings := do(session.GetAuthSettingsWithResponse(t.Context())).JSON200
+	if settings == nil {
+		t.Fatal("no auth settings")
+	}
+
+	refused := func(op string, status int, body []byte) {
+		t.Helper()
+		assertProblem(t, op+" by a token", status, body, http.StatusForbidden, "session_required")
+	}
+	create := do(token.CreateAuthProviderWithResponse(t.Context(), corporate(providerSlug())))
+	refused("create", create.StatusCode(), create.Body)
+	update := do(token.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ifMatch(1)}, management.AuthProviderPatch{}))
+	refused("update", update.StatusCode(), update.Body)
+	enable := do(token.EnableAuthProviderWithResponse(t.Context(), p.Slug))
+	refused("enable", enable.StatusCode(), enable.Body)
+	rotation := do(token.CompleteAuthProviderCertificateRotationWithResponse(t.Context(), p.Slug))
+	refused("complete rotation", rotation.StatusCode(), rotation.Body)
+	replace := do(token.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), p.Slug, &management.ReplaceAuthProviderGroupMappingsParams{IfMatch: ptr(`"1"`)}, mappings))
+	refused("group mappings", replace.StatusCode(), replace.Body)
+	changed := do(token.UpdateAuthSettingsWithResponse(t.Context(), *settings))
+	refused("auth settings", changed.StatusCode(), changed.Body)
+	if res := do(session.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), p.Slug, &management.ReplaceAuthProviderGroupMappingsParams{IfMatch: ptr(`"1"`)}, mappings)); res.JSON200 == nil {
+		t.Errorf("group mappings by a session = %d: %s", res.StatusCode(), res.Body)
+	}
+	// Taking access away stays open to a token.
+	if res := do(token.DisableAuthProviderWithResponse(t.Context(), p.Slug)); res.StatusCode() == http.StatusForbidden {
+		t.Errorf("disabling by a token = %d: %s", res.StatusCode(), res.Body)
+	}
+}
+
 func TestTestingAnAuthProviderAnswersWhatItsDiscoveryDocumentSays(t *testing.T) {
 	dex := testkit.StartDex(t)
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	slug := providerSlug()
 	body := corporate(slug)
 	body.Issuer, body.ClientId, body.Enabled = ptr(dex.Issuer), ptr(dex.ClientID), ptr(false)
@@ -446,7 +485,7 @@ func mustProvider(t *testing.T, c *management.ClientWithResponses, slug string) 
 
 func TestTestingAnAuthProviderThatCannotBeReachedIsABadGatewaySayingWhy(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 
 	notADocument := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "<html>"+strings.Repeat("not here ", 8<<10)+"</html>", http.StatusNotFound)
@@ -515,7 +554,7 @@ func redirecting(t *testing.T, hops int) *httptest.Server {
 
 func TestTestingAnAuthProviderFollowsThreeRedirectsOnItsHostAndNeverToPlainHTTPAwayFromLoopback(t *testing.T) {
 	srv := testkit.StartServer(t, testkit.WithBaseURL(providerBaseURL))
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	admin := testkit.InstanceAdminSession(t, srv)
 	test := func(issuer string) *management.TestAuthProviderResponse {
 		t.Helper()
 		slug := providerSlug()

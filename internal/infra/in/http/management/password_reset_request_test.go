@@ -214,7 +214,7 @@ func TestNothingIsMailedWhileSelfServiceResetIsOff(t *testing.T) {
 	}
 	off := *settings
 	off.SelfServicePasswordReset = false
-	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), off)); res.JSON200 == nil || res.JSON200.SelfServicePasswordReset {
+	if res := do(in.session(t).UpdateAuthSettingsWithResponse(t.Context(), off)); res.JSON200 == nil || res.JSON200.SelfServicePasswordReset {
 		t.Fatalf("turning it off = %d: %s", res.StatusCode(), res.Body)
 	}
 	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || got.PasswordResetAvailable {
@@ -227,7 +227,7 @@ func TestNothingIsMailedWhileSelfServiceResetIsOff(t *testing.T) {
 	// was off left no trace that would make this one wait.
 	on := off
 	on.SelfServicePasswordReset = true
-	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), on)); res.JSON200 == nil || !res.JSON200.SelfServicePasswordReset {
+	if res := do(in.session(t).UpdateAuthSettingsWithResponse(t.Context(), on)); res.JSON200 == nil || !res.JSON200.SelfServicePasswordReset {
 		t.Fatalf("turning it on = %d: %s", res.StatusCode(), res.Body)
 	}
 	if got := do(in.anon.GetAuthMethodsWithResponse(t.Context(), nil)).JSON200; got == nil || !got.PasswordResetAvailable {
@@ -458,7 +458,7 @@ func TestTheAuthSettingsCarrySelfServicePasswordResetAndAuditIt(t *testing.T) {
 	}
 	off := *current
 	off.SelfServicePasswordReset = false
-	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), off)); res.JSON200 == nil || res.JSON200.SelfServicePasswordReset {
+	if res := do(in.session(t).UpdateAuthSettingsWithResponse(t.Context(), off)); res.JSON200 == nil || res.JSON200.SelfServicePasswordReset {
 		t.Fatalf("PUT = %d: %s", res.StatusCode(), res.Body)
 	}
 	if got := do(in.admin.GetAuthSettingsWithResponse(t.Context())).JSON200; got == nil || got.SelfServicePasswordReset {
@@ -481,14 +481,14 @@ func TestNothingIsMailedToAnEmailInAnEnforcedDomain(t *testing.T) {
 	in := startResetInstance(t, testkit.MailpitOpen)
 	body := corporate(providerSlug())
 	body.Domains = []string{"corp.example"}
-	corp := createProvider(t, in.admin, body).Slug
+	corp := createProvider(t, in.session(t), body).Slug
 	settings := do(in.admin.GetAuthSettingsWithResponse(t.Context())).JSON200
 	if settings == nil {
 		t.Fatal("GET /instance/auth-settings answered nothing")
 	}
 	enforced := *settings
 	enforced.SsoEnforcedDomains = []management.SsoEnforcedDomain{{Domain: "corp.example", Provider: corp}}
-	if res := do(in.admin.UpdateAuthSettingsWithResponse(t.Context(), enforced)); res.JSON200 == nil {
+	if res := do(in.session(t).UpdateAuthSettingsWithResponse(t.Context(), enforced)); res.JSON200 == nil {
 		t.Fatalf("enforcing corp.example = %d: %s", res.StatusCode(), res.Body)
 	}
 	m := testkit.NewMember(t, in.pool, testkit.WithEmail("ann@corp.example"))

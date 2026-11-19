@@ -28,7 +28,7 @@ func (e env) createSAML(t *testing.T, idp *testkit.ForgingSAMLIDP, change func(*
 	if change != nil {
 		change(&body)
 	}
-	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)
+	res, err := e.session(t).CreateAuthProviderWithResponse(t.Context(), body)
 	if err != nil || res.JSON201 == nil {
 		t.Fatalf("creating the SAML provider: %v, %d: %s", err, res.StatusCode(), res.Body)
 	}

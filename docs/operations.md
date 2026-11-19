@@ -94,7 +94,7 @@ Instance admins are not exempt from enforcement, so this command, not an exempti
 
 Members sign in with their email and password. A sign-in opens a session held by the server and referred to by a cookie (`HttpOnly; SameSite=Lax`), signed under the secret key. The cookie is `Secure` and named `__Host-flagnetic_session` wherever cookies can be Secure, so a browser refuses one that a sibling subdomain or a plain-HTTP page sets, and the server reads no other name there; on localhost over plain HTTP, or with `FLAGNETIC_INSECURE_COOKIES`, it is `flagnetic_session`. After an upgrade that first sets the prefixed name, members sign in once more. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened (the defaults; see below); a request with its cookie is then answered `401 session_expired` and the cookie is cleared.
 
-An instance admin changes the instance's auth settings at runtime (`/instance/auth-settings`); they live in the database, not in the configuration:
+An instance admin changes the instance's auth settings at runtime (`/instance/auth-settings`, from a signed-in session: an API token is refused `403 session_required`); they live in the database, not in the configuration:
 
 | Setting | Default | Meaning |
 |---|---|---|

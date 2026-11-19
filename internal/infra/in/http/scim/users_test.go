@@ -230,7 +230,7 @@ func TestADirectoryKeepsTheMembersOfADomainItNoLongerVouchesFor(t *testing.T) {
 	token := e.token(t, slug)
 	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
 
-	res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+	res, err := e.browser.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
 		management.AuthProviderPatch{Domains: &[]string{"example.org"}})
 	if err != nil || res.StatusCode() != http.StatusOK {
 		t.Fatalf("moving the provider to another domain = %v, %d: %s", err, res.StatusCode(), res.Body)

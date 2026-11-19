@@ -5667,6 +5667,7 @@ paths:
         enables it again from the server's side. Audited
         `auth_settings.updated`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       requestBody:
         required: true
@@ -5726,6 +5727,7 @@ paths:
         loopback address; private networks are allowed. A slug already in use is
         409 `already_exists`. Audited `auth_provider.created`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       requestBody:
         required: true
@@ -5798,6 +5800,7 @@ paths:
         created. Audited `auth_provider.updated`; an edit that changes nothing
         is not.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       parameters:
         - $ref: "#/components/parameters/IfMatch"
@@ -5869,6 +5872,7 @@ paths:
         `base_url_required` as a creation is. An enabled provider is answered
         as it is. Audited `auth_provider.enabled`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       responses:
         "200":
@@ -5973,6 +5977,7 @@ paths:
         when none was started and `422 not_saml` for an OIDC provider. Audited
         `auth_provider.certificate_rotation_completed`.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       responses:
         "200":
@@ -6046,6 +6051,7 @@ paths:
         was just granted. The version moves on with each replacement that
         changes the list, and is apart from the version of the provider.
       x-permission: instance_admin
+      x-session-required: true
       tags: [instance]
       parameters:
         - $ref: "#/components/parameters/IfMatch"

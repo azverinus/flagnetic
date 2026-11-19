@@ -73,6 +73,9 @@ type provider struct {
 	scopes []string
 	// emailClaim is the claim the email is read from; "email" when empty.
 	emailClaim string
+	// by is the signed-in client creating the provider; the instance admin's
+	// fresh session when nil, which cannot sign in once local login is off.
+	by *management.ClientWithResponses
 }
 
 func (e env) create(t *testing.T, p provider) string {
@@ -89,13 +92,17 @@ func (e env) create(t *testing.T, p provider) string {
 	if p.emailClaim != "" {
 		body.Claims = &management.AuthProviderClaimsPatch{Email: &p.emailClaim}
 	}
-	res, err := e.admin.CreateAuthProviderWithResponse(t.Context(), body)
+	by := p.by
+	if by == nil {
+		by = e.session(t)
+	}
+	res, err := by.CreateAuthProviderWithResponse(t.Context(), body)
 	if err != nil || res.JSON201 == nil {
 		t.Fatalf("creating the provider: %v, %d: %s", err, res.StatusCode(), res.Body)
 	}
 	if p.requireVerifiedEmail != nil {
 		patch := management.AuthProviderPatch{RequireVerifiedEmail: p.requireVerifiedEmail}
-		upd, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), body.Slug,
+		upd, err := by.UpdateAuthProviderWithResponse(t.Context(), body.Slug,
 			&management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)}, patch)
 		if err != nil || upd.JSON200 == nil {
 			t.Fatalf("editing the provider: %v, %d: %s", err, upd.StatusCode(), upd.Body)
@@ -831,7 +838,8 @@ func TestSimultaneousStartsAtOneProviderShareOneDiscoveryFetch(t *testing.T) {
 
 // session returns the instance admin signed in afresh, for the operations
 // that create access (inviting, granting, reactivating, promoting and issuing
-// a password reset) and refuse every API token. It is signed in at each call,
+// a password reset, and replacing group mappings, editing auth providers and
+// auth settings) and refuse every API token. It is signed in at each call,
 // since a session ends with the idle timeout a test's clock may outrun.
 func (e env) session(t *testing.T) *management.ClientWithResponses {
 	t.Helper()

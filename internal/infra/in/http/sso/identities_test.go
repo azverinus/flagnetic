@@ -795,7 +795,7 @@ func TestAnOIDCProviderWithIdentitiesKeepsItsIssuer(t *testing.T) {
 	moved := management.AuthProviderPatch{Issuer: ptr("https://another-issuer.example.com"), ClientSecret: ptr("another-client-secret")}
 	update := func(version int64, patch management.AuthProviderPatch) *management.UpdateAuthProviderResponse {
 		t.Helper()
-		res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(fmt.Sprintf(`"%d"`, version))}, patch)
+		res, err := e.session(t).UpdateAuthProviderWithResponse(t.Context(), slug, &management.UpdateAuthProviderParams{IfMatch: ptr(fmt.Sprintf(`"%d"`, version))}, patch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -835,7 +835,7 @@ func TestASAMLProviderWithIdentitiesKeepsItsEntityID(t *testing.T) {
 		t.Fatal("the sign-in that links the identity failed")
 	}
 
-	res, err := e.admin.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+	res, err := e.session(t).UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
 		management.AuthProviderPatch{IdpMetadataUrl: ptr(other.MetadataURL)})
 	if err != nil {
 		t.Fatal(err)
@@ -845,7 +845,7 @@ func TestASAMLProviderWithIdentitiesKeepsItsEntityID(t *testing.T) {
 		t.Errorf("PATCH metadata = %s, want provider_identities_linked", res.Body)
 	}
 	// Metadata of the same entity is the edit that keeps working.
-	res, err = e.admin.UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
+	res, err = e.session(t).UpdateAuthProviderWithResponse(t.Context(), p.Slug, &management.UpdateAuthProviderParams{IfMatch: ptr(`"1"`)},
 		management.AuthProviderPatch{IdpMetadataXml: ptr(idp.Metadata(testkit.SAMLMetadataOptions{}))})
 	if err != nil || res.JSON200 == nil {
 		t.Errorf("PATCH metadata of the same entity = %v, %v: %s", res.StatusCode(), err, res.Body)
