@@ -107,6 +107,12 @@ func TestAClickHouseSinkTakesItsDefaultsAndRefusesWhatCannotWork(t *testing.T) {
 		"a setting delivery sets itself": {func(d *sinks.Draft) {
 			d.Config.ClickHouse.Settings = map[string]string{"async_insert": "1", "max_threads": "2"}
 		}, map[string]string{"/clickhouse/settings/async_insert": "reserved"}},
+		"progress headers and waiting for the end of the query": {func(d *sinks.Draft) {
+			d.Config.ClickHouse.Settings = map[string]string{"wait_end_of_query": "0", "send_progress_in_http_headers": "1"}
+		}, map[string]string{
+			"/clickhouse/settings/wait_end_of_query":             "reserved",
+			"/clickhouse/settings/send_progress_in_http_headers": "reserved",
+		}},
 		"a masked password on a create": {func(d *sinks.Draft) { d.Secret = sinks.Masked },
 			map[string]string{"/clickhouse/password": "required"}},
 		"another kind's configuration": {func(d *sinks.Draft) { d.Config.Webhook = &sinks.Webhook{URL: "https://r.example"} },

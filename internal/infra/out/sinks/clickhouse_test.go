@@ -112,7 +112,7 @@ func TestAnInsertCarriesTheDeliveryIDTheSettingsAndTheCredentialsInHeadersOnly(t
 	insert, body := srv.requests[1], srv.bodies[1]
 	q := insert.URL.Query()
 	for k, v := range map[string]string{
-		"query_id": "dlv_abc", "async_insert": "0", "date_time_input_format": "best_effort", "max_threads": "2",
+		"query_id": "dlv_abc", "async_insert": "0", "wait_end_of_query": "1", "send_progress_in_http_headers": "0", "date_time_input_format": "best_effort", "max_threads": "2",
 		"query": "INSERT INTO `db`.`fl_exposures` (schema_version, event_id, project_key, environment_key, experiment_key, unit_id, received_at) FORMAT JSONEachRow",
 	} {
 		if q.Get(k) != v {
@@ -283,5 +283,25 @@ func TestAProbeFailsWhenATableCannotBeCreatedAndAnInsertWhenItsTableCannotBeDesc
 	if f := c.Deliver(t.Context(), clickhouseCall(down.URL, true, true, domain.EventAlias), appsinks.Delivery{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows}); f == nil ||
 		f.Class != domain.ClassStatus {
 		t.Errorf("a delivery whose table cannot be described = %v, want class status", f)
+	}
+}
+
+// An insert ClickHouse answers with a 200 and an exception at the end of the
+// body, as it does when it sent its status before the insert finished, is a
+// failure: the rows were not stored.
+func TestAnInsertWhoseAnswerEndsInAnExceptionFails(t *testing.T) {
+	rows := domain.SampleRows(domain.EventAlias, "shop", time.Now())
+	all := []string{"schema_version", "event_id", "project_key", "environment_key", "received_at"}
+	late := func(w http.ResponseWriter) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "Code: 252. DB::Exception: words that are never kept")
+	}
+	srv := startClickHouseServer(t, map[string]func(http.ResponseWriter){"DESCRIBE": describes(all...), "INSERT": late})
+	f := newClickHouse().Deliver(t.Context(), clickhouseCall(srv.URL, true, false, domain.EventAlias), appsinks.Delivery{ID: "dlv_1", Kind: domain.EventAlias, Rows: rows})
+	if f == nil || f.Class != domain.ClassStatus || f.Code != "252 TOO_MANY_PARTS" {
+		t.Fatalf("Deliver = %v, want a transient failure 252 TOO_MANY_PARTS", f)
+	}
+	if strings.Contains(f.Error(), "words that are never kept") {
+		t.Errorf("the failure %q holds ClickHouse's own words", f)
 	}
 }
