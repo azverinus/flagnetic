@@ -43,6 +43,8 @@ tests:
           path: spec.template.spec.containers[0].livenessProbe.httpGet.path
           value: /healthz
   - it: uses the appVersion as the image tag unless one is set
+    chart:
+      appVersion: "0.5.0"
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
