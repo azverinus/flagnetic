@@ -47,7 +47,7 @@ func (s *Store) OnCommitted(f func(environment workspace.EnvironmentID, version 
 func (s *Store) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier(ctx, s.pool) }
 
 // BumpProject moves the ruleset version of every environment of project on
-// to its next version at now (delivery.NextRulesetVersion).
+// to its next version at now.
 func (s *Store) BumpProject(ctx context.Context, project workspace.ProjectID, now time.Time) error {
 	return s.bump(ctx, `project_id = $1`, project.Bytes(), now)
 }
@@ -58,8 +58,21 @@ func (s *Store) BumpEnvironment(ctx context.Context, environment workspace.Envir
 	return s.bump(ctx, `id = $1`, environment.Bytes(), now)
 }
 
-// bump moves on the ruleset version of the environments where selects. The
-// rule is applied in the statement, on the row it locks, so two bumps
+// bump moves on the ruleset version of the environments where selects. A
+// ruleset changed at now takes the greater of its previous version plus one
+// and the clock in milliseconds.
+//
+// Counting one by one alone, a database restored or failed over to a state
+// that lost commits would hand out again a version some SDK already holds
+// with other content, and that SDK, which only ever accepts a higher
+// version, would keep the lost content. Taking the clock as the floor numbers
+// the first write after such a loss above every version handed out before
+// it (as long as the clock has moved past them, which a few milliseconds of
+// lost commits guarantee), while plus one keeps versions strictly increasing
+// when the clock stands still or moves back. Millisecond readings stay far
+// below 2^53, the largest integer every SDK reads exactly from JSON.
+//
+// The rule is applied in the statement, on the row it locks, so two bumps
 // racing on one environment never both start from the same previous
 // version. Each new version is announced on RulesetsChannel in the same
 // statement, which PostgreSQL delivers once the transaction commits and

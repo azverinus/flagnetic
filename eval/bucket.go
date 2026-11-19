@@ -19,11 +19,11 @@ const Buckets = 10000
 //
 //	murmurHash3_32(concat(salt, '.', unit_id)) % 10000
 func Bucket(salt, unitID string) int {
-	return int(Murmur3([]byte(BucketInput(salt, unitID))) % Buckets)
+	return int(Murmur3([]byte(bucketInput(salt, unitID))) % Buckets)
 }
 
-// BucketInput is the string hashed for a unit's bucket: "{salt}.{unit_id}".
-func BucketInput(salt, unitID string) string {
+// bucketInput is the string hashed for a unit's bucket: "{salt}.{unit_id}".
+func bucketInput(salt, unitID string) string {
 	return salt + "." + unitID
 }
 

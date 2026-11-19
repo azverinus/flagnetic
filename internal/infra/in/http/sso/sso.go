@@ -182,7 +182,7 @@ func (e *edge) acs(w http.ResponseWriter, r *http.Request) {
 func (e *edge) metadata(w http.ResponseWriter, r *http.Request, slug string) {
 	doc, err := e.h.Metadata.Handle(r.Context(), slug)
 	if err != nil {
-		if !apperrors.IsKind(err, apperrors.KindNotFound) {
+		if !apperrors.IsKind(err, apperrors.KindNotFound) && !flaghttp.CanceledByClient(r, err) {
 			e.Logger().ErrorContext(r.Context(), "serving SAML metadata", "provider", slug, "error", err)
 		}
 		e.WriteError(w, r, err)
@@ -235,6 +235,10 @@ func clientIP(r *http.Request) netip.Addr { return flaghttp.ClientOf(r.Context()
 func (e *edge) refuse(w http.ResponseWriter, r *http.Request, err error) {
 	var failure *appidentity.SignInFailure
 	switch {
+	case flaghttp.CanceledByClient(r, err):
+		// The browser went away: nobody is left to redirect, and it is no
+		// failure to count or to log as one.
+		e.Logger().DebugContext(r.Context(), "request canceled by the client", "error", err)
 	case errors.As(err, &failure):
 		e.o.Metrics.count(string(failure.Kind), string(failure.Code))
 		e.Logger().WarnContext(r.Context(), "single sign-on failed", "code", failure.Code, "error", err)

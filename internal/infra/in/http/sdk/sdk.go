@@ -106,7 +106,7 @@ func Mount(edge *flaghttp.Server, h Handlers, o Options) {
 		events: newEventMetrics(o.Registerer)}
 	routed := func(path string) bool { return a.paths[path] }
 	deprecated := deprecation.Middleware(BaseURL, Deprecated)
-	edge.Wrap(BaseURL+"/", func(next http.Handler) http.Handler { return deprecated(compression(edge)(cors(routed)(next))) })
+	edge.Wrap(BaseURL+"/", func(next http.Handler) http.Handler { return deprecated(cors(routed)(compression(edge)(next))) })
 	HandlerWithOptions(a, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},

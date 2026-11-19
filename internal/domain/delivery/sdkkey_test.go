@@ -17,6 +17,9 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
+// bumpedAt is a clock reading of the present era: 2026-01-01T09:00:00Z.
+var bumpedAt = time.Date(2026, time.January, 1, 9, 0, 0, 0, time.UTC)
+
 var keyIDs = id.NewSource(clock.NewFake(bumpedAt))
 
 func newKey(t *testing.T, kind delivery.SDKKeyKind, origins ...string) (delivery.SDKKey, string) {

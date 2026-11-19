@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"log/slog"
+	nethttp "net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -13,6 +14,7 @@ import (
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sso"
+	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
 // nginxExample returns the nginx configuration docs/install.md ships.
@@ -109,6 +111,25 @@ func TestTheDocumentedNginxLogHoldsNoOneTimeSecret(t *testing.T) {
 	for _, a := range accessLogs {
 		if a[2] != "flagnetic" {
 			t.Errorf("access_log %s uses the format %s, want flagnetic", a[1], a[2])
+		}
+	}
+}
+
+func TestASecretPathIsMaskedWithATrailingSlashToo(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithRoute("GET /test/links/{secret}", func(*flaghttp.Server) nethttp.Handler {
+		return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) { w.WriteHeader(nethttp.StatusNoContent) })
+	}, flaghttp.SecretInPath()))
+	const secret = "c2VjcmV0LXRoYXQtbXVzdC1uZXZlci1iZS1sb2dnZWQ"
+	for _, path := range []string{"/test/links/" + secret, "/test/links/" + secret + "/"} {
+		request(t, "GET", srv.URL+path, nil)
+	}
+	records := srv.Logs.Find("request")
+	if len(records) != 2 {
+		t.Fatalf("%d access records, want 2", len(records))
+	}
+	for _, r := range records {
+		if p, _ := r.Attrs["path"].(string); strings.Contains(p, secret) || !strings.HasPrefix(p, "/test/links/{secret}") {
+			t.Errorf("access record path %q, want the pattern in place of the secret", p)
 		}
 	}
 }

@@ -11,10 +11,6 @@ import (
 // enough that an SDK polling every few seconds costs a write a minute.
 const InventoryInterval = time.Minute
 
-// DefaultInventoryRetention is how long a row of the SDK inventory is kept
-// after its SDK was last seen when the configuration does not say.
-const DefaultInventoryRetention = 90 * 24 * time.Hour
-
 // MaxInventoryRowsPerKey bounds the rows of the SDK inventory one key
 // holds. A client key ships inside apps and browsers and any caller sets its
 // own User-Agent, so without a bound whoever holds a key could add rows

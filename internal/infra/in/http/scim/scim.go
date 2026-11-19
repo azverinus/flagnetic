@@ -204,7 +204,15 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		isAppErr  = errors.As(err, &appErr)
 		isScimErr = errors.As(err, &scimErr)
 	)
+	if flaghttp.CanceledByClient(r, err) {
+		// Nobody is left to read an answer, and it is no failure of the
+		// server: it is recorded as 499 and not logged as an error.
+		a.log.DebugContext(r.Context(), "request canceled by the client", "error", err.Error())
+		return
+	}
 	switch {
+	case flaghttp.IsBodyTimeout(err):
+		writeError(w, http.StatusRequestTimeout, "", "the body did not arrive in time")
 	case isScimErr:
 		writeError(w, scimStatuses[scimErr.Type], scimErr.Type, scimErr.Detail)
 	case errors.As(err, &tooLarge):
@@ -253,7 +261,9 @@ func readBody(r *http.Request) ([]byte, error) {
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
 		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
+		if errors.As(err, &tooLarge) || flaghttp.IsBodyTimeout(err) || flaghttp.CanceledByClient(r, err) {
+			// Judged by fail, which answers a body too large, a body that
+			// stalled and a client that left each as its own.
 			return nil, err
 		}
 		return nil, &identity.ScimError{Type: "invalidSyntax", Detail: "the body could not be read"}
