@@ -34,7 +34,7 @@ The answer carries `secret`, 32 random bytes in base64url, which signs every cal
 
 ### When a subscription keeps failing
 
-The platform disables a subscription whose receiver is dead: once 25 attempts in a row have failed and the first of them was 24 hours ago or more, with no success between. A short outage is retried, however long the subscription had gone without an event before it: a busy receiver fails 25 attempts in minutes and a quiet one is not judged by the days it had no event; a day of failures is what disables. The subscription's `enabled` turns false with `disabled_reason: persistent_failure`, its pending deliveries are `dropped` and never sent, and the change is audited as `webhook.disabled` by the system. The project's other subscriptions naming `webhook.disabled` (or `*`) are sent it, with `audit_entry_id` null and `data` naming the subscription and why its last attempt failed, never its target:
+The platform disables a subscription whose receiver is dead: once 25 attempts in a row have failed and the first of them was 24 hours ago or more, with no success between. A short outage is retried, however long the subscription had gone without an event before it: a busy receiver fails 25 attempts in minutes and a quiet one is not judged by the days it had no event; a day of failures is what disables. The subscription's `enabled` turns false with `disabled_reason: persistent_failure`, its pending deliveries are `dropped` and never sent, and the change is audited as `webhook.disabled` by the system. The project's other subscriptions naming `webhook.disabled` (or `*`) are sent it, with `audit_entry_id` naming the `webhook.disabled` entry the disabling wrote, and `data` naming the subscription and why its last attempt failed, never its target:
 
 ```json
 {"subscription_id": "0192…", "name": "Security channel", "last_error": "the receiver answered 503"}
@@ -107,7 +107,7 @@ One write can cause several of these: it shares one `audit_entry_id`. A revert i
 | `experiment.started` | an experiment started |
 | `experiment.stopped` | an experiment stopped |
 | `experiment.archived` | an experiment was archived |
-| `experiment.traffic_allocation_changed` | a running experiment's traffic allocation changed |
+| `experiment.traffic_allocation_changed` | a running experiment's traffic allocation grew |
 | `experiment.srm_detected` | the [sample ratio check](sample-ratio-check.md) raised an alert for the experiment in an environment |
 | `experiment.srm_cleared` | the sample ratio check cleared its alert |
 | `experiment.no_exposures` | a running experiment saw no exposures in an environment for a day |

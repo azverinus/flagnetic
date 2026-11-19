@@ -126,7 +126,7 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 	data, _ := envelope["data"].(map[string]any)
 	entity, _ := envelope["entity"].(map[string]any)
 	if data["subscription_id"] != failing.Id.String() || data["name"] != failing.Name || data["last_error"] != "the receiver answered 500" ||
-		entity["kind"] != "webhook" || entity["id"] != failing.Id.String() || envelope["audit_entry_id"] != nil {
+		entity["kind"] != "webhook" || entity["id"] != failing.Id.String() || envelope["audit_entry_id"] != entry.Id.String() {
 		t.Errorf("webhook.disabled envelope %v", envelope)
 	}
 	if body := string(calls[0].Body); strings.Contains(body, dead.URL) || strings.Contains(body, failing.Secret) {

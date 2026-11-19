@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -276,11 +278,17 @@ func (h *ChangeHub) fanOut(ctx context.Context, project workspace.ProjectID, t *
 				"project", project.String(), "error", err.Error())
 		}
 
+		// Offered outside the mutex, from a snapshot: each follower has a
+		// mutex of its own, and offering to every stream of a project while
+		// holding the hub's would stall every project's announcements, Follow
+		// and Close behind the slowest. A stream that closed since is offered
+		// notices nobody takes.
 		h.mu.Lock()
-		for f := range t.followers {
+		followers := slices.Collect(maps.Keys(t.followers))
+		h.mu.Unlock()
+		for _, f := range followers {
 			f.offer(notices, err != nil)
 		}
-		h.mu.Unlock()
 	}
 }
 

@@ -1,5 +1,7 @@
-// Package governance is the domain of how changes are governed. For now it
-// holds the audit entry: who changed what, when, from which value to which.
+// Package governance is the domain of how changes are governed: the audit
+// entry (who changed what, when, from which value to which), change requests,
+// the events that changes cause, webhook subscriptions and their deliveries,
+// and the notices of the change stream.
 package governance
 
 import (

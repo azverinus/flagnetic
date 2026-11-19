@@ -73,10 +73,15 @@ func (s *Digests) ProjectsAwaitingDigest(ctx context.Context, slot time.Time) ([
 	return projects, nil
 }
 
-// RecordDigestSlot marks slot handled by project; false when it already was.
+// RecordDigestSlot marks slot handled by project; false when it already was,
+// and when project was deleted since the round listed it, which leaves
+// nothing to handle. The project's row is locked against deletion until the
+// unit of work ends, so the foreign key never fails.
 func (s *Digests) RecordDigestSlot(ctx context.Context, project workspace.ProjectID, slot time.Time) (bool, error) {
 	tag, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO stale_flag_digests (project_id, slot) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+		INSERT INTO stale_flag_digests (project_id, slot)
+		SELECT p.id, $2 FROM projects p WHERE p.id = $1 FOR KEY SHARE OF p
+		ON CONFLICT DO NOTHING`,
 		project.Bytes(), slot)
 	if err != nil {
 		return false, fmt.Errorf("recording a stale-flag digest slot: %w", err)

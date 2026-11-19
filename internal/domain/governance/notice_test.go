@@ -2,6 +2,7 @@ package governance_test
 
 import (
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -81,5 +82,39 @@ func TestNoticesAfterARefetchFollowIt(t *testing.T) {
 	got, refetch := p.Take()
 	if !refetch || !slices.Equal(entries(got), []byte{2}) {
 		t.Errorf("take = %v %v, want a refetch, then the notice offered after it", entries(got), refetch)
+	}
+}
+
+// distinctNotices returns n notices of n entities.
+func distinctNotices(n int) []governance.ChangeNotice {
+	out := make([]governance.ChangeNotice, n)
+	for i := range out {
+		out[i] = notice(byte(i), "flag", strconv.Itoa(i), "")
+	}
+	return out
+}
+
+func TestOneOfferBeyondTheLimitBecomesARefetchAlone(t *testing.T) {
+	var p governance.PendingNotices
+	p.Offer(notice(1, "flag", "kept-out", ""))
+	p.Offer(distinctNotices(5 * governance.MaxPendingNotices)...)
+	got, refetch := p.Take()
+	if len(got) != 0 || !refetch {
+		t.Errorf("one offer of %d: %d notices, refetch %v; want a refetch alone", 5*governance.MaxPendingNotices, len(got), refetch)
+	}
+	p.Offer(notice(2, "flag", "after", ""))
+	if got, refetch := p.Take(); refetch || len(got) != 1 {
+		t.Errorf("after taking: %d notices, refetch %v; want the one offered", len(got), refetch)
+	}
+}
+
+// Offering many notices costs time linear in them, not in them times those
+// waiting: a change recording thousands of entries is offered to every
+// stream of a project.
+func BenchmarkPendingNoticesOfferBeyondTheLimit(b *testing.B) {
+	notices := distinctNotices(5_000)
+	for b.Loop() {
+		var p governance.PendingNotices
+		p.Offer(notices...)
 	}
 }

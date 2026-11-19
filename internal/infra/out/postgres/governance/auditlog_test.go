@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
@@ -35,9 +36,9 @@ func TestAnEntryIsReadBackAsRecorded(t *testing.T) {
 	if err = log.Append(t.Context(), recorded); err != nil {
 		t.Fatal(err)
 	}
-	entries, err := log.Latest(t.Context(), 10)
+	entries, err := log.Entries(t.Context(), appgovernance.AuditFilter{}, governance.EntryID{}, 10)
 	if err != nil || len(entries) != 1 {
-		t.Fatalf("Latest = %d entries, %v; want 1", len(entries), err)
+		t.Fatalf("Entries = %d entries, %v; want 1", len(entries), err)
 	}
 	e := entries[0]
 	if e.ID != recorded.ID || e.Actor != actor || e.RequestID != "req-7" || e.Project != r.Project || e.Environment != r.Environment ||

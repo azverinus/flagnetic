@@ -18,6 +18,7 @@ import (
 var (
 	someDelivery = id.MustParse[governance.Delivery]("0190d2a0-0000-7000-8000-0000000000f1")
 	someEvent    = id.MustParse[governance.Event]("0190d2a0-0000-7000-8000-0000000000f2")
+	someEntry    = id.MustParse[governance.Entry]("0190d2a0-0000-7000-8000-0000000000f3")
 )
 
 // random returns a source whose next draw is u, a fraction in [0, 1).

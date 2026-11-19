@@ -35,7 +35,6 @@ const fanOutBatch = 200
 
 // FanOutReport is what one round of the fan-out did.
 type FanOutReport struct {
-	Events, Deliveries int
 	// Depth is how many events still wait in the outbox after the round.
 	Depth int
 }
@@ -61,17 +60,15 @@ func NewRunFanOut(tx Transactor, store FanOutStore, c clock.Clock, ids *id.Sourc
 func (h *RunFanOut) Handle(ctx context.Context) (FanOutReport, error) {
 	var report FanOutReport
 	for ctx.Err() == nil {
-		var events, deliveries int
+		var events int
 		err := h.tx.Within(ctx, func(ctx context.Context) error {
 			var err error
-			events, deliveries, err = h.batch(ctx)
+			events, err = h.batch(ctx)
 			return err
 		})
 		if err != nil {
 			return report, err
 		}
-		report.Events += events
-		report.Deliveries += deliveries
 		if events < fanOutBatch {
 			break
 		}
@@ -81,10 +78,11 @@ func (h *RunFanOut) Handle(ctx context.Context) (FanOutReport, error) {
 	return report, err
 }
 
-func (h *RunFanOut) batch(ctx context.Context) (int, int, error) {
+// batch fans out one batch of events and returns how many it claimed.
+func (h *RunFanOut) batch(ctx context.Context) (int, error) {
 	events, err := h.store.ClaimEvents(ctx, fanOutBatch)
 	if err != nil || len(events) == 0 {
-		return 0, 0, err
+		return 0, err
 	}
 	var projects []workspace.ProjectID
 	ids := make([]governance.EventID, len(events))
@@ -94,7 +92,7 @@ func (h *RunFanOut) batch(ctx context.Context) (int, int, error) {
 	}
 	webhooks, err := h.store.EnabledWebhooks(ctx, projects)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 	now := h.clock.Now().UTC().Truncate(time.Microsecond)
 	var deliveries []governance.Delivery
@@ -107,10 +105,10 @@ func (h *RunFanOut) batch(ctx context.Context) (int, int, error) {
 	}
 	if len(deliveries) > 0 {
 		if err = h.store.CreateDeliveries(ctx, deliveries); err != nil {
-			return 0, 0, err
+			return 0, err
 		}
 	}
-	return len(events), len(deliveries), h.store.DeleteEvents(ctx, ids)
+	return len(events), h.store.DeleteEvents(ctx, ids)
 }
 
 // DeliveryFilter selects a subscription's deliveries; every field set

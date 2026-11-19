@@ -383,7 +383,7 @@ func (h *Deliver) disable(ctx context.Context, before governance.Webhook, a gove
 	if err != nil {
 		return after, err
 	}
-	e, err := governance.WebhookDisabledEvent(id.New[governance.Event](h.d.IDs), after, projectKey, a, now).Queue()
+	e, err := governance.WebhookDisabledEvent(id.New[governance.Event](h.d.IDs), entry.ID, after, projectKey, a, now).Queue()
 	if err != nil {
 		return after, err
 	}

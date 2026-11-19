@@ -189,3 +189,39 @@ func TestAClaimedDeliveryNamesTheProjectOfItsSubscription(t *testing.T) {
 		t.Errorf("claimed = %+v, want the delivery of project %s", claimed, p.ID)
 	}
 }
+
+// The platform disabling a subscription drops its deliveries, those another
+// replica is attempting too: that replica's outcome, recorded under the lease
+// token the drop cleared, writes nothing, so the delivery stays dropped with
+// no attempt on it.
+func TestAnAttemptLateAfterAPlatformDisableRecordsNothing(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	ids := testkit.IDs(testkit.Clock())
+	s := pggovernance.NewDeliveries(pool)
+	pending := pendingDeliveries(t, pool, ids, 1)
+	token := id.New[appgovernance.Lease](ids)
+	now := testkit.Start.Add(time.Second)
+	claimed := claim(t, pool, s, token, now)
+	if len(claimed) != 1 {
+		t.Fatalf("claimed %d deliveries, want 1", len(claimed))
+	}
+
+	if err := s.DropPending(t.Context(), pending[0].Webhook, now); err != nil {
+		t.Fatal(err)
+	}
+	next := now.Add(time.Hour)
+	attempt := governance.DeliveryAttempt{N: 1, At: now, StatusCode: new(500)}
+	if recorded, err := s.RecordAttempt(t.Context(), claimed[0], token, attempt, governance.DeliveryPending, &next, now); err != nil || recorded {
+		t.Errorf("the late attempt was recorded = %v, %v; want nothing written", recorded, err)
+	}
+	if _, held, err := s.RenewLease(t.Context(), claimed[0], token, now, now.Add(time.Minute)); err != nil || held {
+		t.Errorf("the dropped delivery's lease was renewed: %v, %v", held, err)
+	}
+	got, err := pggovernance.NewWebhooks(pool).Delivery(t.Context(), pending[0].Webhook, claimed[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != governance.DeliveryDropped || len(got.Attempts) != 0 || got.NextAttemptAt != nil {
+		t.Errorf("delivery after the late attempt = %+v, want dropped with no attempt and none due", got)
+	}
+}
