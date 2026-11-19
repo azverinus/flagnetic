@@ -58,9 +58,10 @@ RE_DART='^(sdks/dart/|conformance/|api/sdk\.yaml$|docs/sdks/(behaviour-matrix|co
 RE_FLUTTER='^(sdks/dart/|sdks/flutter/|\.github/scripts/check-pub-package\.sh$|\.github/workflows/sdk-flutter\.yml$)'
 # What every published Go module is tested with besides its own sources.
 RE_MODULES='^(conformance/|api/sdk\.yaml$)'
-# The migration lint: the migrations it reads, its settings and the scripts and
-# fixtures that run and test it.
-RE_MIGRATIONS='^internal/infra/out/postgres/migrations/.*\.sql$|^\.squawk\.toml$|^\.github/scripts/(lint-migrations|install-squawk)\.sh$|^\.github/scripts/testdata/migration-lint/'
+# The migration checks: the migrations the lint reads, the list that pins the
+# released ones, the lint's settings and the scripts and fixtures that run and
+# test them.
+RE_MIGRATIONS='^internal/infra/out/postgres/migrations/(.*\.sql|released\.sum)$|^\.squawk\.toml$|^\.github/scripts/(lint-migrations|check-released-migrations|install-squawk)\.sh$|^\.github/scripts/testdata/migration-lint/'
 # The Helm chart: its templates, tests and values, the settings of chart-testing
 # and the script that checks it. The image it installs is the server's, so a
 # change to the server does not run these checks.

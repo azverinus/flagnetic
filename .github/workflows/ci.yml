@@ -788,9 +788,11 @@ jobs:
   # The migrations a pull request adds, linted with squawk so that a replica of
   # the previous minor keeps working against the new schema (expand/contract:
   # no rename, no drop, no blocking index, no NOT NULL without a default).
-  # Released migrations are not linted. Other events only prove that the
-  # rules still catch each deliberately bad fixture, which is the case after a
-  # change to the rules or to the pinned squawk.
+  # Released migrations are not linted; they are pinned instead: every file of
+  # the latest server tag must be listed in released.sum, and the server's
+  # release pull request must list every migration it ships. Other events only
+  # prove that the rules still catch each deliberately bad fixture, which is
+  # the case after a change to the rules or to the pinned squawk.
   migrations:
     name: migration lint
     needs: plan
@@ -811,6 +813,13 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: .github/scripts/lint-migrations.sh --base "$BASE"
+      - name: The pinning check catches an unpinned migration
+        run: .github/scripts/check-released-migrations.sh --self-test
+      - name: Every released migration is pinned
+        run: .github/scripts/check-released-migrations.sh
+      - name: Every migration the release ships is pinned
+        if: github.event_name == 'pull_request' && github.head_ref == 'release-please--branches--main--components--server'
+        run: .github/scripts/check-released-migrations.sh --release
 
   # The chart is checked without a cluster (lint, unit tests, kubeconform) with
   # the oldest and the newest Helm it supports, then installed in kind against
