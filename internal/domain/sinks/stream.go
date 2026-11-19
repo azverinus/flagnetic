@@ -62,7 +62,7 @@ type Stream struct {
 	// ConsecutiveFailures is how many calls in a row failed; zero once one
 	// is acknowledged. A stream with any is failing.
 	ConsecutiveFailures int
-	// Stop and Resume are set while a bounded replay runs: the last row it
+	// Stop and Resume are set while a replay runs: the last row it
 	// sends, and the position the stream returns to after it.
 	Stop, Resume *events.Cursor
 	// Floor is the time a stream started from a time reads from: no row
@@ -74,14 +74,14 @@ type Stream struct {
 	// it and the first one received since the start are read too, and must
 	// not be sent.
 	Floor *time.Time
-	// ReplayFloor is the floor of the window a bounded replay reads while it
+	// ReplayFloor is the floor of the window a replay reads while it
 	// runs, nil otherwise: the replay's start. It is a floor of its own and
 	// not the stream's, which the live stream the replay returns to keeps.
 	ReplayFloor *time.Time
 }
 
 // ReadScope is scope as the stream chooses and reads its next batch: with the
-// stream's floor, except while a bounded replay runs, which sends the rows
+// stream's floor, except while a replay runs, which sends the rows
 // received inside the window it was asked for, with the floor of its own at
 // the window's start. The live stream the replay returns to keeps the floor.
 func (s Stream) ReadScope(scope Scope) Scope {
@@ -93,7 +93,7 @@ func (s Stream) ReadScope(scope Scope) Scope {
 }
 
 // LiveScope is scope as the stream's live position reads it, which its lag is
-// measured by: with the stream's floor, a bounded replay running or not.
+// measured by: with the stream's floor, a replay running or not.
 func (s Stream) LiveScope(scope Scope) Scope {
 	scope.Floor = s.Floor
 	return scope

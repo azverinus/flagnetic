@@ -416,7 +416,7 @@ func (h *Deliver) attempt(ctx context.Context, token LeaseToken, c ClaimedSink, 
 			return Failed, fmt.Errorf("choosing a batch: %w", err)
 		}
 		if batch.To == due.Stream.Cursor && due.Stream.Stop != nil {
-			// No row is left up to the end of a bounded replay, perhaps
+			// No row is left up to the end of a replay, perhaps
 			// because retention dropped the last ones: it is over.
 			return h.ack(ctx, ref, token, c, due, sinks.Batch{From: batch.From, To: *due.Stream.Stop}, 0, 0, live)
 		}
@@ -550,7 +550,7 @@ func (h *Deliver) ack(ctx context.Context, ref StreamRef, token LeaseToken, c Cl
 	if skipped > 0 {
 		h.d.Observer.RowsSkipped(SkipEnvironmentDeleted, skipped)
 	}
-	// During a bounded replay the lag is the live stream's, which the replay
+	// During a replay the lag is the live stream's, which the replay
 	// does not move.
 	from := b.To
 	if due.Stream.Resume != nil {

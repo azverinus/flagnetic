@@ -57,7 +57,7 @@ func cursorBefore(a, b events.Cursor) bool {
 }
 
 // Live is where the stream delivers what happens now: its cursor, or, while a
-// bounded replay runs, the position the replay returns to, which the cursor
+// replay runs, the position the replay returns to, which the cursor
 // has left behind.
 func (s Stream) Live() events.Cursor {
 	if s.Resume != nil {
@@ -80,7 +80,7 @@ type ReplayAsk struct {
 	Stop      events.Cursor
 	StopFound bool
 	// From is the time the replay starts at, and Floor the stream's floor,
-	// which a bounded replay leaves for the live stream it returns to.
+	// which a replay leaves for the live stream it returns to.
 	From  time.Time
 	Floor *time.Time
 }
@@ -89,17 +89,14 @@ type ReplayAsk struct {
 type ReplayPlan struct {
 	// Cursor is the position the stream reads on from.
 	Cursor events.Cursor
-	// Stop is the last row a bounded replay sends, and Resume the position
-	// the stream returns to after it: its live one. Both are nil for a
-	// replay that runs on into the live stream.
+	// Stop is the last row the replay sends, and Resume the position the
+	// stream returns to after it: its live one. A replay that runs on into
+	// the live stream stops at the live position and returns to it.
 	Stop, Resume *events.Cursor
-	// Floor is the stream's floor once the replay is set: a replay running on
-	// into the live stream sets it to the replay's start, since every row
-	// received since is to be sent again and none received before; a bounded
-	// one leaves it, since the live stream it returns to keeps it.
+	// Floor is the stream's floor once the replay is set: the replay leaves
+	// it, since the live stream it returns to keeps it.
 	Floor *time.Time
-	// ReplayFloor is the floor a bounded replay reads its window with: its
-	// start. Nil for one that runs on.
+	// ReplayFloor is the floor the replay reads its window with: its start.
 	ReplayFloor *time.Time
 }
 

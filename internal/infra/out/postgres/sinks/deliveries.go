@@ -412,7 +412,7 @@ func (s *Store) Ack(ctx context.Context, stream appsinks.StreamRef, token appsin
 	if delivered > 0 && s.fault.loses() {
 		return true, nil
 	}
-	// A bounded replay that the batch reaches the end of is over: the cursor
+	// A replay that the batch reaches the end of is over: the cursor
 	// goes back to where the replay was to return to, not to the batch's end.
 	tag, err := s.db(ctx).Exec(ctx, `
 		WITH s AS (
