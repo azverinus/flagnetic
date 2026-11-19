@@ -69,6 +69,9 @@ type options struct {
 	// canary is whether serve checks the secret key against the canary,
 	// which the server's own migrations make a table for.
 	canary bool
+	// environ lists the process's environment as os.Environ does, or is nil
+	// to look for no mistyped variable.
+	environ func() []string
 }
 
 type route struct {
@@ -88,6 +91,15 @@ func withServerVersionNum(f func(context.Context, *pgxpool.Pool) (int, error)) O
 
 func withRoute(pattern string, h http.Handler) Option {
 	return func(o *options) { o.routes = append(o.routes, route{pattern, h}) }
+}
+
+// WithEnvironment lets the commands that read the configuration warn about
+// the FLAGNETIC_ variables in environ that are no setting, such as a mistyped
+// name. environ lists the environment as os.Environ does; without the option
+// nothing is checked, since the environment a command reads is whatever its
+// lookup function answers.
+func WithEnvironment(environ func() []string) Option {
+	return func(o *options) { o.environ = environ }
 }
 
 func withStdin(r io.Reader) Option {
@@ -146,6 +158,7 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 		}
 		log := newLogger(stderr, cfg)
 		logger.Store(log)
+		warnAboutUnknownSettings(log, cfg, lookupEnv, o)
 		return cmd(cfg, log)
 	}
 
@@ -273,4 +286,22 @@ func fail(log *slog.Logger, msg string, err error) int {
 		return exitUsage
 	}
 	return exitFailure
+}
+
+// warnAboutUnknownSettings names what the configuration holds that no setting
+// reads. It warns rather than refuses, so a binary rolled back to an earlier
+// version still starts with the environment and the file written for a newer
+// one; a mistyped name changes nothing otherwise, and nothing would say so.
+func warnAboutUnknownSettings(log *slog.Logger, cfg config.Config, lookupEnv func(string) (string, bool), o options) {
+	if o.environ != nil {
+		for _, name := range config.UnknownVariables(o.environ()) {
+			log.Warn("ignored environment variable: not a setting", "variable", name)
+		}
+	}
+	if len(cfg.IgnoredFileKeys) > 0 {
+		file, _ := lookupEnv("FLAGNETIC_CONFIG_FILE")
+		for _, key := range cfg.IgnoredFileKeys {
+			log.Warn("ignored configuration file key: not a setting of this version", "key", key, "file", file)
+		}
+	}
 }

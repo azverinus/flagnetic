@@ -12,5 +12,5 @@ import (
 func main() {
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	os.Exit(cli.Main(os.Args[1:], os.LookupEnv, os.Stdout, os.Stderr, signals))
+	os.Exit(cli.Main(os.Args[1:], os.LookupEnv, os.Stdout, os.Stderr, signals, cli.WithEnvironment(os.Environ)))
 }
