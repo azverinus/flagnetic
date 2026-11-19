@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/netip"
 	"path"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -203,6 +205,11 @@ func (s *Server) SecretPath(path string) {
 		s.secretSeen[path] = true
 		s.secretPaths.Handle(path, http.NotFoundHandler())
 	}
+}
+
+// SecretPaths returns the path patterns marked as carrying a secret, sorted.
+func (s *Server) SecretPaths() []string {
+	return slices.Sorted(maps.Keys(s.secretSeen))
 }
 
 // consoleRoute is the route the log and the metrics name a request the

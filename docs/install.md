@@ -177,10 +177,23 @@ Flagnetic serves plain HTTP; terminate TLS in a reverse proxy or load balancer i
 - **Read timeout above 15 seconds.** The ruleset stream sends a heartbeat every 15 seconds and nothing else while nothing changes, so a proxy must not close a connection idle for 15 seconds; 60 seconds leaves a margin. Each ruleset stream lasts up to 65 minutes before the server closes it; a proxy that caps connections sooner only makes SDKs reconnect sooner, which they do without losing a version.
 - **Keep the metrics port off it.** Proxy the public listener (`FLAGNETIC_LISTEN_ADDR`, `:8080`) only; scrape `/metrics` on `FLAGNETIC_METRICS_LISTEN_ADDR` from inside your network.
 - **Compression is optional.** Flagnetic compresses SDK API answers itself when asked.
+- **Keep one-time secrets out of the proxy's access log.** An invitation and a password reset carry their secret in the path (`/invitations/<secret>`, `/password-reset/<secret>`, the API routes under `/api/v1/auth/` they call, and `/sso/complete/<attempt>`). Flagnetic masks these paths in its own log, but a proxy's default `combined` log format writes the full request line and the `Referer`, so whoever reads that log, or the service it is shipped to, could accept the invitation or set a new password while the link is valid and unused. Log through the `log_format` below, which writes the masked path, never the query string and never the `Referer`. The pages that open these links also answer `Referrer-Policy: no-referrer`, so the browser sends no `Referer` from them whatever the proxy logs. Your own `error_log` records the request line of a request that failed upstream, which this cannot mask: keep it short-lived and local.
 
 An nginx configuration for two replicas:
 
 ```nginx
+# The paths whose request line holds a one-time secret are logged as
+# "<route>/:secret". $uri is the path alone, decoded and normalised, so the
+# query string is not logged and an encoded spelling of a route is masked too.
+map $uri $flagnetic_log_path {
+    default $uri;
+    ~^(?<route>/(?:invitations|password-reset|api/v1/auth/invitations|api/v1/auth/password-reset|sso/complete)/)[^/]+ "${route}:secret";
+}
+
+# No $request, $request_uri, $args or $http_referer: each holds a secret.
+log_format flagnetic '$remote_addr [$time_local] "$request_method $flagnetic_log_path" '
+                     '$status $body_bytes_sent "$http_user_agent"';
+
 upstream flagnetic {
     server 10.0.0.11:8080;
     server 10.0.0.12:8080;
@@ -190,6 +203,7 @@ upstream flagnetic {
 server {
     listen 80;
     server_name flags.example.com;
+    access_log /var/log/nginx/flagnetic.access.log flagnetic;
     return 301 https://$host$request_uri;
 }
 
@@ -198,6 +212,8 @@ server {
     server_name flags.example.com;
     ssl_certificate     /etc/nginx/tls/flags.example.com.crt;
     ssl_certificate_key /etc/nginx/tls/flags.example.com.key;
+
+    access_log /var/log/nginx/flagnetic.access.log flagnetic;
 
     proxy_http_version 1.1;
     proxy_set_header Connection "";
