@@ -475,10 +475,19 @@ func TestEveryVariableTheCommandLineReadsIsDocumented(t *testing.T) {
 }
 
 func TestARefusedBaseURLDoesNotRepeatItsPassword(t *testing.T) {
-	_, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://x/y", "FLAGNETIC_BASE_URL": "https://admin:pass@flags.example.com"}))
-	if err == nil || !strings.Contains(err.Error(), "FLAGNETIC_BASE_URL") || strings.Contains(err.Error(), "pass") ||
-		!strings.Contains(err.Error(), "flags.example.com") {
-		t.Errorf("Load = %v, want a refusal naming the variable and the host, without the userinfo", err)
+	for _, value := range []string{
+		"https://admin:pass@flags.example.com",
+		"https://admin:pa/ss@flags.example.com",
+		"https://admin:pa@ss@flags.example.com",
+		"admin:pass@flags.example.com",
+		"//admin:pass@flags.example.com",
+	} {
+		_, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://x/y", "FLAGNETIC_BASE_URL": value}))
+		if err == nil || !strings.Contains(err.Error(), "FLAGNETIC_BASE_URL") || strings.Contains(err.Error(), "pass") ||
+			strings.Contains(err.Error(), "pa/ss") || strings.Contains(err.Error(), "pa@ss") ||
+			!strings.Contains(err.Error(), "flags.example.com") {
+			t.Errorf("FLAGNETIC_BASE_URL=%s: Load = %v, want a refusal naming the variable and the host, without the userinfo", value, err)
+		}
 	}
 }
 

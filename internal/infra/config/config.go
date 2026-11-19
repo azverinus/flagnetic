@@ -1089,12 +1089,22 @@ func readFile(path string, settings []Setting) (values map[string]string, ignore
 	return values, ignored, nil
 }
 
-// userinfo is the credentials part of a URL, up to the host.
-var userinfo = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#]*@`)
+// scheme is the scheme of a URL with the slashes after it.
+var scheme = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://`)
 
 // redactUserinfo hides the credentials of a URL, so a refusal that quotes the
-// value never repeats a password.
-func redactUserinfo(v string) string { return userinfo.ReplaceAllString(v, "${1}[redacted]@") }
+// value never repeats a password. Everything after the scheme up to the last
+// @ is hidden, since a password may itself hold a slash, a colon or an @ the
+// operator did not escape, and a value with no scheme may still hold one.
+func redactUserinfo(v string) string {
+	prefix := scheme.FindString(v)
+	rest := v[len(prefix):]
+	at := strings.LastIndex(rest, "@")
+	if at < 0 {
+		return v
+	}
+	return prefix + "[redacted]" + rest[at:]
+}
 
 var keywordPassword = regexp.MustCompile(`password\s*=\s*('(?:[^'\\]|\\.)*'|\S+)`)
 

@@ -204,7 +204,15 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	replica := runner.PanicHook(kill)
 	runner.Start(replica)
 	listeners := postgres.NewListeners(replica, pool, log, reg)
-	defer stopTogether(runner, listeners)
+	// Stopped once: on the way out of a failed start here, or below after
+	// the grace period, so a listener that outlives its bound is not waited
+	// for a second time past the cancel step.
+	stopped := false
+	defer func() {
+		if !stopped {
+			stopTogether(runner, listeners)
+		}
+	}()
 	for _, l := range background.Listeners {
 		listeners.Start(l.Channel, l.Handler, pglisten.Options{})
 	}
@@ -237,6 +245,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	}
 	cancelStep = time.Now()
 	stopTogether(runner, listeners)
+	stopped = true
 	log.Info("stopped")
 	return exitOK
 }
