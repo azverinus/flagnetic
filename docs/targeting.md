@@ -76,7 +76,7 @@ Every condition is checked when a configuration or segment is written, and refus
 
 A unit type or attribute that a rule, rollout, override or segment names, an archived flag's included, is not deleted (`409 in_use`, `references` naming each segment, or flag and environment, that names it). A unit type a draft or running experiment assigns is not deleted either, and `references` names each such experiment (`kind` `experiment`, no environment): a stopped or archived experiment assigns nobody and does not hold it. `GET /unit-types` and `GET /attributes` give each declaration a `usage_count`: the flags naming it, each counted once whatever its environments and archived ones included, plus the segments naming it and, for a unit type, the draft and running experiments that assign it, so a declaration the delete guard holds never shows 0.
 
-In the console, **Unit types** and **Attributes** show each declaration's count in **Used by flags and segments**, and a refused deletion names every flag, with its environment, and every segment that still names it.
+In the console, **Unit types** shows each unit type's count in **Used by flags, segments and experiments** and **Attributes** each attribute's in **Used by flags and segments**; a refused deletion names every flag, with its environment, every segment that still names it and, for a unit type, every draft or running experiment that assigns it.
 
 ## Limits
 

@@ -83,7 +83,7 @@ function UnitTypes() {
       },
       {
         id: "usage",
-        header: t`Used by flags and segments`,
+        header: t`Used by flags, segments and experiments`,
         cell: ({ row }) => formatNumber(i18n, row.original.usage_count),
       },
     ];
