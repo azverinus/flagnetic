@@ -279,6 +279,14 @@ func (tr *translation) flag(p grouped, conditions []Condition) (Flag, []apperror
 			rules = append(rules, r)
 		}
 	}
+	// An archived flag is in no ruleset, so nothing judges a change to what
+	// its variations serve; the write refuses it. Refusing it here points the
+	// fault at the parameter, with the others of the template.
+	if existing != nil && existing.Flag.ArchivedAt != nil && len(vs.list) > len(existing.Flag.Variations) {
+		faults = append(faults, apperrors.Violation{Pointer: p.pointer, Code: "archived",
+			Detail: "the flag " + p.key + " is archived; restore it before importing a value it does not have",
+			Params: map[string]any{"parameter": p.key}})
+	}
 	if len(faults) > 0 {
 		tr.result.Warnings = tr.result.Warnings[:mark]
 		return Flag{}, faults

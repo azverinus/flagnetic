@@ -373,7 +373,7 @@ Re-importing the same template changes nothing, so you can import again after ed
 
 A condition expression is expanded to disjunctive normal form: one rule per conjunction, at most 50 alternatives. A configuration holds at most 50 rules; further ones are dropped with `rule_limit`.
 
-A new flag is on in the target environment and off in the others. An existing flag (of the same type, else `type_immutable`) is switched on in the target environment, keeps its name, owner, other environments, prerequisites and overrides, gains missing variations, and has its description replaced only by a non-empty one. Rules equal to existing ones keep their ids and salts. A template cannot express a rule that serves an experiment, so the rules of the flag in the target environment that do are kept, after the translated rules, and count towards the limit of 50. An archived flag is configured and stays archived (`archived_flag`).
+A new flag is on in the target environment and off in the others. An existing flag (of the same type, else `type_immutable`) is switched on in the target environment, keeps its name, owner, other environments, prerequisites and overrides, gains missing variations, and has its description replaced only by a non-empty one. Rules equal to existing ones keep their ids and salts. A template cannot express a rule that serves an experiment, so the rules of the flag in the target environment that do are kept, after the translated rules, and count towards the limit of 50. An archived flag is configured and stays archived (`archived_flag`), unless the template brings a value it lacks: that would change what an archived flag serves, and is refused as `422 invalid_document` with `archived` at the parameter's pointer.
 
 ### Condition terms
 
@@ -405,7 +405,7 @@ Conditions Flagnetic cannot reproduce are **skipped**, with a warning naming the
 
 `rollout_reshuffled` is a warning on every percent condition: Firebase and Flagnetic hash units differently, so the units that were in a percentage are not the same units in the rollout. A parameter's pointer is `/parameters/<key>`, or `/parameterGroups/<group>/parameters/<key>` for a grouped parameter; its default value is `<parameter>/defaultValue` and a conditional value `<parameter>/conditionalValues/<condition>`. The condition's expression is `/conditions/<index>/expression`. A document import's own warnings are `owner_replaced {email}` and `protection_kept`.
 
-A template fault is `422 invalid_document` with every fault reported, each with its pointer into the template: `invalid_json`, `required`, `duplicate_condition`, `unknown_condition`, `duplicate_parameter`, `invalid_value_type`, `invalid_value`, `type_immutable`.
+A template fault is `422 invalid_document` with every fault reported, each with its pointer into the template: `invalid_json`, `required`, `duplicate_condition`, `unknown_condition`, `duplicate_parameter`, `invalid_value_type`, `invalid_value`, `type_immutable`, `archived`.
 
 ## The demo project
 

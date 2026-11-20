@@ -311,6 +311,29 @@ func TestAFirebaseImportKeepsTheRulesThatServeAnExperimentAfterTheTranslatedOnes
 	}
 }
 
+func TestAFirebaseImportOfAValueAnArchivedFlagLacksIsRefusedAtTheParameter(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	k := p.Key
+	f := createFlag(t, admin, k, management.FlagCreate{Key: "banner_text", Type: management.FlagTypeString, Name: "Banner",
+		Variations: variations("a", `"Hello"`, "b", `"Other"`)})
+	if res := do(admin.ArchiveFlagWithResponse(t.Context(), k, "banner_text", &management.ArchiveFlagParams{IfMatch: ifMatch(f.Version)})); res.JSON200 == nil {
+		t.Fatalf("archive = %d %s", res.StatusCode(), res.Body)
+	}
+	actions := auditActions(t, admin, k)
+
+	template := []byte(`{"parameters": {"banner_text": {"defaultValue": {"value": "Something new"}}}}`)
+	res := firebaseImport(t, admin, k, "production", template)
+	got := violationsOf(t, "an archived flag given a new value", res.StatusCode(), res.Body, "invalid_document")
+	if !slices.Equal(got, []string{"/parameters/banner_text archived"}) {
+		t.Errorf("violations = %v, want archived at the parameter", got)
+	}
+	if after := auditActions(t, admin, k); !slices.Equal(after, actions) {
+		t.Errorf("a refused import recorded %v", after)
+	}
+}
+
 func TestAFirebaseImportRefusesWhatItCannotImportAndWritesNothing(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
