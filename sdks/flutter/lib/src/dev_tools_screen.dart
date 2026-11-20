@@ -10,7 +10,7 @@ import 'dev_tools.dart';
 /// Lists every flag the client currently holds — key, value, reason and
 /// stage — and lets QA edit or clear local overrides.
 ///
-/// A boolean flag toggles inline; every other type opens a dialog with a
+/// A boolean flag switches inline; every other type opens a dialog with a
 /// text field, parsed by the flag's type. Refused edits (a release build, a
 /// protected environment) simply do nothing, exactly as [FlagneticDevTools]
 /// does: nothing here needs to know why.
