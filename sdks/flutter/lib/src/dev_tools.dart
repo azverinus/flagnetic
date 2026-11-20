@@ -80,6 +80,15 @@ final class FlagneticDevTools {
       _refused(key);
       return false;
     }
+    // Checked here too: a released `flagnetic` accepts what the store cannot
+    // encode.
+    if (value is num && !value.isFinite) {
+      throw ArgumentError.value(
+        value,
+        'value',
+        'a local override of "$key" must be a finite number',
+      );
+    }
     return local.set(key, value);
   }
 
