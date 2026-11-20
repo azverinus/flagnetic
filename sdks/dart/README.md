@@ -53,7 +53,7 @@ Values come from, in order: the fresh response, the last good values in the stor
 
 ## Events
 
-Exposures and aliases are queued in the store, sent in batches and flushed every 5 seconds while the app is in the foreground, so events recorded offline are sent on a later start. Call `foreground()` and `background()` as the app's lifecycle changes.
+Exposures and aliases are queued in the store, sent in batches and flushed every 5 seconds while the app is in the foreground, so events recorded offline are sent on a later start. The evaluation summary is reported on its own interval, every 60 seconds by default (`ClientOptions.summaryInterval`), and when the app goes to the background and on `flush` and `close`: an app that only reads flags posts about one events request a minute, not one every 5 seconds. Call `foreground()` and `background()` as the app's lifecycle changes.
 
 ## Staying fresh
 

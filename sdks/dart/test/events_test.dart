@@ -5,6 +5,7 @@ library;
 // The persisted event queue of client mode: exposures,
 // aliases and evaluation summaries recorded on the device, surviving a
 // restart and flushed once with stable event IDs when the network returns.
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flagnetic/flagnetic.dart';
@@ -32,6 +33,7 @@ Future<({FlagneticClient client, MockServer server, LogRecorder logs})> serving(
   int exposureMemory = 1000,
   Duration retryBackoff = const Duration(milliseconds: 2),
   Duration flushInterval = const Duration(hours: 1),
+  Duration summaryInterval = const Duration(hours: 1),
   FlagneticContext context = testContext,
 }) async {
   final server = on ?? await MockServer.start();
@@ -47,6 +49,7 @@ Future<({FlagneticClient client, MockServer server, LogRecorder logs})> serving(
       platform: 'android',
       appVersion: '1.42.0',
       flushInterval: flushInterval,
+      summaryInterval: summaryInterval,
       retryBackoff: retryBackoff,
       eventBatchSize: eventBatchSize,
       eventQueueCapacity: eventQueueCapacity,
@@ -896,7 +899,7 @@ void main() {
         'next', () async {
       final run = await serving(
         experimentValues(),
-        retryBackoff: const Duration(seconds: 30),
+        retryBackoff: const Duration(milliseconds: 20),
       );
       addTearDown(() async {
         await run.client.close();
@@ -914,6 +917,7 @@ void main() {
       // The next window closes with another evaluation; the unanswered one
       // merges into it and reports under a new event ID.
       run.client.getBool('checkout', false);
+      unawaited(run.client.flush());
       await eventually(
         () => run.server.received.length > 2,
         reason: 'the retry went out',
@@ -931,6 +935,66 @@ void main() {
         },
       ]);
       await acceptBatch(merged);
+    });
+
+    test('reading flags alone posts nothing before the summary interval, an '
+        'exposure goes on the flush interval, and a summary follows on its '
+        'own', () async {
+      final run = await serving(
+        experimentValues(),
+        flushInterval: const Duration(milliseconds: 20),
+        summaryInterval: const Duration(milliseconds: 700),
+      );
+      addTearDown(() async {
+        await run.client.close();
+        await run.server.close();
+      });
+
+      for (var i = 0; i < 20; i++) {
+        run.client.getBool('checkout', false);
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(
+        run.server.received.where((e) => e.path == '/sdk/v1/events'),
+        isEmpty,
+        reason: 'reading flags is not a reason to post',
+      );
+
+      expose(run.client);
+      final exposure = await run.server.next(path: '/sdk/v1/events');
+      expect(eventsOf(exposure).map((e) => e['type']), ['exposure']);
+      await acceptBatch(exposure);
+
+      final summary = await run.server.next(path: '/sdk/v1/events');
+      expect(eventsOf(summary).map((e) => e['type']), ['evaluation_summary']);
+      await acceptBatch(summary);
+    });
+
+    test('going to the background reports the partial window', () async {
+      final run = await serving(experimentValues());
+      addTearDown(() async {
+        await run.client.close();
+        await run.server.close();
+      });
+
+      run.client
+        ..getBool('checkout', false)
+        ..background();
+      final exchange = await run.server.next(path: '/sdk/v1/events');
+      expect(eventsOf(exchange).map((e) => e['type']), ['evaluation_summary']);
+      await acceptBatch(exchange);
+    });
+
+    test('close reports the partial window', () async {
+      final run = await serving(experimentValues());
+      addTearDown(run.server.close);
+
+      run.client.getBool('checkout', false);
+      final closed = run.client.close();
+      final exchange = await run.server.next(path: '/sdk/v1/events');
+      expect(eventsOf(exchange).map((e) => e['type']), ['evaluation_summary']);
+      await acceptBatch(exchange);
+      await closed;
     });
 
     test('sendSummaries off sends no summary', () async {
