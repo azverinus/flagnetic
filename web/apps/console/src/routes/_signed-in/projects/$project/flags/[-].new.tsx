@@ -75,7 +75,7 @@ const me = "me";
 
 /** The fields whose refusals the form shows under them, by their pointers. */
 const fieldPointer =
-  /^\/(key|type|name|description|owner|tags(\/\d+)?|lifetime|expected_removal_at|variations\/\d+\/(key|value|name|description))$/;
+  /^\/(key|type|name|description|owner|tags(\/\d+)?|lifetime|expected_removal_at|variations\/\d+\/(key|value|name|description)(\/.*)?)$/;
 
 function CreateFlag({ project }: { project: string }) {
   const { i18n, t } = useLingui();

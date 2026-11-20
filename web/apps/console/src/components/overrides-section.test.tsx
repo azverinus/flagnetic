@@ -35,7 +35,7 @@ function configurationWith(overrides: { unit_type: string; unit_id: string }[]) 
   } as unknown as FlagConfiguration;
 }
 
-function show(configuration: FlagConfiguration, frozen?: string) {
+function show(configuration: FlagConfiguration, frozen?: string | true) {
   return renderWithProviders(
     <AccessContext.Provider
       value={{ permissions: new Set(["flag_configuration.update"]), roles: [] as never }}
@@ -107,6 +107,15 @@ describe("overrides where they cannot be written", () => {
 
     expect(await screen.findByText("emp-1")).toBeInTheDocument();
     expect(screen.getByText("The environment is protected.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Remove the override/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add override" })).not.toBeInTheDocument();
+  });
+
+  it("adds no reason of its own when the page already says why", async () => {
+    const { container } = show(configurationWith([{ unit_type: "user", unit_id: "emp-1" }]), true);
+
+    expect(await screen.findByText("emp-1")).toBeInTheDocument();
+    expect([...container.querySelectorAll("p")].map((p) => p.textContent)).not.toContain("");
     expect(screen.queryByRole("button", { name: /Remove the override/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add override" })).not.toBeInTheDocument();
   });

@@ -576,7 +576,11 @@ function EnvironmentPage(props: EnvironmentPageProps) {
             experiments: experiments.data,
           }}
           switches={switches}
-          overrides={<OverridesSection {...props} frozen={frozen ?? overridesProtected} />}
+          overrides={
+            // The archived flag's reason is the page's status above; saying it
+            // again under the overrides would repeat it.
+            <OverridesSection {...props} frozen={frozen ? true : overridesProtected} />
+          }
           evaluations={evaluations}
           readOnly={frozen ?? missing}
           proposes={editing.kind === "propose"}

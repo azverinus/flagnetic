@@ -349,24 +349,42 @@ export function isFullSemver(value: string): boolean {
 }
 
 /**
+ * The parts of a pattern RE2 and a browser's engine read differently: an
+ * escape, a `\Q…\E` literal, a character class, a look-around, a named
+ * capture and a flag group, each read as one token so that what looks like
+ * a group inside a class or after a backslash is not taken for one.
+ */
+const re2Token =
+  /\\Q[\s\S]*?(?:\\E|$)|\\[\s\S]|\[\^?\]?(?:\\[\s\S]|\[:\^?[a-z]+:\]|[^\]\\])*\]|\(\?<?[=!]|\(\?P<[A-Za-z_][A-Za-z0-9_]*>|\(\?[imsU]*(?:-[imsU]+)?\)|\(\?[imsU]*(?:-[imsU]+)?:/g;
+
+/**
  * Whether a pattern is one RE2, the engine every evaluator matches with,
  * runs. RE2 has no look-around and no back-references, which a browser's
- * engine would accept; it has flag groups (`(?i)`, `(?s:x)`) and `(?P<name>x)`
- * captures, which a browser's engine refuses. Those are rewritten to
- * their plain groups before the compile check, so the pattern is judged by
- * its shape and the server's `invalid_value` answers for the rest.
+ * engine would accept; it has flag groups (`(?i)`, `(?s:x)`), `(?P<name>x)`
+ * captures and `\Q…\E` literals, which a browser's engine refuses or reads
+ * otherwise. Those are rewritten to their plain forms before the compile
+ * check, so the pattern is judged by its shape and the server's
+ * `invalid_value` answers for the rest.
  */
 export function isRe2Pattern(pattern: string): boolean {
-  if (/\(\?<?[=!]|\\[1-9]/.test(pattern)) return false;
-  const plain = pattern.replace(
-    /\\[\s\S]|\(\?P<[A-Za-z_][A-Za-z0-9_]*>|\(\?[imsU]*(?:-[imsU]+)?\)|\(\?[imsU]*(?:-[imsU]+)?:/g,
-    (token) => {
-      if (token.startsWith("\\")) return token;
-      if (token.startsWith("(?P<")) return "(";
-      if (token.endsWith(")")) return "";
-      return "(?:";
-    },
-  );
+  let refused = false;
+  const plain = pattern.replace(re2Token, (token) => {
+    if (token.startsWith("\\Q")) {
+      return token.replace(/^\\Q|\\E$/g, "").replace(/[.*+?^${}()|[\]\\/-]/g, "\\$&");
+    }
+    if (token.startsWith("\\") || token.startsWith("[")) {
+      if (/^\\[1-9]$/.test(token)) refused = true;
+      return token;
+    }
+    if (/^\(\?<?[=!]$/.test(token)) {
+      refused = true;
+      return token;
+    }
+    if (token.startsWith("(?P<")) return "(";
+    if (token.endsWith(")")) return "";
+    return "(?:";
+  });
+  if (refused) return false;
   try {
     new RegExp(plain);
     return true;

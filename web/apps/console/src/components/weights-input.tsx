@@ -15,7 +15,7 @@ import {
   type WeightIssue,
   weightTotal,
 } from "@/lib/experiments";
-import { violationMessage } from "@/lib/problem-messages";
+import { violationAt, violationMessage } from "@/lib/problem-messages";
 
 export type WeightsInputProps = {
   rows: readonly WeightDraft[];
@@ -54,9 +54,7 @@ export function WeightsInput({
   );
   const refused = (index: number, field: "variation" | "weight") => {
     if (!(refusal instanceof ApiError)) return undefined;
-    const violation = refusal.violations.find(
-      (candidate) => candidate.pointer === `/variations/${index}/${field}`,
-    );
+    const violation = violationAt(refusal, `/variations/${index}/${field}`);
     return violation && violationMessage(i18n, violation);
   };
   const issueAt = (index: number, field: "variation" | "weight") =>

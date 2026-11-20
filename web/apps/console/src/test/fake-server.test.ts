@@ -31,6 +31,14 @@ describe("the fake server", () => {
     expect(takeUndeclared()).toEqual(["GET /projects/shop/environments/stagging"]);
   });
 
+  it("keeps what an earlier server in the same test was asked undeclared", async () => {
+    fakeServer({});
+    await getEnvironment({ path: { project: "shop", environment: "staging" } });
+    fakeServer({ "GET /projects/shop/environments/staging": reply<Environment>(staging) });
+
+    expect(takeUndeclared()).toEqual(["GET /projects/shop/environments/staging"]);
+  });
+
   it("checks a body against the generated type, so a renamed field fails tsc", () => {
     // @ts-expect-error `protected_at` is not a field of an environment
     reply<Environment>({ ...staging, protected_at: "2026-11-01T00:00:00Z" });

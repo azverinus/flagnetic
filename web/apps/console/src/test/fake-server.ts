@@ -59,7 +59,6 @@ export function takeUndeclared(): string[] {
  * with `problem`.
  */
 export function fakeServer(routes: Partial<Record<Route, Handler | FakeAnswer>>) {
-  undeclared = [];
   const requests: Request[] = [];
   const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);

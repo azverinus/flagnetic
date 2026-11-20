@@ -202,11 +202,18 @@ describe("values", () => {
       "(?i:beta)",
       "(?i)@example\\.com$",
       "(?i-s:x)",
+      "\\\\1",
+      "[(?=]",
+      "\\Q(?=\\E",
+      "\\Q(",
+      "[[:alpha:]]+",
     ]) {
       expect(isRe2Pattern(pattern), pattern).toBe(true);
     }
     expect(isRe2Pattern("(?i)(?=x)")).toBe(false);
     expect(isRe2Pattern("(?P<n>x)\\1")).toBe(false);
+    expect(isRe2Pattern("[a](?!b)")).toBe(false);
+    expect(isRe2Pattern("\\Qx\\E\\1")).toBe(false);
   });
 });
 
