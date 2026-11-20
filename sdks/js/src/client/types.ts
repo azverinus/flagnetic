@@ -82,7 +82,7 @@ export interface Status {
  *   `store`, `bootstrap`, `offline`), ruleset_version, flags.
  * - `fetch_failed` (warn): a remote evaluation failed; the held values keep
  *   serving. Fields: cause, status?, code?, retry_in_ms.
- * - `sse_connected` (info) and `sse_dropped` (warn): the change stream.
+ * - `sse_connected` (info) and `sse_dropped` (warn): the ruleset stream.
  *   Fields of the drop: cause, retry_in_ms.
  * - `stage_changed` (warn when leaving `fresh`, else info). Fields: from, to.
  * - `key_revoked` (error): 401 or 403, logged once until a fetch succeeds. Fields: status.
@@ -189,7 +189,7 @@ export interface ClientOptions {
    */
   readonly store?: ClientStore | false;
   /**
-   * Whether to hold the change stream, which brings a change within seconds
+   * Whether to hold the ruleset stream, which brings a change within seconds
    * at the cost of one connection per tab: false by default.
    */
   readonly stream?: boolean;
@@ -197,8 +197,18 @@ export interface ClientOptions {
   readonly pollInterval?: number;
   /** Milliseconds a remote evaluation or an events request may take: 5 000 by default. */
   readonly requestTimeout?: number;
-  /** Milliseconds between event flushes while the tab is visible: 5 000 by default. */
+  /**
+   * Milliseconds between event flushes while the tab is visible, of a queue
+   * that holds an exposure or an alias: 5 000 by default. A queue holding
+   * only an evaluation summary waits for the summary interval.
+   */
   readonly flushInterval?: number;
+  /**
+   * Milliseconds between evaluation summaries while the tab is visible: 60 000
+   * by default. The summary is also reported when the tab is hidden and when
+   * the client closes. Exposures and aliases keep the flush interval.
+   */
+  readonly summaryInterval?: number;
   /** Whether exposures are sent: true by default. Off logs a warning at construction. */
   readonly sendExposures?: boolean;
   /** Whether evaluation summaries are sent: true by default. */
@@ -222,7 +232,8 @@ export function copyJson<T extends JsonValue>(value: T): T {
   if (Array.isArray(value)) return (value as readonly JsonValue[]).map(copyJson) as unknown as T;
   if (typeof value === "object" && value !== null) {
     const out: Record<string, JsonValue> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = copyJson(v);
+    // defineProperty, so a "__proto__" key stays data.
+    for (const [k, v] of Object.entries(value)) Object.defineProperty(out, k, { value: copyJson(v), enumerable: true, writable: true, configurable: true });
     return out as T;
   }
   return value;

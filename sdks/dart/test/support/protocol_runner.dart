@@ -501,6 +501,9 @@ Future<void> _runScenario(
   final flushInterval = options['flush_interval_ms'] == null
       ? const Duration(hours: 1)
       : scale(options['flush_interval_ms']);
+  final summaryInterval = options['summary_interval_ms'] == null
+      ? const Duration(hours: 1)
+      : scale(options['summary_interval_ms']);
   final Sdk sdk = ClientSdk(
     Flagnetic.client(
       clientKey,
@@ -525,6 +528,7 @@ Future<void> _runScenario(
         minimumRefetchGap: const Duration(seconds: 10),
         offline: offlineSource,
         flushInterval: flushInterval,
+        summaryInterval: summaryInterval,
         sendExposures: options['send_exposures'] != false,
         sendSummaries: options['send_summaries'] == true,
         allowOverrides: options['allow_overrides'] == true,

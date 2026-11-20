@@ -71,6 +71,7 @@ final class ClientOptions {
     this.unauthorizedBackoffCap = const Duration(minutes: 15),
     this.closeTimeout = const Duration(seconds: 2),
     this.flushInterval = const Duration(seconds: 5),
+    this.summaryInterval = const Duration(seconds: 60),
     this.eventBatchSize = 100,
     this.eventQueueCapacity = 1000,
     this.exposureMemory = 1000,
@@ -152,9 +153,17 @@ final class ClientOptions {
   final Duration closeTimeout;
 
   /// How often the persisted event queue is sent while the app is
-  /// foregrounded. It also flushes when a batch has filled, when the app
-  /// goes to the background, and on `flush` and `close`.
+  /// foregrounded, when it holds an exposure or an alias. It also flushes
+  /// when a batch has filled, when the app goes to the background, and on
+  /// `flush` and `close`.
   final Duration flushInterval;
+
+  /// How often the evaluation summary is reported while the app is
+  /// foregrounded: 60 seconds by default. The summary is also reported when
+  /// the app goes to the background, and on `flush` and `close`, so an app
+  /// that reads flags all day posts one events request a minute rather than
+  /// one every flush interval.
+  final Duration summaryInterval;
 
   /// The most events one ingest batch carries. The endpoint's own limit is
   /// 500 and bounds this.

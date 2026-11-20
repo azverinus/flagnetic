@@ -1,7 +1,8 @@
 // Offline clients for deterministic tests, built from a ruleset document or
 // a map of flag key to value. No client built here touches the network.
 import { decodeDocument, type JsonValue } from "../evaluator/ruleset.js";
-import { FlagneticServer, typeOfValue } from "./client.js";
+import { FlagneticServer } from "./client.js";
+import { flagTypeOf } from "../internal/detail.js";
 import type { Recorder } from "./recorder.js";
 import type { RulesetSource, ServerOptions } from "./types.js";
 
@@ -84,7 +85,7 @@ function parse(source: RulesetSource): Doc {
 
 function setFlag(doc: Doc, key: string, value: JsonValue): void {
   const flags: unknown[] = Array.isArray(doc.flags) ? (doc.flags as unknown[]) : [];
-  let type: string = typeOfValue(value);
+  let type: string = flagTypeOf(value);
   const at = flags.findIndex((f) => typeof f === "object" && f !== null && (f as { key?: unknown }).key === key);
   if (at >= 0) {
     const existing = (flags[at] as { type?: unknown }).type;

@@ -82,3 +82,29 @@ export async function writeStore(path: string, sdkKey: string, document: string)
     throw e;
   }
 }
+
+/** How old a temporary file must be before it counts as left behind by a write that never finished. */
+const STALE_TEMPORARY_MS = 60_000;
+
+/**
+ * Removes the temporary files of this store that an interrupted write left
+ * beside it. A file younger than a minute may belong to another process
+ * writing the same store, and is left alone. Never throws: a store that
+ * cannot be tidied still serves.
+ */
+export async function removeStaleTemporaries(path: string): Promise<void> {
+  try {
+    const fs = await import("node:fs/promises");
+    const nodePath = await import("node:path");
+    const dir = nodePath.dirname(path);
+    const mine = new RegExp(`^${nodePath.basename(path).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.\\d+\\.[a-z0-9]+\\.tmp$`);
+    for (const name of await fs.readdir(dir)) {
+      if (!mine.test(name)) continue;
+      const file = nodePath.join(dir, name);
+      const stat = await fs.stat(file);
+      if (Date.now() - stat.mtimeMs > STALE_TEMPORARY_MS) await fs.rm(file, { force: true });
+    }
+  } catch {
+    // Nothing to tidy, or nothing that can be.
+  }
+}

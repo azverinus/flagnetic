@@ -51,8 +51,11 @@ typedef IngestSettings = ({
   String? appVersion,
   Duration requestTimeout,
 
-  /// How often the queue is sent.
+  /// How often the queue is sent when it holds an exposure or an alias.
   Duration flushInterval,
+
+  /// How often the evaluation summary is materialized.
+  Duration summaryInterval,
   int eventBatchSize,
   int eventQueueCapacity,
   Duration retryBackoff,
@@ -64,7 +67,11 @@ typedef IngestSettings = ({
 /// The event queue and the ingest batches it sends.
 ///
 /// Exposures and aliases are appended with the event ID they keep for every
-/// retry, and the evaluation summary rides in the same batch. The queue
+/// retry. The evaluation summary is materialized on its own interval, and
+/// when the app goes to the background and when it flushes or closes; a
+/// batch carries whatever is queued, but the flush interval sends one only
+/// for an exposure or an alias, so an app reading flags does not post every
+/// few seconds. The queue
 /// lives in the client's store, so an app killed while offline sends what it
 /// recorded on its next start, exactly once.
 ///
@@ -115,6 +122,7 @@ final class Ingest {
   Future<void> _writes = Future.value();
   Future<void> _settled = Future.value();
   Timer? _timer;
+  Timer? _summaryTimer;
   Timer? _retry;
   // The event IDs of the batch being posted. A summary among them is not
   // merged forward while the platform may still be accepting it, which
@@ -146,7 +154,10 @@ final class Ingest {
   }
 
   /// Starts the flush interval; called once the client is running.
-  void start() => _arm();
+  void start() {
+    _arm();
+    _armSummary();
+  }
 
   /// Follows the application: the interval runs while it is foregrounded,
   /// and going to the background flushes best effort: by beacon in a
@@ -159,11 +170,14 @@ final class Ingest {
       if (_foreground) return;
       _foreground = true;
       _arm();
+      _armSummary();
       return;
     }
     _foreground = false;
     _timer?.cancel();
     _timer = null;
+    _summaryTimer?.cancel();
+    _summaryTimer = null;
     if (!_beacon()) unawaited(flush());
   }
 
@@ -228,7 +242,7 @@ final class Ingest {
     if (_closed) return;
     _append(event);
     if (_queue.length >= _settings.eventBatchSize) {
-      unawaited(flush());
+      unawaited(_drain());
     }
   }
 
@@ -243,6 +257,14 @@ final class Ingest {
     // has been counted reaches the store rather than dying with the
     // process.
     _materialize();
+    return _drain();
+  }
+
+  /// Sends what is queued without closing the summary window first.
+  Future<void> _drain() async {
+    if (_closed) return;
+    await _loaded;
+    if (_closed) return;
     if (_sending || _retry != null) return _settled;
     if (_queue.isEmpty) return;
     return _settled = _send();
@@ -253,6 +275,8 @@ final class Ingest {
     _closed = true;
     _timer?.cancel();
     _timer = null;
+    _summaryTimer?.cancel();
+    _summaryTimer = null;
     _retry?.cancel();
     _retry = null;
   }
@@ -399,9 +423,21 @@ final class Ingest {
   /// Turns what has been counted since the last batch into one evaluation
   /// summary, folding in a window whose report never arrived and dropping
   /// one too old to place.
-  void _materialize() {
+  ///
+  /// On the summary interval ([waitForFlight]) the counts wait while a
+  /// summary is being posted, so the queue never holds two unsent windows;
+  /// a flush, a background and a close cannot wait.
+  void _materialize({bool waitForFlight = false}) {
     _dropStaleWindows();
     if (!_settings.sendSummaries || _summary.isEmpty) return;
+    if (waitForFlight &&
+        _queue.any(
+          (e) =>
+              e['type'] == EventTypes.evaluationSummary &&
+              _inFlight.contains(e['event_id']),
+        )) {
+      return;
+    }
     final window = _summary.take();
     if (window.rows.isEmpty) return;
     var rows = window.rows;
@@ -478,7 +514,28 @@ final class Ingest {
     if (_closed || !_foreground) return;
     _timer = Timer(_settings.flushInterval, () {
       _timer = null;
-      unawaited(flush().whenComplete(_arm));
+      // The flush interval carries exposures and aliases: a queue of
+      // nothing but a summary waits for the summary interval.
+      final due = _queue.any((e) => e['type'] != EventTypes.evaluationSummary);
+      unawaited((due ? _drain() : Future<void>.value()).whenComplete(_arm));
+    });
+  }
+
+  void _armSummary() {
+    _summaryTimer?.cancel();
+    _summaryTimer = null;
+    if (_closed || !_foreground) return;
+    _summaryTimer = Timer(_settings.summaryInterval, () {
+      _summaryTimer = null;
+      unawaited(
+        _loaded
+            .then((_) async {
+              if (_closed) return;
+              _materialize(waitForFlight: true);
+              await _drain();
+            })
+            .whenComplete(_armSummary),
+      );
     });
   }
 
@@ -553,7 +610,7 @@ final class Ingest {
     _retry?.cancel();
     _retry = Timer(delay, () {
       _retry = null;
-      unawaited(flush());
+      unawaited(_drain());
     });
   }
 

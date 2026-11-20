@@ -315,8 +315,6 @@ export class Delivery {
     this.fetchDueAt = this.clock.now() + delay;
   }
 
-
-
   /** One ruleset request and what its response means. */
   private async request(): Promise<Outcome> {
     const held = this.host.heldVersion();

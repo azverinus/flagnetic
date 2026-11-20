@@ -1,6 +1,6 @@
 // The browser client's behaviour the protocol fixtures leave to each SDK:
 // construction, browser storage (a store that throws included), bootstrap,
-// the refetch triggers a tab has, the change stream, the persisted event
+// the refetch triggers a tab has, the ruleset stream, the persisted event
 // queue, local overrides and offline mode. It runs in Node and in a real
 // browser, on a virtual clock, against the mock of `fetch` in
 // test/support/mock-network.ts.
@@ -681,7 +681,7 @@ describe("refetch triggers", () => {
 
 // ---------------------------------------------------------------- the stream
 
-describe("the change stream", () => {
+describe("the ruleset stream", () => {
   test("the stream is off unless asked for", async () => {
     const h = harness();
     h.client({ store: false });
@@ -714,6 +714,42 @@ describe("the change stream", () => {
     expect(h.net.waiting("/sdk/v1/evaluate")).toHaveLength(1);
     await h.serve("/sdk/v1/evaluate", values(2, { checkout: boolFlag(false) }));
     expect(c.getBool("checkout", true)).toBe(false);
+  });
+
+  test("an answer below the announced version is retried within a second, instead of waiting for the poll", async () => {
+    const h = harness();
+    const c = h.client({ store: false, stream: true, pollInterval: 300_000 });
+    (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: "retry: 3000\n\n" });
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
+
+    h.net.send('event: ruleset\nid: 2\ndata: {"version":2}\n\n');
+    // A replica that has not loaded version 2 yet answers version 1.
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
+    expect(c.getBool("checkout", false)).toBe(true);
+    const behind = h.clock.now();
+    const retry = await h.waitFor("/sdk/v1/evaluate", 1_000);
+    expect(retry.at - behind).toBeLessThanOrEqual(1_000);
+    await h.serve("/sdk/v1/evaluate", values(2, { checkout: boolFlag(false) }));
+    expect(c.getBool("checkout", true)).toBe(false);
+    await h.advance(60_000);
+    expect(h.net.waiting("/sdk/v1/evaluate"), "caught up: nothing more until the poll").toHaveLength(0);
+  });
+
+  test("a replica that never catches up is retried at 1, 2 and 4 seconds, then the announcement is dropped", async () => {
+    const h = harness();
+    h.client({ store: false, stream: true, pollInterval: 300_000 });
+    (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: "retry: 3000\n\n" });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    h.net.send('event: ruleset\nid: 2\ndata: {"version":2}\n\n');
+    const at: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const req = await h.waitFor("/sdk/v1/evaluate", 5_000);
+      at.push(req.at);
+      await h.serve("/sdk/v1/evaluate", values(1, {}));
+    }
+    expect(at.slice(1).map((t, i) => t - (at[i] ?? 0))).toStrictEqual([1_000, 2_000, 4_000]);
+    await h.advance(60_000);
+    expect(h.net.waiting("/sdk/v1/evaluate"), "the poll takes over").toHaveLength(0);
   });
 
   test("a stream the server closes is reconnected within 2 s with Last-Event-ID, and the client evaluates again", async () => {
@@ -757,7 +793,7 @@ describe("the change stream", () => {
   });
 });
 
-describe("the change stream, refused", () => {
+describe("the ruleset stream, refused", () => {
   test("a stream answering 401 stays closed, logs key_revoked once, and opens again after an evaluation succeeds", async () => {
     const h = harness();
     h.client({ store: false, stream: true, pollInterval: 30_000 });
@@ -1188,5 +1224,216 @@ describe("detail changes", () => {
     await h.advance(30_000);
     await h.serve("/sdk/v1/evaluate", values(4, { checkout: boolFlag(true), banner: boolFlag(false) }));
     expect(changed).toStrictEqual([["checkout"], ["checkout"]]);
+  });
+});
+
+// ------------------------------------------------- summaries and the queue
+
+/** The events a request carries. */
+function eventsOf(req: Pending): Record<string, unknown>[] {
+  return (JSON.parse(req.body ?? "{}") as { events: Record<string, unknown>[] }).events;
+}
+
+/** The queue as the store holds it. */
+function queued(store: MemoryStore): Record<string, unknown>[] {
+  return JSON.parse(store.getItem(keys.events) ?? "[]") as Record<string, unknown>[];
+}
+
+const accepted = (n: number) => ({ status: 202, body: JSON.stringify({ accepted: n, duplicates: 0, dropped_rows: 0, rejected: [] }) });
+
+describe("evaluation summaries in the queue", () => {
+  const options = { pollInterval: 3_600_000 };
+
+  test("an app reading a flag every second posts nothing in its first 50 seconds, an exposure goes within the flush interval, and a summary follows on the summary interval", async () => {
+    const h = harness();
+    const c = h.client({ ...options, store: false });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true), tested: experimentFlag(true, false) }));
+    for (let s = 1; s <= 50; s++) {
+      await h.advance(1_000);
+      c.getBool("plain", false);
+      if (s === 10) {
+        c.getBool("tested", false);
+        c.exposure("tested");
+        await h.advance(5_000);
+        s += 5;
+        const req = h.net.waiting("/sdk/v1/events")[0];
+        expect(req, "the exposure goes out within the flush interval").toBeDefined();
+        expect(eventsOf(req as Pending).map((e) => e.type), "without a summary riding along").toStrictEqual(["exposure"]);
+        (req as Pending).answer(accepted(1));
+        await settle();
+      }
+    }
+    expect(h.net.waiting("/sdk/v1/events"), "reading flags alone posts nothing").toHaveLength(0);
+    await h.advance(11_000);
+    const summary = h.net.waiting("/sdk/v1/events");
+    expect(summary).toHaveLength(1);
+    expect(eventsOf(summary[0] as Pending).map((e) => e.type)).toStrictEqual(["evaluation_summary"]);
+  });
+
+  test("hiding the page hands the partial window to the beacon", async () => {
+    const h = harness();
+    const c = h.client({ ...options, store: false });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
+    c.getBool("plain", false);
+    await h.advance(20_000);
+    expect(h.net.waiting("/sdk/v1/events")).toHaveLength(0);
+    h.page.hide();
+    const beacons = h.net.waiting("/sdk/v1/events").filter((p) => p.kind === "beacon");
+    expect(beacons.map((b) => eventsOf(b).map((e) => e.type))).toStrictEqual([["evaluation_summary"]]);
+  });
+
+  test("closing sends the partial window", async () => {
+    const h = harness();
+    const c = h.client({ ...options, store: false });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
+    c.getBool("plain", false);
+    const closing = c.close();
+    const req = await h.waitFor("/sdk/v1/events");
+    expect(eventsOf(req).map((e) => e.type)).toStrictEqual(["evaluation_summary"]);
+    req.answer(accepted(1));
+    await closing;
+  });
+
+  test("an outage keeps one summary and the exposure, and the exposure arrives when the endpoint answers again", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ ...options, store, flushInterval: 30_000, summaryInterval: 30_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true), tested: experimentFlag(true, true) }));
+    c.getBool("tested", false);
+    let largest = 0;
+    for (let t = 0; t < 30 * 60_000; t += 30_000) {
+      c.getBool("plain", false);
+      await h.advance(30_000);
+      for (const req of h.net.waiting("/sdk/v1/events")) {
+        largest = Math.max(largest, (req.body ?? "").length);
+        req.answer({ status: 503 });
+      }
+      await settle();
+      expect(queued(store).filter((e) => e.type === "evaluation_summary").length, "one summary window is kept").toBeLessThanOrEqual(1);
+    }
+    expect(queued(store).filter((e) => e.type === "exposure")).toHaveLength(1);
+    expect(h.count("queue_dropped")).toBe(0);
+
+    const req = await h.waitFor("/sdk/v1/events");
+    const sent = eventsOf(req);
+    expect(sent[0]?.type, "the exposure goes first").toBe("exposure");
+    expect(sent.filter((e) => e.type === "evaluation_summary")).toHaveLength(1);
+    expect(largest).toBeLessThan(1 << 20);
+    req.answer(accepted(sent.length));
+    await settle();
+    expect(queued(store)).toHaveLength(0);
+  }, 60_000);
+
+  test("a window older than an hour is dropped with a log, and the counts since survive", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ ...options, store, flushInterval: 600_000, summaryInterval: 300_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
+    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+    for (let t = 0; t < 90 * 60_000; t += 300_000) {
+      c.getBool("plain", false);
+      await h.advance(300_000);
+      for (const req of h.net.waiting("/sdk/v1/events")) req.answer({ status: 503 });
+      await settle();
+    }
+    expect(h.logs.some((l) => l.event === "queue_dropped" && l.fields.cause === "window_older_than_one_hour")).toBe(true);
+    const summaries = queued(store).filter((e) => e.type === "evaluation_summary");
+    expect(summaries).toHaveLength(1);
+    expect(h.clock.now() - Date.parse(String(summaries[0]?.interval_start))).toBeLessThanOrEqual(3_600_000 + 600_000);
+  }, 60_000);
+
+  test("an unsent window with nothing counted since keeps its event ID through the summary interval", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ ...options, store, flushInterval: 600_000, summaryInterval: 60_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
+    c.getBool("plain", false);
+    await h.advance(60_000);
+    for (const req of h.net.waiting("/sdk/v1/events")) req.answer({ status: 503 });
+    await settle();
+    const before = queued(store).filter((e) => e.type === "evaluation_summary").map((e) => e.event_id);
+    expect(before).toHaveLength(1);
+    for (let i = 0; i < 3; i++) {
+      await h.advance(60_000);
+      for (const req of h.net.waiting("/sdk/v1/events")) req.answer({ status: 503 });
+      await settle();
+    }
+    expect(queued(store).filter((e) => e.type === "evaluation_summary").map((e) => e.event_id)).toStrictEqual(before);
+  });
+
+  test("a stored window whose start cannot be read is dropped, not merged", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const broken = { type: "evaluation_summary", event_id: "s-1", interval_start: "not a time", interval_end: "2026-01-01T00:01:00.000Z", ruleset_version: 1, counts: [{ flag: "plain", variation: "on", reason: "fallthrough", count: 5 }] };
+    store.setItem(keys.events, JSON.stringify([broken]));
+    const c = h.client({ ...options, store, flushInterval: 600_000, summaryInterval: 60_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
+    c.getBool("plain", false);
+    await h.advance(60_000);
+    const summaries = queued(store).filter((e) => e.type === "evaluation_summary");
+    expect(summaries.map((e) => e.event_id)).not.toContain("s-1");
+    expect(JSON.stringify(summaries)).not.toContain('"count":5');
+  });
+
+  test("a full queue drops its summaries before an exposure or an alias", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const summary = { type: "evaluation_summary", event_id: "s-1", interval_start: "2026-01-01T00:00:00.000Z", interval_end: "2026-01-01T00:01:00.000Z", ruleset_version: 1, counts: [] };
+    const alias = (id: string) => ({ type: "alias", event_id: id });
+    store.setItem(keys.events, JSON.stringify([alias("a-1"), summary, alias("a-2")]));
+    const c = h.client({ ...options, store, flushInterval: 3_600_000, sendSummaries: false }, key, { capacity: 3 });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-3", toUnitType: "user", toUnitId: "u-1001" });
+    expect(queued(store).map((e) => e.type)).toStrictEqual(["alias", "alias", "alias"]);
+    expect(queued(store).map((e) => e.event_id)[0]).toBe("a-1");
+  });
+
+  test("a batch is packed under the endpoint's 1 MiB, the exposure first", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const pad = "x".repeat(20_000);
+    const summaries = Array.from({ length: 60 }, (_, i) => ({ type: "evaluation_summary", event_id: `s-${i}`, interval_start: "2026-01-01T00:00:00.000Z", interval_end: "2026-01-01T00:01:00.000Z", ruleset_version: 1, counts: [], pad }));
+    store.setItem(keys.events, JSON.stringify([{ type: "alias", event_id: "a-1" }, ...summaries]));
+    const c = h.client({ ...options, store, sendSummaries: false });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    void c.flush();
+    const sizes: number[] = [];
+    let first = true;
+    for (let i = 0; i < 2; i++) {
+      const req = await h.waitFor("/sdk/v1/events");
+      const body = req.body ?? "";
+      sizes.push(new TextEncoder().encode(body).length);
+      if (first) expect(eventsOf(req)[0]?.event_id).toBe("a-1");
+      first = false;
+      req.answer(accepted(eventsOf(req).length));
+      await settle();
+    }
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(1 << 20);
+    expect(queued(store)).toHaveLength(0);
+  });
+});
+
+describe("a JSON value with a __proto__ key", () => {
+  const served = JSON.parse('{"__proto__": {"admin": true}, "plain": 1}') as JsonValue;
+
+  test("is served with the key as data and no inherited member", async () => {
+    const h = harness();
+    const c = h.client({ store: false });
+    await h.serve("/sdk/v1/evaluate", values(1, { cfg: { type: "json", value: served, variation: "v", reason: "targeting_match", override_influenced: false, automatic_exposure: false } }));
+    const got = c.getJson("cfg", {}) as Record<string, unknown>;
+    expect(Object.hasOwn(got, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(got)).toBe(Object.prototype);
+    expect((got as { admin?: unknown }).admin).toBeUndefined();
+    expect(JSON.stringify(got)).toBe('{"__proto__":{"admin":true},"plain":1}');
+  });
+
+  test("is kept by a local override", async () => {
+    const h = harness();
+    const c = h.client({ store: false, allowOverrides: true });
+    await h.serve("/sdk/v1/evaluate", values(1, { cfg: { type: "json", value: {}, variation: "v", reason: "targeting_match", override_influenced: false, automatic_exposure: false } }));
+    c.overrides.set("cfg", served);
+    const got = c.getJson("cfg", {}) as Record<string, unknown>;
+    expect(Object.hasOwn(got, "__proto__")).toBe(true);
+    expect((got as { admin?: unknown }).admin).toBeUndefined();
   });
 });

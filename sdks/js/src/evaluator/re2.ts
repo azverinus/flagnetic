@@ -44,7 +44,7 @@ export function compileRE2(pattern: string): Matcher {
 }
 
 /** The longest input, in UTF-8 bytes, that a `matches` condition tests; a longer one does not match. */
-export const MAX_INPUT_BYTES = 64 * 1024;
+const MAX_INPUT_BYTES = 64 * 1024;
 
 function utf8Bytes(s: string): number {
   return new TextEncoder().encode(s).length;

@@ -14,7 +14,7 @@ import { Ingest } from "./ingest.js";
 import { causeOf, consoleLogger, safeLog } from "./logger.js";
 import { Recorder } from "./recorder.js";
 import { Summaries } from "./summaries.js";
-import { readStore, writeStore } from "./store.js";
+import { readStore, removeStaleTemporaries, writeStore } from "./store.js";
 import type {
   Detail,
   DetailErrorCode,
@@ -53,7 +53,7 @@ export interface EventTiming {
   readonly detailMemory: number;
 }
 
-export const defaultEventTiming: EventTiming = {
+const defaultEventTiming: EventTiming = {
   flushInterval: 2_000,
   batchSize: 500,
   capacity: 10_000,
@@ -141,6 +141,7 @@ export class FlagneticServer {
   /** The store file and the key its content belongs to. */
   private readonly store: { readonly path: string; readonly sdkKey: string } | undefined;
   private storeWrites: Promise<void> = Promise.resolve();
+  private readonly clock: Clock;
   private readonly changeListeners = new Set<(keys: string[]) => void>();
   private readonly stageListeners = new Set<(stage: Stage) => void>();
   private readyWaiters: (() => void)[] = [];
@@ -178,6 +179,7 @@ export class FlagneticServer {
       ...(options.summaryInterval !== undefined && { summaryInterval: options.summaryInterval }),
       ...internals.eventTiming,
     };
+    this.clock = internals.clock ?? realClock;
     this.now = internals.now ?? Date.now;
     this.random = internals.random ?? Math.random;
     this.exposed = new ExposureSuppressor(this.eventTiming.exposureMemory);
@@ -232,7 +234,7 @@ export class FlagneticServer {
           this.markReady();
         },
         failed: () => {
-          this.staleSince ??= new Date();
+          this.staleSince ??= new Date(this.now());
           if (this.currentStage === "fresh") this.setStage("last_good");
         },
         log: (level, event, fields) => {
@@ -242,7 +244,7 @@ export class FlagneticServer {
     );
     const now = this.now;
     const random = this.random;
-    const clock = internals.clock ?? realClock;
+    const clock = this.clock;
     const ingest = new Ingest({
       baseUrl,
       sdkKey,
@@ -298,6 +300,7 @@ export class FlagneticServer {
 
   private async start(): Promise<void> {
     if (this.store !== undefined) {
+      await removeStaleTemporaries(this.store.path);
       try {
         const stored = await readStore(this.store.path, this.store.sdkKey);
         if (stored && !this.held && !this.closed) {
@@ -349,17 +352,17 @@ export class FlagneticServer {
   ready(timeout?: number): Promise<Stage> {
     if (this.isReady || this.closed) return Promise.resolve(this.currentStage);
     return new Promise((resolve) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
+      let timer: unknown;
       const done = (): void => {
-        clearTimeout(timer);
+        this.clock.clearTimeout(timer);
         this.readyWaiters = this.readyWaiters.filter((w) => w !== done);
         resolve(this.currentStage);
       };
       this.readyWaiters.push(done);
       if (timeout !== undefined) {
-        timer = setTimeout(done, Math.max(0, timeout));
-        // A pending ready never keeps a Node process alive.
-        (timer as { unref?: () => void }).unref?.();
+        // On the clock the client was built with, whose real timers never
+        // keep a Node process alive.
+        timer = this.clock.setTimeout(done, Math.max(0, timeout));
       }
     });
   }
@@ -395,7 +398,7 @@ export class FlagneticServer {
         this.log("error", "evaluation_failed", { operation: "flush", cause: causeOf(e) });
       },
     );
-    await Promise.race([flushed, deadline(timeout)]);
+    await Promise.race([flushed, this.deadline(timeout)]);
   }
 
   /**
@@ -409,10 +412,12 @@ export class FlagneticServer {
     this.closed = true;
     this.delivery?.close();
     this.markReady();
-    const flushed = Promise.all([this.summaries?.close(), this.queue?.close()]).catch((e: unknown) => {
+    // The write of the last ruleset is part of closing: a process that exits
+    // right after loses it otherwise, and leaves a temporary file behind.
+    const flushed = Promise.all([this.summaries?.close(), this.queue?.close(), this.storeWrites]).catch((e: unknown) => {
       this.log("error", "evaluation_failed", { operation: "close", cause: causeOf(e) });
     });
-    await Promise.race([flushed, deadline(this.eventTiming.closeTimeout)]);
+    await Promise.race([flushed, this.deadline(this.eventTiming.closeTimeout)]);
   }
 
   /**
@@ -433,8 +438,9 @@ export class FlagneticServer {
    * serialised into the page it rendered and handed to `createClient`'s
    * `bootstrap`, so the browser hydrates with the values the page was
    * rendered from. The document is masked: where targeting decided a value
-   * its reason is `targeting_match` and no rule is named, because a page
-   * is public. Read the true reason from `getDetail`.
+   * its reason is `targeting_match` and no rule is named, and an
+   * override reads as targeting too unless it led the unit into a running
+   * experiment, because a page is public. Read the true reason from `getDetail`.
    *
    * Undefined at stage `built_in`: there is nothing to render from, the page
    * serves built-in defaults, and the browser that hydrates it does the same
@@ -494,6 +500,13 @@ export class FlagneticServer {
     return this.evaluate(key, flagTypeOf(defaultValue), defaultValue, context);
   }
 
+  /** A promise resolving after ms on the client's clock. */
+  private deadline(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.clock.setTimeout(resolve, Math.max(0, ms));
+    });
+  }
+
   // The API boundary every getter goes through: it never throws, and an
   // offline client counts what it served.
   private evaluate<T extends JsonValue>(key: string, type: FlagType, def: T, context: Context): Detail<T> {
@@ -512,11 +525,12 @@ export class FlagneticServer {
       // stops carrying an experiment block forgets what it served, so the
       // call reports nothing rather than an assignment the ruleset no
       // longer serves.
-      const fingerprint = contextFingerprint(context);
+      // The fingerprint serializes the context, which only a flag that
+      // carries an experiment block, or ever did, has any use for.
       if (d.experiment) {
-        this.served.remember(key, fingerprint, { experiment: d.experiment, reason: d.reason, rulesetVersion: d.rulesetVersion ?? 0 });
-      } else {
-        this.served.forget(key, fingerprint, d.rulesetVersion ?? 0);
+        this.served.remember(key, contextFingerprint(context), { experiment: d.experiment, reason: d.reason, rulesetVersion: d.rulesetVersion ?? 0 });
+      } else if (this.served.everCarried(key)) {
+        this.served.forget(key, contextFingerprint(context), d.rulesetVersion ?? 0);
       }
       // Automatic exposure is the flag's own setting, carried on the result:
       // every evaluation with an experiment block emits, as if `exposure` had
@@ -676,7 +690,7 @@ export class FlagneticServer {
   // load swaps in a decoded ruleset: stage fresh, ready, change listeners.
   private load(rs: Ruleset, source: "offline" | "network"): void {
     const prev = this.held;
-    this.swap(rs, new Date(), source);
+    this.swap(rs, new Date(this.now()), source);
     this.setStage("fresh");
     this.markReady();
     const dropped = this.refuseLocalOverrides(rs);
@@ -848,9 +862,6 @@ export class LocalOverrides {
 
 export { LocalOverrideRefused, LocalOverridesNotAllowed };
 
-/** The flag type a value belongs to: boolean, string, number, anything else JSON. */
-export { flagTypeOf as typeOfValue } from "../internal/detail.js";
-
 function frozenJson(v: JsonValue): JsonValue {
   const copy = JSON.parse(JSON.stringify(v)) as JsonValue;
   const freeze = (x: unknown): void => {
@@ -861,14 +872,6 @@ function frozenJson(v: JsonValue): JsonValue {
   };
   freeze(copy);
   return copy;
-}
-
-/** A promise resolving after ms of real time; it never keeps a Node process alive. */
-function deadline(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    const t = setTimeout(resolve, Math.max(0, ms));
-    (t as { unref?: () => void }).unref?.();
-  });
 }
 
 function isObject(v: unknown): v is Context {

@@ -217,6 +217,7 @@ final class FlagneticClient {
         appVersion: _options.appVersion,
         requestTimeout: _options.requestTimeout,
         flushInterval: _options.flushInterval,
+        summaryInterval: _options.summaryInterval,
         eventBatchSize: _options.eventBatchSize,
         eventQueueCapacity: _options.eventQueueCapacity,
         retryBackoff: _options.retryBackoff,

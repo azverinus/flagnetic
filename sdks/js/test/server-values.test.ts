@@ -122,6 +122,28 @@ const everyReason = {
     flag("switched_off", { on: false }),
     flag("gated", { prerequisites: [{ flag: "switched_off", variation: "on" }] }),
     flag("pinned", { overrides: [{ unit_type: "user", unit_id: "u-1", variation: "on" }] }),
+    flag("behind_pinned", { prerequisites: [{ flag: "pinned", variation: "on" }] }),
+    flag("pinned_into_test", {
+      overrides: [{ unit_type: "user", unit_id: "u-1", variation: "on" }],
+      rules: [
+        {
+          id: "r-exp-pinned",
+          conditions: [],
+          serve: {
+            kind: "experiment",
+            experiment: "pinned_exp",
+            unit_type: "user",
+            inclusion_salt: "inclusion-salt",
+            variation_salt: "variation-salt",
+            traffic_allocation: 10000,
+            weights: [
+              { variation: "on", weight: 10000 },
+              { variation: "off", weight: 0 },
+            ],
+          },
+        },
+      ],
+    }),
     flag("tested", {
       rules: [
         {
@@ -177,10 +199,27 @@ describe("the mask, reason by reason", () => {
 
   test.each([
     ["switched_off", "off"],
-    ["pinned", "override"],
     ["tested", "experiment"],
   ])("serves %s, decided by %s, under its own reason: a client key is told it too", (key, reason) => {
     expect(doc?.flags[key]?.reason).toBe(reason);
+  });
+
+  test("serves an override as targeting_match and never says an override influenced it", () => {
+    expect(flags.getDetail(germanUser, "pinned", false).reason).toBe("override");
+    expect(doc?.flags.pinned?.reason).toBe("targeting_match");
+    expect(doc?.flags.pinned?.override_influenced).toBe(false);
+  });
+
+  test("does not tell through a prerequisite that an override decided it", () => {
+    expect(doc?.flags.behind_pinned?.reason).toBe("targeting_match");
+    expect(doc?.flags.behind_pinned?.override_influenced).toBe(false);
+  });
+
+  test("keeps an override that leads the unit into a running experiment: the exposure is left out of analysis", () => {
+    const served = doc?.flags.pinned_into_test;
+    expect(served?.reason).toBe("override");
+    expect(served?.override_influenced).toBe(true);
+    expect(served?.experiment?.override).toBe(true);
   });
 
   test("keeps the experiment block whole: the browser reports the exposure from it", () => {

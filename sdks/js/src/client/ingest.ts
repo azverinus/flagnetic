@@ -1,12 +1,17 @@
 // The persisted event queue and the batches it posts to /sdk/v1/events.
 // Exposures and aliases are appended with the event ID they keep for every
-// retry; the evaluation summary rides along in the same batch. The queue
+// retry. The evaluation summary is materialized on its own interval, and
+// when the page is hidden or closed: the queue never holds more than one
+// unsent window of it, merged forward through an outage and dropped once its
+// interval began over an hour ago, so summaries cannot push exposures out of
+// a full queue. A batch goes out when the queue holds an exposure or an
+// alias, and carries whatever else is queued. The queue
 // lives in browser storage under the SDK key, so a tab closed mid-flush
 // sends its events on the next load, and a hidden or closing tab hands it
 // to the page's beacon.
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
-import { summaryEvents, SummaryCounter, utf8Length, type QueuedEvent, type SummaryRow } from "../internal/events.js";
+import { countKey, orderRows, packBatch, summaryEvents, SummaryCounter, utf8Length, type QueuedEvent, type SummaryRow } from "../internal/events.js";
 import { causeOf, type LogLevel } from "../internal/logger.js";
 import type { SafeStore } from "./storage.js";
 import type { LogEvent, Reason } from "./types.js";
@@ -33,10 +38,14 @@ export interface IngestConfig {
    * survive, and a closed tab's leftovers go with the next batch.
    */
   readonly queueKey: string;
-  /** The most events one batch carries. */
+  /** The queue length at which a recorded event flushes at once, and the most events one beacon carries. */
   readonly batchSize: number;
-  /** Milliseconds between flushes while the tab is visible. */
+  /** Milliseconds between flushes while the tab is visible, of a queue that holds an exposure or an alias. */
   readonly flushInterval: number;
+  /** Milliseconds between evaluation summaries while the tab is visible. */
+  readonly summaryInterval: number;
+  /** The age past which an unsent summary window is dropped, in milliseconds. */
+  readonly maxWindowAge: number;
   readonly requestTimeout: number;
   readonly retryInitial: number;
   readonly retryMax: number;
@@ -59,7 +68,7 @@ type Log = (level: LogLevel, event: LogEvent, fields: Record<string, unknown>) =
  * The bytes a page may have in beacons and `keepalive` requests not yet
  * sent: browsers refuse a beacon beyond 64 KiB in flight.
  */
-export const MAX_BEACON_BYTES = 64 * 1024;
+const MAX_BEACON_BYTES = 64 * 1024;
 
 /**
  * The event queue and its sender. `record` appends, `flush` sends what is
@@ -70,6 +79,7 @@ export class Ingest {
   /** The event IDs of the batch this tab is posting, which a beacon leaves to it. */
   private inFlight = new Set<string>();
   private timer: unknown;
+  private summaryTimer: unknown;
   private retryTimer: unknown;
   private closed = false;
   private visible = true;
@@ -95,6 +105,7 @@ export class Ingest {
   /** Starts the flush interval; called once the client is running. */
   start(): void {
     this.arm();
+    this.armSummary();
   }
 
   /**
@@ -106,15 +117,18 @@ export class Ingest {
     this.visible = visible;
     if (visible) {
       this.arm();
+      this.armSummary();
     } else {
       this.config.clock.clearTimeout(this.timer);
+      this.config.clock.clearTimeout(this.summaryTimer);
       this.timer = undefined;
+      this.summaryTimer = undefined;
     }
   }
 
   /** Appends an event, dropping the oldest when the queue is full. */
   record(event: QueuedEvent): void {
-    if (this.append([event]) >= this.config.batchSize) void this.flush();
+    if (this.append([event]) >= this.config.batchSize) void this.drain();
   }
 
   /**
@@ -124,6 +138,11 @@ export class Ingest {
    */
   async flush(): Promise<void> {
     this.materializeSummary();
+    return this.drain();
+  }
+
+  // Sends what is queued, without turning the counts into a summary first.
+  private async drain(): Promise<void> {
     if (this.closed || this.read().length === 0) return;
     // A retry is already scheduled: let its backoff run rather than hammering.
     if (this.retryTimer !== undefined) return this.settled;
@@ -164,7 +183,7 @@ export class Ingest {
         size += cost;
       }
       if (batch.length === 0 || !beacon?.(url, this.envelope(batch))) {
-        if (first) void this.flush();
+        if (first) void this.drain();
         else this.log("warn", "events_failed", { cause: "beacon_refused", events: pending.length });
         return;
       }
@@ -192,6 +211,7 @@ export class Ingest {
   close(): void {
     this.closed = true;
     this.config.clock.clearTimeout(this.timer);
+    this.config.clock.clearTimeout(this.summaryTimer);
     this.config.clock.clearTimeout(this.retryTimer);
   }
 
@@ -217,13 +237,26 @@ export class Ingest {
     else this.store.set(this.config.queueKey, JSON.stringify(queue));
   }
 
-  /** Appends events to the stored queue, dropping its oldest beyond capacity; returns its length. */
+  /** Appends events to the stored queue, dropping beyond capacity; returns its length. */
   private append(events: readonly QueuedEvent[]): number {
-    const queue = [...this.read(), ...events];
-    const over = queue.length - this.config.capacity;
+    return this.replace([...this.read(), ...events]);
+  }
+
+  // Stores a queue, dropping what does not fit: evaluation summaries first,
+  // oldest first, because counts nobody is waiting for must not push out an
+  // exposure or an alias, which an experiment's analysis cannot do without.
+  private replace(queue: QueuedEvent[]): number {
+    let over = queue.length - this.config.capacity;
     if (over > 0) {
-      queue.splice(0, over);
       this.log("warn", "queue_dropped", { dropped: over, capacity: this.config.capacity });
+      const kept = queue.filter((e) => {
+        if (over > 0 && e.type === "evaluation_summary") {
+          over--;
+          return false;
+        }
+        return true;
+      });
+      queue = over > 0 ? kept.slice(over) : kept;
     }
     this.write(queue);
     return queue.length;
@@ -237,19 +270,64 @@ export class Ingest {
     return queue.length;
   }
 
-  // Turns the counts collected since the last batch into one summary event.
-  // Its ID is generated here, so a retry of the batch carries the same one
-  // and the server drops it as a duplicate.
-  private materializeSummary(): void {
-    if (!this.config.sendSummaries || this.summary.size === 0) return;
-    const { counts, intervalStart, intervalEnd } = this.summary.take();
-    const window = {
-      intervalStart,
-      intervalEnd,
-      rulesetVersion: this.config.rulesetVersion() ?? 0,
-      ...(this.config.appVersion !== undefined && { appVersion: this.config.appVersion }),
+  // Turns the counts collected since the last summary into the queue's one
+  // summary window, merging in the one still unsent unless its interval
+  // began over an hour ago. A window in flight is left to its request. The
+  // merged window gets new event IDs, as a merged window does in server mode:
+  // the events it replaces were never accepted.
+  //
+  // On the summary interval the counts wait in memory while a window is in
+  // flight, so the queue never holds two unsent windows; a flush, a hide and
+  // a close cannot wait, and leave the window in flight to its request.
+  private materializeSummary(waitForFlight = false): void {
+    if (!this.config.sendSummaries) return;
+    const queue = this.read();
+    if (waitForFlight && queue.some((e) => e.type === "evaluation_summary" && this.inFlight.has(e.event_id))) return;
+    const counted = this.summary.size > 0 ? this.summary.take() : undefined;
+    const kept = queue.filter((e) => e.type === "evaluation_summary" && !this.inFlight.has(e.event_id));
+    const now = this.config.now();
+    const end = counted?.intervalEnd ?? now;
+    // Infinity without a window, so nothing is aged; NaN for a malformed
+    // start, which cannot be placed and is dropped as aged.
+    const began = Math.min(...kept.map((e) => Date.parse(String(e.interval_start))));
+    const aged = !(end - began <= this.config.maxWindowAge);
+    // Nothing counted and nothing to drop: the unsent window stays as it is,
+    // under the event IDs it was stored with.
+    if (!counted && !aged) return;
+    let start = counted?.intervalStart ?? end;
+    const byKey = new Map<string, SummaryRow<Reason>>();
+    const add = (row: SummaryRow<Reason>): void => {
+      const id = countKey(row.flag, row.variation, row.reason);
+      const seen = byKey.get(id);
+      byKey.set(id, seen ? { ...seen, count: seen.count + row.count } : row);
     };
-    this.append(summaryEvents(this.config.now(), this.config.random, window, counts));
+    for (const row of counted?.counts ?? []) add(row);
+    if (kept.length > 0) {
+      const rows = kept.flatMap((e) => (Array.isArray(e.counts) ? (e.counts as SummaryRow<Reason>[]) : []));
+      if (aged) {
+        this.log("warn", "queue_dropped", { kind: "evaluation_summary", cause: "window_older_than_one_hour", rows: rows.length, age_ms: end - began });
+      } else {
+        if (began < start) start = began;
+        rows.forEach(add);
+      }
+    }
+    const replaced = new Set(kept.map((e) => e.event_id));
+    const rest = queue.filter((e) => !replaced.has(e.event_id));
+    const merged =
+      byKey.size === 0
+        ? []
+        : summaryEvents(
+            now,
+            this.config.random,
+            {
+              intervalStart: start,
+              intervalEnd: end,
+              rulesetVersion: this.config.rulesetVersion() ?? 0,
+              ...(this.config.appVersion !== undefined && { appVersion: this.config.appVersion }),
+            },
+            orderRows([...byKey.values()]),
+          );
+    this.replace([...rest, ...merged]);
   }
 
   // ------------------------------------------------------------------ send
@@ -259,12 +337,26 @@ export class Ingest {
     if (this.closed || !this.visible) return;
     this.timer = this.config.clock.setTimeout(() => {
       this.timer = undefined;
-      void this.flush().finally(() => { this.arm(); });
+      // The flush interval carries exposures and aliases: a queue of nothing
+      // but a summary waits for the summary interval, so an app that reads a
+      // flag every second does not post every few seconds.
+      const due = this.read().some((e) => e.type !== "evaluation_summary");
+      void (due ? this.drain() : Promise.resolve()).finally(() => { this.arm(); });
     }, this.config.flushInterval);
   }
 
+  private armSummary(): void {
+    this.config.clock.clearTimeout(this.summaryTimer);
+    if (this.closed || !this.visible) return;
+    this.summaryTimer = this.config.clock.setTimeout(() => {
+      this.summaryTimer = undefined;
+      this.materializeSummary(true);
+      void this.drain().finally(() => { this.armSummary(); });
+    }, this.config.summaryInterval);
+  }
+
   private async send(): Promise<void> {
-    const batch = this.read().slice(0, this.config.batchSize);
+    const batch = packBatch(this.read(), utf8Length(this.envelope([])));
     this.inFlight = new Set(batch.map((e) => e.event_id));
     let outcome: "sent" | "retry" | "drop" = "retry";
     let status: number | undefined;
@@ -298,7 +390,7 @@ export class Ingest {
       const left = this.remove(batch);
       this.backoff.reset();
       if (outcome === "drop") this.log("warn", "events_failed", { cause, status, events: batch.length, dropped: batch.length });
-      if (left > 0 && !this.closed) await this.flush();
+      if (left > 0 && !this.closed) await this.drain();
       return;
     }
     const cap = status === 401 || status === 403 ? this.config.unauthorizedMax : this.config.retryMax;
@@ -307,7 +399,7 @@ export class Ingest {
     if (this.closed) return;
     this.retryTimer = this.config.clock.setTimeout(() => {
       this.retryTimer = undefined;
-      void this.flush();
+      void this.drain();
     }, delay);
   }
 

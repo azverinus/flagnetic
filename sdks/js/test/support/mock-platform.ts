@@ -1,5 +1,5 @@
 // A mock of the platform's SDK API for server-mode scenarios: the ruleset
-// endpoint with ETag revalidation and the change stream, on Node's http
+// endpoint with ETag revalidation and the ruleset stream, on Node's http
 // server. Each endpoint can be scripted per request; every request is
 // recorded with its headers and arrival time.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";

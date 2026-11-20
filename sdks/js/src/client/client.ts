@@ -17,7 +17,7 @@ import { defaultBeacon, defaultPage, type Page } from "./page.js";
 import { Recorder } from "./recorder.js";
 import { serveDetail, type ServeBase } from "./serve.js";
 import { defaultStore, SafeStore, sameUnits, StoreKeys } from "./storage.js";
-import { ChangeStream, defaultStreamTiming, type StreamTiming } from "./stream.js";
+import { RulesetStream, defaultStreamTiming, type StreamTiming } from "./stream.js";
 import {
   copyJson,
   fitsFlagType,
@@ -49,14 +49,19 @@ const defaults = {
   minRefetchGap: 10_000,
   requestTimeout: 5_000,
   flushInterval: 5_000,
+  summaryInterval: 60_000,
+  /** The age past which an unsent summary window is dropped. */
+  maxWindowAge: 3_600_000,
   retryInitial: 2_000,
   retryMax: 300_000,
   unauthorizedMax: 900_000,
   closeTimeout: 5_000,
+  /** The retries, after an answer below an announced version, before the poll takes over. */
+  catchUp: [1_000, 2_000, 4_000] as readonly number[],
   batchSize: 100,
   capacity: 1_000,
   storedUnitSets: 4,
-  /** How long the first evaluation waits for the change stream to connect. */
+  /** How long the first evaluation waits for the ruleset stream to connect. */
   streamFirstWait: 2_000,
   /** The most (experiment, unit, variation) triples the in-process exposure suppressor holds. */
   exposureMemory: 1_000,
@@ -155,7 +160,7 @@ export class FlagneticClient {
   private readonly served = new Map<string, Detail>();
   private readonly ingest: Ingest | undefined;
   private readonly recorder: Recorder | undefined;
-  private stream: ChangeStream | undefined;
+  private stream: RulesetStream | undefined;
   private readonly streamTiming: Partial<StreamTiming> | undefined;
   private readonly unlisten: () => void;
 
@@ -177,6 +182,7 @@ export class FlagneticClient {
   private readonly backoff: Backoff;
   private unauthorized = false;
   private announced = 0;
+  private catchUpStep = 0;
   /**
    * The context whose values were last accepted. Values of another context
    * set no floor for the version: a replica a little behind may answer the
@@ -220,6 +226,7 @@ export class FlagneticClient {
       ...(options.pollInterval !== undefined && { pollInterval: Math.max(pollFloor, options.pollInterval) }),
       ...(options.requestTimeout !== undefined && { requestTimeout: options.requestTimeout }),
       ...(options.flushInterval !== undefined && { flushInterval: options.flushInterval }),
+      ...(options.summaryInterval !== undefined && { summaryInterval: options.summaryInterval }),
       ...internals.timing,
     };
     this.backoff = new Backoff(this.timing.retryInitial, this.random);
@@ -257,6 +264,8 @@ export class FlagneticClient {
         capacity: this.timing.capacity,
         batchSize: this.timing.batchSize,
         flushInterval: this.timing.flushInterval,
+        summaryInterval: this.timing.summaryInterval,
+        maxWindowAge: this.timing.maxWindowAge,
         requestTimeout: this.timing.requestTimeout,
         retryInitial: this.timing.retryInitial,
         retryMax: this.timing.retryMax,
@@ -293,11 +302,11 @@ export class FlagneticClient {
     if (!this.deferred) this.begin();
   }
 
-  // begin opens the change stream when it is on and starts the first
+  // begin opens the ruleset stream when it is on and starts the first
   // evaluation, which with the stream waits for it to open.
   private begin(): void {
     if (this.options.stream === true) {
-      this.stream = new ChangeStream(
+      this.stream = new RulesetStream(
         {
           url: `${this.baseUrl}${SDK_API_PATH}/stream`,
           sdkKey: this.sdkKey,
@@ -461,7 +470,7 @@ export class FlagneticClient {
   }
 
   /**
-   * Stops the timers and the change stream and flushes best effort within
+   * Stops the timers and the ruleset stream and flushes best effort within
    * the close timeout. Values keep serving afterwards.
    */
   async close(): Promise<void> {
@@ -750,7 +759,34 @@ export class FlagneticClient {
   private onAnnounced(version: number): void {
     if (version <= (this.values?.rulesetVersion ?? -1) || version <= this.announced) return;
     this.announced = version;
+    this.catchUpStep = 0;
     this.refetch("stream");
+  }
+
+  // An evaluation answered below the version the stream announced: the
+  // answer came from a replica that has not loaded it yet, which a stream
+  // held on another replica cannot tell. Retried on 1, 2 and 4 seconds, as
+  // server mode does, instead of leaving the old value for a whole poll
+  // interval; once the sequence is spent the announcement is dropped, and
+  // the next event would start it again. Reports whether a retry is armed.
+  private catchUp(): boolean {
+    const held = this.values?.rulesetVersion ?? 0;
+    if (held >= this.announced) {
+      this.catchUpStep = 0;
+      return false;
+    }
+    const delay = this.timing.catchUp[this.catchUpStep];
+    if (delay === undefined) {
+      this.catchUpStep = 0;
+      this.announced = held;
+      return false;
+    }
+    this.catchUpStep++;
+    this.nextAttempt = this.clock.setTimeout(() => {
+      this.nextAttempt = undefined;
+      this.refetch("stream");
+    }, delay);
+    return true;
   }
 
   /** Runs start, which starts an evaluation, and resolves once an evaluation started no earlier than now has settled. */
@@ -811,7 +847,7 @@ export class FlagneticClient {
       return;
     }
     if (ok) {
-      this.armPoll();
+      if (!this.catchUp()) this.armPoll();
       return;
     }
     // A failed evaluation is retried by backoff alone; the poll waits.
@@ -882,7 +918,7 @@ export class FlagneticClient {
         if (res.status === 401 || res.status === 403) {
           this.unauthorized = true;
           this.once("revoked", "error", "key_revoked", { status: res.status });
-          // The change stream carries the same key: it stays closed until
+          // The ruleset stream carries the same key: it stays closed until
           // an evaluation succeeds again.
           this.stream?.close();
         }

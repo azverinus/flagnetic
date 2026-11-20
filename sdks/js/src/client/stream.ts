@@ -1,4 +1,4 @@
-// The opt-in change stream of a browser client, read over `fetch`. A
+// The opt-in ruleset stream of a browser client, read over `fetch`. A
 // browser's own `EventSource` would be simpler, but it cannot do what the
 // protocol asks of a reconnect: it closes for good on a 503, cannot send
 // `Last-Event-ID` on a connection it did not make itself, and has no silence
@@ -51,10 +51,10 @@ export interface StreamConfig {
 }
 
 /**
- * One change stream per client. `open` and `close` are idempotent; while
+ * One ruleset stream per client. `open` and `close` are idempotent; while
  * open, the stream reconnects by itself until `close` or a refused key.
  */
-export class ChangeStream {
+export class RulesetStream {
   private wanted = false;
   private run = 0;
   private abort: AbortController | undefined;

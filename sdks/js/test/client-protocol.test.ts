@@ -194,6 +194,7 @@ class Runner {
       stream: o.sse === true,
       pollInterval: o.poll_interval_ms as number,
       flushInterval: o.flush_interval_ms as number,
+      ...(typeof o.summary_interval_ms === "number" && { summaryInterval: o.summary_interval_ms }),
       sendSummaries: o.send_summaries === true,
       sendExposures: o.send_exposures !== false,
       allowOverrides: o.allow_overrides === true,
@@ -282,7 +283,7 @@ class Runner {
       // The fixtures leave a client key's stream authentication open; this
       // SDK reads the stream over fetch, so the key goes in a header and
       // never in the URL.
-      expect(req.headers.authorization, `${where}: the change stream carries the client key`).toBe(`Bearer ${key}`);
+      expect(req.headers.authorization, `${where}: the ruleset stream carries the client key`).toBe(`Bearer ${key}`);
       expect(req.url.search, `${where}: nothing in the stream's URL`).toBe("");
     }
     const events = want.events ? this.checkEvents(want.events, req, where) : undefined;

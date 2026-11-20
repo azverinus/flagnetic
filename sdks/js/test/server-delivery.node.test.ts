@@ -2,7 +2,7 @@
 // scenarios for a server SDK, each asserting values, stage
 // transitions, listener calls and log events. Timings are scaled down
 // through the client's test seam; the behaviour is the production one.
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
@@ -12,6 +12,7 @@ import type { FlagneticServer, LogEvent, LogLevel, ServerOptions, Stage } from "
 import { encodeStore } from "../src/server/store.js";
 import { VERSION } from "../src/version.js";
 import { MockPlatform, rulesetOf } from "./support/mock-platform.js";
+import { VirtualClock } from "./support/virtual-clock.js";
 
 const key = "fn_srv_0123456789abcdefghijklmnopqrstuvwxyzABCD";
 
@@ -640,5 +641,73 @@ describe("the store", () => {
       expect(h.events("store_failed")[0]?.fields, name).toMatchObject({ operation: "read", cause });
       expect(down.rulesetRequests()[0]?.headers["if-none-match"], name).toBeUndefined();
     }
+  });
+});
+
+describe("the clocks the client was built with", () => {
+  test("ready(timeout) and status() run on them, not on real time", async () => {
+    const clock = new VirtualClock();
+    const refused = (): Promise<Response> => Promise.resolve(new Response("unavailable", { status: 503 }));
+    const client = createServerWith(key, "http://flagnetic.test", { logger: () => undefined, stream: false }, {
+      timing: { ...fast, retryInitial: 1_000_000, retryMax: 1_000_000 },
+      clock,
+      now: () => 1_700_000_000_000 + clock.now(),
+      fetch: refused,
+    });
+    cleanups.push(() => client.close());
+    const ready = client.ready(5_000);
+    let stage: Stage | undefined;
+    void ready.then((s) => (stage = s));
+    await sleep(20);
+    expect(stage, "five virtual seconds have not passed").toBeUndefined();
+    expect(client.status().staleSince?.getTime(), "the failed attempt is stamped by the injected wall clock").toBe(1_700_000_000_000);
+    clock.advanceTo(5_000);
+    for (let at = clock.next(); at !== undefined && at <= 5_000; at = clock.next()) clock.fireNext();
+    await expect(ready).resolves.toBe("built_in");
+  });
+
+  test("a ruleset's receivedAt is the injected wall clock's", async () => {
+    const clock = new VirtualClock();
+    const p = await platform(rulesetOf(1, { a: true }));
+    const client = createServerWith(key, p.baseUrl, { logger: () => undefined, stream: false }, { timing: fast, clock, now: () => 42_000 });
+    cleanups.push(() => client.close());
+    await client.ready(2_000);
+    await eventually(() => {
+      expect(client.status().receivedAt?.getTime()).toBe(42_000);
+    });
+  });
+});
+
+describe("closing with a store", () => {
+  test("waits for the write of the last ruleset, so a process that exits next loses nothing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "flagnetic-"));
+    const store = join(dir, "ruleset.json");
+    const p = await platform(rulesetOf(7, { a: true }));
+    const client = start(p, { store, stream: false }).client;
+    await client.ready(2_000);
+    await client.close();
+    const file = await readFile(store, "utf8");
+    expect(JSON.parse(file.slice(file.indexOf("\n") + 1))).toMatchObject({ version: 7 });
+    expect((await readdir(dir)).filter((n) => n.endsWith(".tmp"))).toStrictEqual([]);
+  });
+
+  test("removes the temporary files an interrupted write left beside the store, and only old ones", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "flagnetic-"));
+    const store = join(dir, "ruleset.json");
+    const stale = join(dir, "ruleset.json.1700000000000.abc123.tmp");
+    const fresh = join(dir, "ruleset.json.1700000000001.def456.tmp");
+    const foreign = join(dir, "other.json.1700000000000.abc123.tmp");
+    for (const f of [stale, fresh, foreign]) await writeFile(f, "torn");
+    const old = new Date(Date.now() - 3_600_000);
+    await utimes(stale, old, old);
+    await utimes(foreign, old, old);
+    const p = await platform(rulesetOf(1, { a: true }));
+    const client = start(p, { store, stream: false }).client;
+    await client.ready(2_000);
+    await client.close();
+    const left = (await readdir(dir)).sort();
+    expect(left).toContain("ruleset.json.1700000000001.def456.tmp");
+    expect(left, "another store's file is not this store's to remove").toContain("other.json.1700000000000.abc123.tmp");
+    expect(left).not.toContain("ruleset.json.1700000000000.abc123.tmp");
   });
 });

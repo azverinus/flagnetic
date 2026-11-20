@@ -20,7 +20,7 @@ export interface Page {
 }
 
 /** A page that is always visible and never changes: Node, a worker, a test. */
-export const headlessPage: Page = {
+const headlessPage: Page = {
   visible: () => true,
   listen: () => () => undefined,
 };
