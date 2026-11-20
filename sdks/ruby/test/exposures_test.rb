@@ -68,6 +68,16 @@ class ExposuresTest < Minitest::Test
     assert_equal ["a x "], c.recorder.exposures.map(&:unit_id)
   end
 
+  def test_exposure_tells_an_integer_unit_id_from_its_string
+    c = offline
+    named = { units: { "anonymous" => "42" } }
+    numbered = { units: { "anonymous" => 42 } }
+    c.string("auto_off", default: "", context: named)
+    c.string("auto_off", default: "", context: numbered)
+    c.exposure("auto_off", context: named)
+    assert_equal ["42"], c.recorder.exposures.map(&:unit_id)
+  end
+
   def test_exposure_sends_nothing_for_a_flag_never_evaluated_with_an_experiment
     c = offline
     c.exposure("auto_off", context: ASSIGNED)

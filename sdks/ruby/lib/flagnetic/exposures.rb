@@ -238,7 +238,10 @@ module Flagnetic
     # stability.
     def fingerprint(context)
       c = Eval::Context.__send__(:coerce, context)
-      units = c.units.sort.flatten.map { |u| part(u.to_s) }
+      # A unit ID goes through attribute_token like an attribute value, so
+      # an Integer 42 (which is no unit) and the String "42" (which is)
+      # stay apart.
+      units = c.units.sort.flat_map { |type, id| [part(type), part(attribute_token(id))] }
       attributes = c.attributes.sort.map { |k, v| [part(k.to_s), part(attribute_token(v))] }.flatten
       (units + [part("")] + attributes).join
     rescue StandardError
@@ -345,8 +348,9 @@ module Flagnetic
     rescue StandardError
       # What was taken and not answered goes back: the queue was emptied
       # for this send, and a failure in reading an answer would otherwise
-      # drop every later batch with it.
-      put_back(batches[settled..].flatten(1)) if batches
+      # drop every later batch with it. A failure in packing them puts back
+      # all that was taken.
+      put_back(batches ? batches[settled..].flatten(1) : events.to_a)
       raise
     end
 
