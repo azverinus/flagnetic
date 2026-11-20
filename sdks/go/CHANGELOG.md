@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/go/v0.1.2...sdks/go/v0.1.3) (2026-11-20)
+
+
+### Bug Fixes
+
+* **sdks:** close the Go SDK and provider review findings ([#406](https://github.com/azverinus/flagnetic/issues/406)) ([3d12bd8](https://github.com/azverinus/flagnetic/commit/3d12bd8eb37c8daa4547ef381512d16aedca243b))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/go/v0.1.1...sdks/go/v0.1.2) (2026-11-17)
 
 
