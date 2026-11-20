@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.3...sdks/ruby/v0.1.4) (2026-11-20)
+
+
+### Bug Fixes
+
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **sdks:** close the Python and Ruby SDK review findings ([#414](https://github.com/azverinus/flagnetic/issues/414)) ([d02c998](https://github.com/azverinus/flagnetic/commit/d02c998264c98f3a0904f0187d779be749270237))
+
 ## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.2...sdks/ruby/v0.1.3) (2026-11-17)
 
 
