@@ -110,6 +110,7 @@ describe("a webhook's delivery log", () => {
     fakeServer({
       "GET /webhook-event-types": { status: 200, body: catalogue },
       [`GET ${log}`]: { status: 200, body: { items: [retrying], next_cursor: null } },
+      [`GET ${log}/${retrying.id}`]: { status: 200, body: retrying },
     });
     renderLog({ tab: "deliveries", delivery: retrying.id });
 

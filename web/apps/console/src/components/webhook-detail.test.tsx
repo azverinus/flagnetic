@@ -3,7 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { fakeServer } from "@/test/fake-server";
+import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithRouter } from "@/test/render";
 
 import { WebhookScreen } from "./webhook-detail";
@@ -49,7 +49,7 @@ describe("a webhook's screen", () => {
   });
 
   it("says the subscription is missing when the server has none", async () => {
-    fakeServer({ ...common });
+    fakeServer({ ...common, [`GET ${base}`]: problem(404, "not_found") });
     await renderScreen();
     expect(await screen.findByRole("heading", { name: "Webhook not found" })).toBeVisible();
   });

@@ -82,7 +82,7 @@ export function ProjectInviteDialog({
       title={t`Invite to the project`}
       description={
         <Trans>
-          Someone without an account here joins the instance through the invitation, and accepting
+          Someone who is not a member of the instance joins it through the invitation, and accepting
           it grants them the role. A member of the instance is granted a role instead.
         </Trans>
       }

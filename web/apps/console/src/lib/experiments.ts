@@ -14,10 +14,10 @@ import { msg } from "@lingui/core/macro";
 import { nameSchema } from "./forms";
 
 /** The basis points of a whole: weights and traffic allocations are written in them. */
-export const wholeBasisPoints = 10_000;
+const wholeBasisPoints = 10_000;
 
 /** How many variations an experiment compares, at least and at most. */
-export const minVariations = 2;
+const minVariations = 2;
 export const maxVariations = 50;
 
 /** A percentage with at most two decimals, the point or a comma before them. */

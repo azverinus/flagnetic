@@ -27,7 +27,7 @@ import { authMethodsQuery, myIdentitiesQuery } from "@/lib/queries";
 import { linkErrorMessage } from "@/lib/sso-errors";
 
 /** Where linking returns the browser to: the page the member started it from. */
-export const signInMethodsPath = "/settings/sign-in-methods";
+const signInMethodsPath = "/settings/sign-in-methods";
 
 export type SignInMethodsProps = {
   /** The code a failed linking sent the member back with. */
@@ -132,8 +132,8 @@ export function SignInMethods({
           return (
             <p>
               <Trans>
-                You will no longer be able to sign in through {name} with this account. Your own
-                account here, and everything in it, stays. You can link it again later.
+                You will no longer be able to sign in through {name} with this account. You, and
+                everything you hold here, stay. You can link it again later.
               </Trans>
             </p>
           );

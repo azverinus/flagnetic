@@ -286,7 +286,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       );
     case "identity_required":
       return i18n._(
-        msg`Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one to your account, then try again.`,
+        msg`Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one, then try again.`,
       );
     case "local_login_disabled":
       return i18n._(
@@ -699,7 +699,7 @@ export function violationsByPointer(i18n: I18n, error: ApiError): Map<string, st
  * server points as deep as the value it refused (`/variations/0/value/msg`),
  * and the nearest field the form has is the one it starts with.
  */
-export function pointsInto(pointer: string, field: string): boolean {
+function pointsInto(pointer: string, field: string): boolean {
   return pointer === field || pointer.startsWith(`${field}/`);
 }
 

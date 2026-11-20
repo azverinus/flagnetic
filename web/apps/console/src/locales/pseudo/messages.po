@@ -4859,7 +4859,7 @@ msgid "Local login"
 msgstr ""
 
 #: src/lib/problem-messages.ts
-msgid "Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one to your account, then try again."
+msgid "Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one, then try again."
 msgstr ""
 
 #: src/lib/audit.ts
@@ -7622,7 +7622,7 @@ msgid "Someone saved this configuration after this draft was loaded."
 msgstr ""
 
 #: src/components/project-invitations.tsx
-msgid "Someone without an account here joins the instance through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
+msgid "Someone who is not a member of the instance joins it through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
 msgstr ""
 
 #: src/components/import-project.tsx
@@ -8308,7 +8308,7 @@ msgid "The experiment is archived: nothing about it changes any more."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
-msgid "The experiment is created as a draft: nothing changes for users until a rule serves it and it starts."
+msgid "The experiment is created as a draft: nothing changes for any unit until a rule serves it and it starts."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -10060,6 +10060,10 @@ msgstr ""
 msgid "Yes"
 msgstr ""
 
+#: src/lib/sso-errors.ts
+msgid "You are deactivated here. Ask an instance admin to reactivate you."
+msgstr ""
+
 #: src/components/invitation-acceptance.tsx
 msgid "You are invited to the project {projectName} as {role}. Accepting grants you that role there."
 msgstr ""
@@ -10154,15 +10158,11 @@ msgid "You need the permission to {name}."
 msgstr ""
 
 #: src/components/sign-in-methods.tsx
-msgid "You will no longer be able to sign in through {name} with this account. Your own account here, and everything in it, stays. You can link it again later."
+msgid "You will no longer be able to sign in through {name} with this account. You, and everything you hold here, stay. You can link it again later."
 msgstr ""
 
 #: src/components/sign-in-methods.tsx
 msgid "You will sign in only through the providers you linked. Any invitation link or password reset link still open for you stops working. This device and your other sessions stay signed in. It is refused while no linked provider is left that lets you in."
-msgstr ""
-
-#: src/lib/sso-errors.ts
-msgid "Your account here is deactivated. Ask an instance admin to reactivate it."
 msgstr ""
 
 #: src/components/token-list.tsx

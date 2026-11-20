@@ -20,7 +20,7 @@ import { ApiError } from "./errors";
 import { violationMessage } from "./problem-messages";
 
 /** The name identifier formats a SAML provider may ask for, the default first. */
-export const nameIDFormats = [
+const nameIDFormats = [
   "unspecified",
   "emailAddress",
   "persistent",
@@ -146,7 +146,7 @@ export function samlPatchOf(
 }
 
 /** The JSON Pointer of each field of the SAML form in the request body. */
-export const samlPointerOf = {
+const samlPointerOf = {
   slug: "/slug",
   display_name: "/display_name",
   idp_metadata_url: "/idp_metadata_url",

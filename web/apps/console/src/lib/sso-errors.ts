@@ -23,7 +23,7 @@ export function ssoErrorMessage(i18n: I18n, code: string, providerName?: string)
         msg`No member of this instance matches that account. Ask an instance admin to invite you.`,
       );
     case "member_deactivated":
-      return i18n._(msg`Your account here is deactivated. Ask an instance admin to reactivate it.`);
+      return i18n._(msg`You are deactivated here. Ask an instance admin to reactivate you.`);
     case "attempt_mismatch":
       return i18n._(
         msg`That sign-in was started in another browser or window, so it was not completed. Start it again from here.`,

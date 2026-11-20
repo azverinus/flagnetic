@@ -53,6 +53,17 @@ const rotating: AuthProvider = {
   version: 5,
 };
 
+/** The fake API, which also answers the reads the group mappings below the settings make, with nothing in them. */
+function serve(routes: Parameters<typeof fakeServer>[0]) {
+  return fakeServer({
+    "GET /instance/auth-providers/corp/scim-groups": { status: 200, body: { items: [] } },
+    "GET /instance/auth-providers/corp/group-mappings": { status: 200, body: { items: [] } },
+    "GET /projects": { status: 200, body: { items: [] } },
+    "GET /roles": { status: 200, body: { items: [] } },
+    ...routes,
+  });
+}
+
 function renderScreen() {
   return renderWithRouter(() => <AuthProviderScreen slug="corp" />);
 }
@@ -62,7 +73,7 @@ const certificates = () => screen.getByRole("list", { name: "SP certificates", h
 
 describe("a SAML provider's page", () => {
   it("shows the addresses to give the identity provider, copyable, and the SP metadata to download", async () => {
-    fakeServer({ "GET /instance/auth-providers/corp": { status: 200, body: corp } });
+    serve({ "GET /instance/auth-providers/corp": { status: 200, body: corp } });
     await renderScreen();
     const user = userEvent.setup();
 
@@ -82,7 +93,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("says the instance serves its metadata only while the provider is enabled", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/corp": { status: 200, body: { ...corp, enabled: false } },
     });
     await renderScreen();
@@ -97,7 +108,7 @@ describe("a SAML provider's page", () => {
 
   it("says the addresses need the instance's public address when it has none", async () => {
     const { acs_url: _a, entity_id: _e, metadata_url: _m, ...withoutAddress } = corp;
-    fakeServer({ "GET /instance/auth-providers/corp": { status: 200, body: withoutAddress } });
+    serve({ "GET /instance/auth-providers/corp": { status: 200, body: withoutAddress } });
     await renderScreen();
 
     expect(await screen.findByText(/FLAGNETIC_BASE_URL/)).toBeVisible();
@@ -105,7 +116,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("shows what the identity provider's metadata said and when it was last read", async () => {
-    fakeServer({ "GET /instance/auth-providers/corp": { status: 200, body: corp } });
+    serve({ "GET /instance/auth-providers/corp": { status: 200, body: corp } });
     await renderScreen();
 
     const idp = await screen.findByRole("region", { name: "Identity provider" });
@@ -119,7 +130,7 @@ describe("a SAML provider's page", () => {
 
   it("says pasted metadata is never read again", async () => {
     const { idp_metadata_url: _, ...pasted } = corp;
-    fakeServer({ "GET /instance/auth-providers/corp": { status: 200, body: pasted } });
+    serve({ "GET /instance/auth-providers/corp": { status: 200, body: pasted } });
     await renderScreen();
 
     const idp = await screen.findByRole("region", { name: "Identity provider" });
@@ -128,7 +139,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("starts a certificate rotation and says to import the new metadata", async () => {
-    const server = fakeServer({
+    const server = serve({
       "GET /instance/auth-providers/corp": { status: 200, body: corp },
       "POST /instance/auth-providers/corp/rotate-certificate": { status: 200, body: rotating },
     });
@@ -161,7 +172,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("says to enable a disabled provider before the identity provider imports the metadata of a rotation", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/corp": {
         status: 200,
         body: { ...rotating, enabled: false },
@@ -176,7 +187,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("completes a pending rotation, warning that the old key is destroyed", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/corp": { status: 200, body: rotating },
       "POST /instance/auth-providers/corp/rotate-certificate/complete": {
         status: 200,
@@ -204,7 +215,7 @@ describe("a SAML provider's page", () => {
 
   it("explains a rotation someone else started first, and shows it", async () => {
     let started = false;
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/corp": () => ({
         status: 200,
         body: started ? rotating : corp,
@@ -230,7 +241,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("explains completing a rotation nobody started", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/corp": { status: 200, body: rotating },
       "POST /instance/auth-providers/corp/rotate-certificate/complete": problem(
         409,
@@ -250,7 +261,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("shows what the identity provider's metadata said to a test", async () => {
-    fakeServer({
+    serve({
       "GET /instance/auth-providers/corp": { status: 200, body: corp },
       "POST /instance/auth-providers/corp/test": {
         status: 200,
@@ -272,7 +283,7 @@ describe("a SAML provider's page", () => {
   });
 
   it("edits the provider with the SAML form", async () => {
-    fakeServer({ "GET /instance/auth-providers/corp": { status: 200, body: corp } });
+    serve({ "GET /instance/auth-providers/corp": { status: 200, body: corp } });
     await renderScreen();
 
     expect(await screen.findByLabelText("Metadata URL")).toHaveValue(

@@ -19,7 +19,7 @@ function openStream(url: string): EventSource {
 }
 
 /** Where a project's change stream is served. */
-export function changeStreamUrl(project: string): string {
+function changeStreamUrl(project: string): string {
   const base = (client.getConfig().baseUrl ?? "").replace(/\/$/, "");
   return `${base}/projects/${encodeURIComponent(project)}/stream`;
 }
@@ -97,7 +97,7 @@ export function ChangeStream({
 }
 
 /** Calls `listener` with each notice of the open project's stream; the latest listener is used. */
-export function useChangeNotices(listener: Listener) {
+function useChangeNotices(listener: Listener) {
   const subscribe = useContext(NoticesContext);
   const latest = useRef(listener);
   useEffect(() => {

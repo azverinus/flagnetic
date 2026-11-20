@@ -9,8 +9,6 @@ import { activateForTests, renderWithProviders } from "@/test/render";
 
 import { FlagEvaluations } from "./flag-evaluations";
 
-const path = "GET /projects/checkout/flags/checkout_cta/environments/production/evaluations";
-
 const flag = {
   key: "checkout_cta",
   variations: [{ key: "control" }, { key: "treatment" }],
@@ -23,7 +21,12 @@ const flag = {
 beforeEach(() => activateForTests("en"));
 
 function renderEvaluations(items: FlagEvaluationDay[], environment = "production") {
-  const server = fakeServer({ [path]: { status: 200, body: { items } } });
+  const server = fakeServer({
+    [`GET /projects/checkout/flags/checkout_cta/environments/${environment}/evaluations`]: {
+      status: 200,
+      body: { items },
+    },
+  });
   renderWithProviders(
     <FlagEvaluations
       project="checkout"

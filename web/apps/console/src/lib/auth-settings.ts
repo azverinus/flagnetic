@@ -26,10 +26,10 @@ export type Duration = { amount: string; unit: DurationUnit };
  * seconds: a minute to ten years. The schema states them only in prose,
  * so they are written here as its description gives them.
  */
-export const durationBounds = { min: 60, max: 315_360_000 } as const;
+const durationBounds = { min: 60, max: 315_360_000 } as const;
 
 /** The bounds of the password minimum length, never below the policy's floor of 12. */
-export const passwordLengthBounds = { min: 12, max: 128 } as const;
+const passwordLengthBounds = { min: 12, max: 128 } as const;
 
 /**
  * A number of seconds in the largest unit that holds it whole, so a day
@@ -63,7 +63,7 @@ export type AuthSettingsValues = Record<DurationField, Duration> & {
 };
 
 /** The form's fields that hold a duration. */
-export const durationFields = [
+const durationFields = [
   "session_idle_timeout",
   "session_absolute_timeout",
   "token_max_lifetime",

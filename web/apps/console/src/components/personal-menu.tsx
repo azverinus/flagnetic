@@ -25,7 +25,7 @@ import { isTheme } from "@/lib/theme";
 import { useTheme } from "@/lib/use-theme";
 
 /** The initials shown for a member: of their name, else of their email. */
-export function initialsOf(name: string, email: string): string {
+function initialsOf(name: string, email: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const letters =
     words.length >= 2 ? `${words[0]![0]}${words[words.length - 1]![0]}` : (words[0] ?? email)[0];

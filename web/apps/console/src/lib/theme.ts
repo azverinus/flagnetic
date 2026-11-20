@@ -28,7 +28,7 @@ export function writeTheme(theme: Theme): void {
 }
 
 /** What `system` means right now. */
-export function resolveTheme(theme: Theme, root: Document = document): "light" | "dark" {
+function resolveTheme(theme: Theme, root: Document = document): "light" | "dark" {
   if (theme !== "system") return theme;
   return root.defaultView?.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }

@@ -48,6 +48,7 @@ const mappingReads = {
 function serve(routes: Parameters<typeof fakeServer>[0]) {
   return fakeServer({
     "GET /instance/auth-providers/acme/scim-groups": { status: 200, body: { items: [] } },
+    ...mappingReads,
     ...routes,
   });
 }
