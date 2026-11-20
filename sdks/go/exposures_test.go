@@ -536,8 +536,9 @@ func TestEventsEnqueuedDuringFailuresFlushOnceWithTheSameIDs(t *testing.T) {
 	// A clock the test moves and a jitter that always draws its ceiling,
 	// so the backoff a failed flush leaves behind is exactly known.
 	clock := &testClock{at: time.Date(2026, 9, 19, 10, 0, 0, 0, time.UTC)}
+	ticks := make(chan time.Time)
 	c := onExperiments(t, m, flagnetic.WithLogger(l.logger()),
-		flagnetic.WithExposureNow(clock.now), ceiling())
+		flagnetic.WithExposureNow(clock.now), flagnetic.WithExposureTick(ticks), ceiling())
 
 	for _, unit := range []string{"u-1", "u-2"} {
 		ctx := unitContext(unit)
@@ -546,20 +547,20 @@ func TestEventsEnqueuedDuringFailuresFlushOnceWithTheSameIDs(t *testing.T) {
 	}
 
 	// The first attempt fails and the events stay queued. The backoff it
-	// left holds the queue back, so a flush before it is up sends
-	// nothing: a platform that keeps failing is asked ever less often,
-	// not once per flush interval for ever.
+	// left holds back what the loop sends on its own: two ticks, the
+	// second taken only once the first send is over, send nothing, so a
+	// platform that keeps failing is asked ever less often, not once per
+	// flush interval for ever.
 	_ = c.Flush(context.Background())
-	_ = c.Flush(context.Background())
+	ticks <- time.Now()
+	ticks <- time.Now()
 	if got := m.count(); got != 1 {
 		t.Fatalf("%d batches sent, want 1: the backoff did not hold the queue back", got)
 	}
 
-	// One second on the backoff is up; the second attempt fails and
-	// doubles it, so two more seconds pass before the third.
-	clock.advance(time.Second)
+	// A Flush is asked for, so it tries whatever the backoff says; the
+	// second failure doubles the backoff.
 	_ = c.Flush(context.Background())
-	clock.advance(2 * time.Second)
 	_ = c.Flush(context.Background())
 
 	for n := 1; n <= 3; n++ {
@@ -777,5 +778,71 @@ func TestTheQueueIsSafeUnderConcurrentUse(t *testing.T) {
 	}
 	if sent != want {
 		t.Errorf("%d events reached the platform over %d batches, want %d", sent, m.count(), want)
+	}
+}
+
+func TestCloseDuringTheBackoffSendsTheQueuedEventsAgain(t *testing.T) {
+	m := newExperimentMock(t,
+		reply{status: http.StatusServiceUnavailable},
+		reply{status: http.StatusAccepted, body: accepted})
+	clock := &testClock{at: time.Date(2026, 9, 19, 10, 0, 0, 0, time.UTC)}
+	c := onExperiments(t, m, flagnetic.WithExposureNow(clock.now), ceiling())
+	c.Alias(context.Background(), "anonymous", "d-1", "user", "u-1")
+	c.Alias(context.Background(), "anonymous", "d-2", "user", "u-1")
+
+	// The batch fails and a backoff of a second starts; the clock does not
+	// move, so Close is well inside it.
+	if err := c.Flush(context.Background()); err == nil {
+		t.Fatal("Flush after a 503 returned nil")
+	}
+	if err := c.Close(context.Background()); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := m.count(); got != 2 {
+		t.Fatalf("%d batches sent, want 2: Close skipped the queue during its backoff", got)
+	}
+	first, second := m.nth(1).eventIDs(), m.nth(2).eventIDs()
+	if len(first) != 2 || fmt.Sprint(first) != fmt.Sprint(second) {
+		t.Errorf("Close sent %v, want the queued events %v with their original IDs", second, first)
+	}
+}
+
+func TestCloseOfAPlatformThatKeepsFailingReturnsTheErrorAndLogsWhatIsLeft(t *testing.T) {
+	var l logs
+	m := newExperimentMock(t, reply{status: http.StatusServiceUnavailable})
+	c := onExperiments(t, m, flagnetic.WithLogger(l.logger()), ceiling())
+	for i := range 3 {
+		c.Alias(context.Background(), "anonymous", fmt.Sprintf("d-%d", i), "user", "u-1")
+	}
+	if err := c.Close(context.Background()); err == nil {
+		t.Fatal("Close returned nil with three events undelivered")
+	}
+	var closing []logEntry
+	for _, e := range l.named(flagnetic.EventQueueDropped) {
+		if e.Fields["cause"] == "closing" {
+			closing = append(closing, e)
+		}
+	}
+	if len(closing) != 1 || closing[0].Fields["events"] != 3 {
+		t.Fatalf("queue_dropped with cause closing = %v, want one naming 3 events", closing)
+	}
+
+	// Nothing reads the queue any more: a later event is neither queued
+	// nor sent, and the first one says so.
+	before := m.count()
+	c.Alias(context.Background(), "anonymous", "d-late", "user", "u-1")
+	c.Alias(context.Background(), "anonymous", "d-later", "user", "u-1")
+	_ = c.Flush(context.Background())
+	if got := m.count(); got != before {
+		t.Errorf("%d requests after Close, want none", got-before)
+	}
+	var late int
+	for _, e := range l.named(flagnetic.EventQueueDropped) {
+		if e.Fields["cause"] == "closed" {
+			late++
+		}
+	}
+	if late != 1 {
+		t.Errorf("queue_dropped with cause closed logged %d times, want once", late)
 	}
 }

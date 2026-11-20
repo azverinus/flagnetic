@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -228,6 +229,12 @@ type exposures struct {
 	// the flush goroutine alone reads and writes them.
 	failures  int
 	notBefore time.Time
+
+	// closing is set by Close once its last flush is done: nothing reads
+	// the queue after it, so an event arriving then is not queued.
+	// afterClose makes the log line about it one line.
+	closing    atomic.Bool
+	afterClose sync.Once
 
 	// full wakes the loop when the batch size is reached.
 	full    chan struct{}
@@ -485,6 +492,14 @@ func (q *exposures) enqueue(e event) {
 		q.record(e)
 		return
 	}
+	if q.closing.Load() {
+		q.afterClose.Do(func() {
+			q.log(slog.LevelWarn, EventQueueDropped, map[string]any{
+				"kind": eventQueueKind, "cause": "closed", "events": 1,
+			})
+		})
+		return
+	}
 	q.queueMu.Lock()
 	q.queue = append(q.queue, e)
 	dropped := q.trim()
@@ -550,6 +565,24 @@ func (q *exposures) putBack(events []event) {
 	q.reportDropped(dropped)
 }
 
+// stop ends the queue's life at Close, after its last flush: what is still
+// queued is logged as dropped, and events recorded from now on are not
+// queued. It returns how many events were still queued.
+func (q *exposures) stop() int {
+	if q == nil || q.offline() || !q.closing.CompareAndSwap(false, true) {
+		return 0
+	}
+	q.queueMu.Lock()
+	left := len(q.queue)
+	q.queueMu.Unlock()
+	if left > 0 {
+		q.log(slog.LevelWarn, EventQueueDropped, map[string]any{
+			"kind": eventQueueKind, "cause": "closing", "events": left,
+		})
+	}
+	return left
+}
+
 // run flushes the queue on every tick, whenever a batch has filled and on
 // every flush, until ctx is done. An offline queue has no loop: New never
 // starts one.
@@ -564,11 +597,11 @@ func (q *exposures) run(ctx context.Context) {
 	for {
 		select {
 		case <-q.ticks:
-			_ = q.send(ctx)
+			_ = q.send(ctx, false)
 		case <-q.full:
-			_ = q.send(ctx)
+			_ = q.send(ctx, false)
 		case reply := <-q.flushes:
-			reply <- q.send(ctx)
+			reply <- q.send(ctx, true)
 		case <-ctx.Done():
 			return
 		}
@@ -599,13 +632,16 @@ func (q *exposures) flush(ctx context.Context) error {
 	}
 }
 
-// send posts what the queue holds. Nothing queued, nothing sent.
-func (q *exposures) send(ctx context.Context) error {
+// send posts what the queue holds. Nothing queued, nothing sent. The
+// backoff after a failure governs the sends the loop makes on its own; a
+// send asked for (force) is one attempt whatever the backoff, because its
+// caller wants the events delivered or the error.
+func (q *exposures) send(ctx context.Context, force bool) error {
 	events := q.take()
 	if len(events) == 0 {
 		return nil
 	}
-	if now := q.now(); now.Before(q.notBefore) {
+	if now := q.now(); !force && now.Before(q.notBefore) {
 		// The last attempt failed and its backoff has not run out: the
 		// events wait in the queue rather than being posted into the same
 		// failure on every flush interval.

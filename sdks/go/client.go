@@ -858,9 +858,11 @@ func (c *Client) callListener(l func([]string), changed []string) {
 // evaluation counts and sends it as one evaluation summary, waiting for
 // the platform's answer or until ctx is done. Nothing queued and nothing
 // evaluated is nothing sent. An offline client records both in its
-// Recorder instead, at the call itself. Flush returns the error of the
-// last attempt, so a caller may ignore it: events that failed stay queued
-// and a window that failed merges into the next one.
+// Recorder instead, at the call itself. Flush attempts the queue of
+// exposures and aliases even while the backoff after a failure runs, and
+// returns the error of the last attempt, so a caller may ignore it: events
+// that failed stay queued and a window that failed merges into the next
+// one.
 func (c *Client) Flush(ctx context.Context) error {
 	if c == nil {
 		return nil
@@ -886,14 +888,21 @@ func (c *Client) flushAll(ctx context.Context) error {
 // evaluation counts, within five seconds or ctx, then stops fetching and
 // polling and returns once the background loops have ended, even during a
 // backoff or a request, or when ctx is done. Getters keep serving the held
-// ruleset. Close is idempotent.
+// ruleset. Close attempts the queue even during a backoff and, once
+// everything has stopped, returns the error of that attempt; what it
+// could not deliver is logged as queue_dropped with the cause
+// closing, and an exposure or alias recorded after Close is not queued
+// (logged once, with the cause closed). Close is idempotent.
 func (c *Client) Close(ctx context.Context) error {
 	if c == nil || c.cancel == nil {
 		return nil
 	}
 	flushCtx, stopFlush := context.WithTimeout(ctx, closeFlushTimeout)
-	_ = c.flushAll(flushCtx)
+	flushErr := c.flushAll(flushCtx)
 	stopFlush()
+	// Whatever the flush could not deliver is gone with the loops: say so.
+	c.exposures.stop()
+	c.summaries.stop()
 	c.cancel()
 	c.markReady()
 	select {
@@ -904,5 +913,5 @@ func (c *Client) Close(ctx context.Context) error {
 	if c.ownsHTTP {
 		c.http.CloseIdleConnections()
 	}
-	return nil
+	return flushErr
 }

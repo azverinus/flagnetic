@@ -3,6 +3,7 @@ package flagnetic_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -789,13 +790,13 @@ func TestCloseReturnsWithinItsFlushTimeoutWhileTheBatchHangs(t *testing.T) {
 	clk.next(t)
 	c.Bool(context.Background(), linux, "new_checkout", false)
 
-	// Close gets its flush timeout of five seconds, and
-	// returns rather than waiting on a request that never answers.
+	// Close gets its flush timeout of five seconds, and returns the
+	// flush's error rather than waiting on a request that never answers.
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := c.Close(ctx); err != nil {
-		t.Errorf("Close: %v", err)
+	if err := c.Close(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Close = %v, want the flush's deadline exceeded", err)
 	}
 	if took := time.Since(started); took > 10*time.Second {
 		t.Errorf("Close took %v, want at most the five-second flush timeout and a little", took)
