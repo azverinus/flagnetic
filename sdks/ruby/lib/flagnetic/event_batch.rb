@@ -127,13 +127,18 @@ module Flagnetic
       end
     end
 
-    # accepted decodes the 202 answer. A body that does not decode leaves
-    # the counts unset: the batch was accepted either way, so nothing is
-    # retried.
+    # accepted decodes the 202 answer. A body that does not decode, or is
+    # not an object, leaves the counts unset, and a rejected list that is
+    # not a list of objects counts for none: the batch was accepted either
+    # way, so nothing is retried.
     def accepted(response)
       json = JSON.parse(response.body.to_s.byteslice(0, MAX_RESULT_BYTES))
+      return Outcome.new(kind: :accepted, status: 202, rejected: []) unless json.is_a?(Hash)
+
+      rejected = json["rejected"]
+      rejected = rejected.is_a?(Array) ? rejected.grep(Hash) : []
       Outcome.new(kind: :accepted, status: 202, accepted: json["accepted"], duplicates: json["duplicates"],
-                  dropped_rows: json["dropped_rows"], rejected: json["rejected"] || [])
+                  dropped_rows: json["dropped_rows"], rejected: rejected)
     rescue JSON::ParserError, TypeError
       Outcome.new(kind: :accepted, status: 202, rejected: [])
     end

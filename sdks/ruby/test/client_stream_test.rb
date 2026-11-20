@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-# The change stream: events trigger fetches, drops reconnect with
+# The ruleset stream: events trigger fetches, drops reconnect with
 # Last-Event-ID, silence reconnects, a revoked key closes it.
 class ClientStreamTest < Minitest::Test
   include ClientHelpers

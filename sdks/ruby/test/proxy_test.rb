@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-# The fetch and the change stream both go through the HTTP proxy the process
+# The fetch and the ruleset stream both go through the HTTP proxy the process
 # is configured with. The mock server plays the proxy: it takes the
 # absolute-form request a proxy receives and answers as the origin would.
 class ProxyTest < Minitest::Test

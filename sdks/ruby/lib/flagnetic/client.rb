@@ -13,12 +13,14 @@ module Flagnetic
   #
   # Threads: the ruleset is a frozen object swapped under a mutex and read
   # without locking, so getters never wait. One background thread runs the
-  # change stream, polling and retries.
+  # ruleset stream, polling and retries.
   #
   # Fork: the first call in a forked child (Puma cluster mode, Unicorn)
   # sees the new process ID and starts the child's own background thread;
   # the child keeps serving the ruleset it inherited meanwhile. after_fork
-  # starts it at once, from a fork hook.
+  # starts it at once, for an application that wants a worker to follow the
+  # ruleset before its first call; a child that never evaluates opens no
+  # stream.
   #
   # Getters never raise: any failure serves the built-in default with
   # reason fallback and a log event.
@@ -26,16 +28,19 @@ module Flagnetic
     include FallbackChain
 
     # Timing holds the delays and intervals of the background thread, in
-    # seconds, and the random source of the stream's waits (nil: Random.new).
+    # seconds, the random source of the stream's waits (nil: Random.new) and
+    # the monotonic and wall clocks (now, wall_now: callables a test replaces
+    # to move time).
     # Only poll_interval and request_timeout are public options; the timing
     # option exists for tests and is not part of the API.
     Timing = Struct.new(:request_timeout, :fetch_base, :fetch_cap, :unauthorized_cap, :stream_base, :stream_cap,
                         :worker_stable, :close_jitter, :silence, :poll_connected, :poll_down, :event_retries,
-                        :exposure_flush, :summary_flush, :random, keyword_init: true)
+                        :exposure_flush, :summary_flush, :random, :now, :wall_now, keyword_init: true)
     DEFAULT_TIMING = Timing.new(
       request_timeout: 10, fetch_base: 1, fetch_cap: 300, unauthorized_cap: 900, stream_base: 1, stream_cap: 30,
       worker_stable: 60, close_jitter: 2, silence: 45, poll_connected: 300, poll_down: 30, event_retries: [1, 2, 4],
-      exposure_flush: 2, summary_flush: 60
+      exposure_flush: 2, summary_flush: 60,
+      now: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, wall_now: -> { Time.now }
     ).freeze
     MIN_POLL_INTERVAL = 30
     TYPES = %w[boolean string number json].freeze
@@ -56,7 +61,7 @@ module Flagnetic
     #   another key, or under none, is discarded with store_failed.
     # - logger: a callable receiving (level, event, fields), or a Logger.
     #   Default: warn and above to $stderr.
-    # - stream: false disables the change stream; polling then runs every
+    # - stream: false disables the ruleset stream; polling then runs every
     #   30 s.
     # - poll_interval: seconds between safety polls while the stream is
     #   connected (default 300, at least 30).
@@ -123,6 +128,12 @@ module Flagnetic
     # served number that is not whole serves default with error
     # type_mismatch rather than a truncated value.
     def int(key, default:, context: nil) = serve(key, "number", default, context, int: true).value
+
+    # int_detail serves a number flag as int does, with why it was served:
+    # the value is narrowed to an Integer before the evaluation is counted
+    # or exposed, so a number that is not whole is counted as the fallback it
+    # serves and exposes nothing. default is an Integer.
+    def int_detail(key, default:, context: nil) = serve(key, "number", default, context, int: true)
 
     # json serves a JSON flag's value, parsed and frozen, for context, or
     # default.
@@ -205,6 +216,8 @@ module Flagnetic
     # deduplication by event ID is what analysis relies on. It never raises.
     def exposure(key, context: nil)
       ensure_worker
+      return if closed_for_events?
+
       @exposures&.exposure(context, key.to_s)
       nil
     rescue StandardError => e
@@ -219,6 +232,8 @@ module Flagnetic
     # raises.
     def alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
       ensure_worker
+      return if closed_for_events?
+
       @exposures&.add_alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
       nil
     rescue StandardError => e
@@ -262,9 +277,10 @@ module Flagnetic
 
     # after_fork starts a forked child's background thread now rather than
     # on the child's first call, so a worker that has not served a request
-    # yet already follows the change stream. It does nothing in the process
-    # that built the client and never raises. The Rails integration calls
-    # it from a fork hook.
+    # yet already follows the ruleset stream. It does nothing in the process
+    # that built the client and never raises. Nothing calls it by itself:
+    # a fork-per-job runner that never evaluates would open a stream per
+    # child.
     def after_fork
       ensure_worker unless @closed
       nil
@@ -283,7 +299,7 @@ module Flagnetic
 
     private
 
-    def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    def now = @timing.now.call
 
     def init_state
       @mutex = Mutex.new
@@ -474,7 +490,8 @@ module Flagnetic
     end
 
     def base(loaded, **fields)
-      Detail.new(ruleset_version: loaded&.ruleset&.version, received_at: loaded&.received_at, stage: @stage, **fields)
+      Detail.new(ruleset_version: loaded&.ruleset&.version, received_at: loaded&.received_at,
+                 stage: loaded ? loaded.stage : @stage, **fields)
     end
 
     def fallback(loaded, default, code)
@@ -517,6 +534,16 @@ module Flagnetic
       end
     end
 
+    # closed_for_events? tells whether an exposure or alias would only sit
+    # in a queue nothing sends any more; the first one after close is
+    # logged and none is recorded.
+    def closed_for_events?
+      return false unless @closed && @exposures && !@exposures.offline?
+
+      once(%i[exposure_skipped closed]) { log(:warn, :exposure_skipped, cause: "closed") }
+      true
+    end
+
     def once(key)
       first = @mutex.synchronize { @once.key?(key) ? false : (@once[key] = true) }
       yield if first
@@ -538,18 +565,31 @@ module Flagnetic
       end
 
       ensure_worker
-      loaded = @loaded
-      if loaded&.ruleset&.protected?
-        log(:warn, :override_refused, flag: key, reason: "protected", environment: loaded.ruleset.environment.key)
-        raise LocalOverrideRefused, "local override of #{key.inspect} refused: the environment " \
-                                    "#{loaded.ruleset.environment.key.inspect} is protected"
-      end
-      flag = loaded&.ruleset&.flag(key)
+      refuse_protected(key, @loaded)
+      flag = @loaded&.ruleset&.flag(key)
       type = flag ? flag.type : Client.__send__(:type_of, value)
       normalized = LocalOverrides.__send__(:normalize, type, value)
-      @mutex.synchronize { @overrides = @overrides.merge(key => [type, normalized].freeze).freeze }
+      # Looked at again under the mutex a swap takes before it clears the
+      # overrides: one stored after a swap to a protected ruleset cleared
+      # them would be served once the environment is unprotected.
+      refused = @mutex.synchronize do
+        held = @loaded
+        next held if held&.ruleset&.protected?
+
+        @overrides = @overrides.merge(key => [type, normalized].freeze).freeze
+        nil
+      end
+      refuse_protected(key, refused)
       log(:warn, :override_set, flag: key)
       fire_change([key])
+    end
+
+    def refuse_protected(key, loaded)
+      return unless loaded&.ruleset&.protected?
+
+      log(:warn, :override_refused, flag: key, reason: "protected", environment: loaded.ruleset.environment.key)
+      raise LocalOverrideRefused, "local override of #{key.inspect} refused: the environment " \
+                                  "#{loaded.ruleset.environment.key.inspect} is protected"
     end
 
     def remove_local_overrides(keys)

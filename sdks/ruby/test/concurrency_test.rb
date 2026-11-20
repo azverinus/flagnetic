@@ -45,6 +45,35 @@ class ConcurrencyTest < Minitest::Test
     assert_operator Array.new(evaluations.size) { evaluations.pop }.sum, :>, 1000
   end
 
+  # A ruleset from the store is held at last_good and one fetched at fresh:
+  # swapping between the two while threads evaluate must never serve one
+  # ruleset's version with the other's stage.
+  def test_a_detail_never_pairs_a_ruleset_with_the_stage_of_another
+    c = Flagnetic::Client.new(offline: versioned(1))
+    rulesets = [[1, :last_good], [2, :fresh]].to_h do |version, stage|
+      [version, [Flagnetic::Eval::Ruleset.decode(JSON.generate(versioned(version))), stage]]
+    end
+    stop = false
+    mismatches = Queue.new
+    readers = Array.new(4) do
+      Thread.new do
+        until stop
+          d = c.detail("version", default: -1)
+          mismatches << [d.ruleset_version, d.stage] unless rulesets.fetch(d.ruleset_version)[1] == d.stage
+          Thread.pass
+        end
+      end
+    end
+    20_000.times do |i|
+      ruleset, stage = rulesets.fetch((i % 2) + 1)
+      c.__send__(:swap, ruleset, received_at: Time.now, stage: stage, source: "test")
+      Thread.pass
+    end
+    stop = true
+    readers.each(&:join)
+    assert_empty Array.new(mismatches.size) { mismatches.pop }
+  end
+
   def test_every_evaluation_of_every_thread_is_counted
     @server.publish(document(1, { "on" => true }))
     c = client(summary_interval: 3600, stream: false)

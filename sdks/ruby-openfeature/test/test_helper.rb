@@ -58,6 +58,15 @@ DOCUMENT = {
                                  "inclusion_salt" => "in2", "variation_salt" => "var2",
                                  "traffic_allocation" => 10_000,
                                  "weights" => [{ "variation" => "control", "weight" => 0 },
+                                               { "variation" => "treatment", "weight" => 10_000 }] } }] },
+    { "key" => "auto_ratio", "type" => "number", "automatic_exposure" => true, "on" => true,
+      "variations" => [{ "key" => "control", "value" => 1 }, { "key" => "treatment", "value" => 1.5 }],
+      "off_variation" => "control", "fallthrough" => "control",
+      "rules" => [{ "id" => "exp3", "conditions" => [],
+                    "serve" => { "kind" => "experiment", "experiment" => "ratio_test", "unit_type" => "user",
+                                 "inclusion_salt" => "in3", "variation_salt" => "var3",
+                                 "traffic_allocation" => 10_000,
+                                 "weights" => [{ "variation" => "control", "weight" => 0 },
                                                { "variation" => "treatment", "weight" => 10_000 }] } }] }
   ]
 }.freeze

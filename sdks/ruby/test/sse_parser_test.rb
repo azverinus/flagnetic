@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-# The change stream's parser follows the WHATWG event-stream rules: any of
+# The ruleset stream's parser follows the WHATWG event-stream rules: any of
 # CRLF, LF or CR ends a line, even split across reads.
 class SSEParserTest < Minitest::Test
   SSEParser = Flagnetic.const_get(:SSEParser)
@@ -20,7 +20,7 @@ class SSEParserTest < Minitest::Test
 
   def test_the_frames_the_server_writes
     out = parse("retry: 3000\n\n", "event: ruleset\nid: 7\ndata: {\"version\":7}\n\n", ": hb\n\n")
-    assert_equal [[:retry, 3000], event("ruleset", '{"version":7}', "7"), [:comment, " hb"]], out
+    assert_equal [event("ruleset", '{"version":7}', "7"), [:comment, " hb"]], out
   end
 
   def test_crlf_cr_and_lf_line_endings
@@ -55,8 +55,8 @@ class SSEParserTest < Minitest::Test
     assert_equal [event("message", "x")], parse("event: ruleset\n\n", "data: x\n\n")
   end
 
-  def test_retry_needs_digits_and_unknown_fields_are_ignored
-    assert_equal [[:retry, 10]], parse("retry: 1x\nretry: 10\nfoo: bar\n\n")
+  def test_a_retry_and_unknown_fields_are_ignored
+    assert_empty parse("retry: 1x\nretry: 10\nfoo: bar\n\n")
   end
 
   def test_a_leading_bom_is_skipped

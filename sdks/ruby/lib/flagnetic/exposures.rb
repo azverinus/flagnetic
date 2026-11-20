@@ -59,6 +59,10 @@ module Flagnetic
       @flushed_at = now
       @revoked_logged = false
       @send_mutex = Mutex.new
+      # Events dropped for a full queue since the last flush logged them:
+      # an outage fills the queue and every enqueue after it drops one, so
+      # the log carries one count per flush instead of one line per event.
+      @overflowed = 0
     end
 
     # offline? reports whether events go to the Recorder rather than to the
@@ -99,7 +103,7 @@ module Flagnetic
 
     # add_alias enqueues an alias event linking two unit IDs.
     def add_alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
-      t = Time.now
+      t = wall_now
       enqueue({ "type" => "alias", "event_id" => UUID.v7(time: t), "from_unit_type" => from_unit_type.to_s,
                 "from_unit_id" => from_unit_id.to_s, "to_unit_type" => to_unit_type.to_s,
                 "to_unit_id" => to_unit_id.to_s, "occurred_at" => EventBatch.format_time(t) })
@@ -133,6 +137,7 @@ module Flagnetic
     def flush_once(budget)
       return true if offline?
 
+      log_overflowed
       deadline = now + budget
       return true unless wait_for_send_lock(deadline)
 
@@ -168,7 +173,7 @@ module Flagnetic
         skipped(key, "repeat")
         return
       end
-      t = Time.now
+      t = wall_now
       coerced = begin
         Eval::Context.__send__(:coerce, context)
       rescue StandardError
@@ -233,12 +238,20 @@ module Flagnetic
     # stability.
     def fingerprint(context)
       c = Eval::Context.__send__(:coerce, context)
-      units = c.units.sort.flatten
-      attributes = c.attributes.sort.map { |k, v| [k, attribute_token(v)] }.flatten
-      (units + [""] + attributes).join(" ")
+      # A unit ID goes through attribute_token like an attribute value, so
+      # an Integer 42 (which is no unit) and the String "42" (which is)
+      # stay apart.
+      units = c.units.sort.flat_map { |type, id| [part(type), part(attribute_token(id))] }
+      attributes = c.attributes.sort.map { |k, v| [part(k.to_s), part(attribute_token(v))] }.flatten
+      (units + [part("")] + attributes).join
     rescue StandardError
       context.object_id.to_s
     end
+
+    # part prefixes a piece with its length, so no choice of pieces can join
+    # the same way as another: a separator would let a unit ID holding it
+    # collide with two units.
+    def part(string) = "#{string.bytesize}:#{string}"
 
     def attribute_token(value)
       case value
@@ -275,9 +288,7 @@ module Flagnetic
         excess.positive? ? @queue.shift(excess).size : 0
       end
       @wake.call
-      return unless dropped.positive?
-
-      log(:warn, :queue_dropped, kind: kind, cause: "queue_full", events: dropped, capacity: @capacity)
+      overflowed(dropped)
     end
 
     def take = @mutex.synchronize { @queue.dup.tap { @queue.clear } }
@@ -294,6 +305,17 @@ module Flagnetic
         excess = @queue.size - @capacity
         excess.positive? ? @queue.shift(excess).size : 0
       end
+      overflowed(dropped)
+    end
+
+    def overflowed(dropped)
+      @mutex.synchronize { @overflowed += dropped } if dropped.positive?
+    end
+
+    # log_overflowed reports the events dropped for a full queue since it
+    # last did, as one line.
+    def log_overflowed
+      dropped = @mutex.synchronize { @overflowed.tap { @overflowed = 0 } }
       return unless dropped.positive?
 
       log(:warn, :queue_dropped, kind: kind, cause: "queue_full", events: dropped, capacity: @capacity)
@@ -304,8 +326,11 @@ module Flagnetic
       return true if events.empty?
 
       batches = EventBatch.pack(events, @transport.identity) { |_, err| report_unserialisable(err) }
+      settled = 0
       batches.each_with_index do |group, i|
+        settled = i
         result = attempt(group, deadline)
+        settled = i + 1
         case result.kind
         when :accepted
           @backoff.reset
@@ -320,6 +345,13 @@ module Flagnetic
         end
       end
       true
+    rescue StandardError
+      # What was taken and not answered goes back: the queue was emptied
+      # for this send, and a failure in reading an answer would otherwise
+      # drop every later batch with it. A failure in packing them puts back
+      # all that was taken.
+      put_back(batches ? batches[settled..].flatten(1) : events.to_a)
+      raise
     end
 
     # schedule_retry backs off on its own schedule rather than honouring

@@ -5,7 +5,7 @@ require "uri"
 
 module Flagnetic
   # Transport speaks the SDK API under SDK_API_PATH for one server key. Every
-  # request, the change stream included, goes through Net::HTTP, so the
+  # request, the ruleset stream included, goes through Net::HTTP, so the
   # proxy the process is configured with (the http_proxy, https_proxy and
   # no_proxy environment variables) applies to all of them.
   class Transport
@@ -99,7 +99,7 @@ module Flagnetic
       Response.new(status: status, body: body)
     end
 
-    # stream_request is the change stream's request; Last-Event-ID is the
+    # stream_request is the ruleset stream's request; Last-Event-ID is the
     # held version, so the platform emits only what is newer. The stream is
     # asked for uncompressed: a compressed one would hold frames back until
     # the compressor flushed.

@@ -8,8 +8,6 @@ module Flagnetic
       # properties, or everything else when negated. It answers membership in
       # constant time for ASCII and in logarithmic time otherwise.
       class CharSet
-        attr_reader :ranges
-
         def initialize(ranges, props, negated)
           @ranges = ranges.freeze
           @los = ranges.map(&:first).freeze

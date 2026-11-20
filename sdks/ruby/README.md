@@ -33,11 +33,11 @@ Under Rails no initializer is needed: set `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BAS
 
 ## Propagation
 
-A change saved in Flagnetic, a kill switch included, reaches a client holding the change stream (the default) within **2 seconds at the 99th percentile**, whichever replica the change and the client each go through. With `stream: false`, or behind a proxy that blocks `text/event-stream`, it arrives at the next poll, within 30 seconds. Every pull request that changes this gem checks the 2 seconds against two real replicas.
+A change saved in Flagnetic, a kill switch included, reaches a client holding the ruleset stream (the default) within **2 seconds at the 99th percentile**, whichever replica the change and the client each go through. With `stream: false`, or behind a proxy that blocks `text/event-stream`, it arrives at the next poll, within 30 seconds. Every pull request that changes this gem checks the 2 seconds against two real replicas.
 
 ## Client
 
-`Flagnetic::Client` is the server-mode client. It downloads the ruleset with the server key, holds it in memory, follows every change through the change stream (polling while the stream is down) and evaluates locally, so a getter never waits on the network and never raises. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0 to 2 seconds.
+`Flagnetic::Client` is the server-mode client. It downloads the ruleset with the server key, holds it in memory, follows every change through the ruleset stream (polling while the stream is down) and evaluates locally, so a getter never waits on the network and never raises. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0 to 2 seconds.
 
 ```ruby
 require "flagnetic"
@@ -48,6 +48,7 @@ client.ready(timeout: 5) # => :fresh, :last_good or :built_in
 context = { units: { user: "u-1001" }, attributes: { plan: "pro" } }
 client.bool("new_checkout", default: false, context: context)
 client.int("max_items", default: 10, context: context) # a number flag, whole numbers only
+client.int_detail("max_items", default: 10, context: context) # the same, with why it was served
 detail = client.detail("new_checkout", default: false, context: context)
 detail.value  # => true
 detail.reason # => :rule
@@ -59,7 +60,7 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 
 | Option | Meaning |
 |---|---|
-| `stream:` | `false` turns the change stream off; the ruleset is then polled every 30 s (default `true`). |
+| `stream:` | `false` turns the ruleset stream off; the ruleset is then polled every 30 s (default `true`). |
 | `poll_interval:` | Seconds between polls while the stream is up (default 300, at least 30). |
 | `request_timeout:` | Seconds per request (default 10). |
 | `store:` | Path of a file keeping the last good ruleset across restarts. It is read at construction and rewritten on every accepted ruleset. The file is headed by a digest of the SDK key: one written under another key (another environment's, say) or under none is discarded with `store_failed`. |
@@ -75,9 +76,9 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 
 `stage` is `:fresh` while the latest attempt succeeded (a `304` included), `:last_good` while the held ruleset is older than the latest attempt (it came from an earlier success or from the store) and `:built_in` before any ruleset was received. `status` adds `stale_since`. `on_change` and `on_stage` register blocks and return a callable that removes them.
 
-Every request, the change stream included, goes through `Net::HTTP`, so the proxy configured for the process (`http_proxy`, `https_proxy`, `no_proxy`) applies.
+Every request, the ruleset stream included, goes through `Net::HTTP`, so the proxy configured for the process (`http_proxy`, `https_proxy`, `no_proxy`) applies.
 
-After `fork` the child starts its own background thread on its first call; `after_fork` starts it at once, so a worker that has not served a request yet already follows the stream.
+After `fork` the child starts its own background thread on its first call, so a child that never evaluates opens no stream; `after_fork` starts it at once, so a worker that has not served a request yet already follows the stream.
 
 Local overrides replace a flag's value inside this process and are refused in a protected environment:
 
@@ -102,7 +103,7 @@ client.flush(timeout: 5)
 - **Evaluation summaries.** Every evaluation is counted per flag, variation and reason (`fallback` and `local_override` included, never a unit ID or a value) and sent every `summary_interval` as one or more `evaluation_summary` events of at most 1,000 rows, with the version of the ruleset held at the interval's end. A report that fails merges into the next one; one older than an hour is dropped.
 - **Exposures.** Evaluating records nothing on its own. `exposure` sends the experiment block of the latest evaluation of that flag for that context, or nothing when it carried none (`exposure_skipped` at debug says why). A flag with automatic exposure sends one as it is evaluated. A repeat for the same experiment, unit and variation is sent once per `flush_interval`.
 - **Aliases.** `alias` links the unit ID used before sign-up to the one after it; it changes no context.
-- **Delivery.** Events go gzipped to `POST /sdk/v1/events` in batches of at most 500, each with a UUIDv7 event ID kept across retries, so the server drops a resend as a duplicate. An evaluation summary that is still unanswered when its flush ends is merged into the next window and sent under new IDs. A 429, a 5xx or a network error is retried with backoff (evaluation summaries wait for `Retry-After`, capped at five minutes); a 401 or 403 logs `key_revoked` and keeps the events; an event the server rejects is logged as `queue_dropped` and never sent again. The queue holds 10,000 events and drops the oldest beyond that. A string that is not valid UTF-8 (a unit ID taken from a cookie, say) is sent with each invalid byte replaced by U+FFFD; an event that still cannot be encoded is dropped alone, logged as `queue_dropped` with cause `not_serialisable` and the class of the error as `fault`, and costs no other event.
+- **Delivery.** Events go gzipped to `POST /sdk/v1/events` in batches of at most 500, each with a UUIDv7 event ID kept across retries, so the server drops a resend as a duplicate. An evaluation summary that is still unanswered when its flush ends is merged into the next window and sent under new IDs. A 429, a 5xx or a network error is retried with backoff (evaluation summaries wait for `Retry-After`, capped at five minutes); a 401 or 403 logs `key_revoked` and keeps the events; an event the server rejects is logged as `queue_dropped` and never sent again. The queue holds 10,000 events and drops the oldest beyond that. Drops beyond that are logged as one `queue_dropped` per flush with the count. A string that is not valid UTF-8 (a unit ID taken from a cookie, say) is sent with each invalid byte replaced by U+FFFD; an event that still cannot be encoded is dropped alone, logged as `queue_dropped` with cause `not_serialisable` and the class of the error as `fault`, and costs no other event.
 - `flush(timeout:)` sends what is queued and the current window and waits at most `timeout` seconds; `close(timeout:)` flushes first and then stops the background thread, both within the one `timeout`. A forked child starts with an empty queue and window.
 
 An offline client sends nothing: it hands every summary, exposure and alias to its `recorder`.
@@ -128,7 +129,7 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `listener_failed` | error | `cause` |
 | `store_failed` | error | `path`, `cause` |
 | `worker_failed` | error | `cause` |
-| `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`) |
+| `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`); once at warn with `cause` `closed` for an exposure or alias after `close` |
 | `exposures_disabled` | warn | |
 | `ingest_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
 | `client_not_configured` | warn | `rails_env`: the Rails integration found no SDK key and base URL outside production and serves built-in defaults |
@@ -146,7 +147,7 @@ A condition this SDK cannot evaluate although the server accepted it, such as a 
 
 Under Rails the gem loads a railtie (nothing of it loads without Rails) that sets `Flagnetic.client` up without an initializer. The SDK key and base URL come from the first of `config.flagnetic.sdk_key` and `config.flagnetic.base_url`, the `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BASE_URL` environment variables, and credentials (`flagnetic.sdk_key`, `flagnetic.base_url`). Without both and without `offline_file`, building the client in production raises `Flagnetic::NotConfigured`, naming what is missing and where to set it, so a deployment that lost its key fails at boot (in console, runner and rake, on first use) instead of serving built-in defaults to every user; in any other environment the client serves built-in defaults and logs `client_not_configured`.
 
-A server or job process builds the client at boot and waits up to `ready_timeout` seconds for the ruleset; `rails console`, `rails runner` and rake build it on first use, so a task that never asks for a flag makes no request. Every forked child (Puma cluster mode, Unicorn) starts its own background thread at once, and every process closes its client at exit, which flushes what it queued. Local overrides are allowed in every environment but production, where no setting enables them.
+A server or job process builds the client at boot and waits up to `ready_timeout` seconds for the ruleset; `rails console`, `rails runner` and rake build it on first use, so a task that never asks for a flag makes no request. Every forked child (Puma cluster mode, Unicorn) starts its own background thread on its first call, and every process closes its client at exit, which flushes what it queued. Local overrides are allowed in every environment but production, where no setting enables them.
 
 | `config.flagnetic.` | |
 |---|---|

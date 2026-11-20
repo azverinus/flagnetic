@@ -118,7 +118,7 @@ module Flagnetic
       # client's int getter does: a number that is not whole serves
       # default_value with TYPE_MISMATCH rather than a truncated value.
       def fetch_integer_value(flag_key:, default_value:, evaluation_context: nil)
-        Mapping.resolution(integral(detail(flag_key, default_value, evaluation_context), default_value))
+        Mapping.resolution(integer_detail(flag_key, default_value, evaluation_context))
       end
 
       # fetch_float_value serves a number flag as a Float.
@@ -158,9 +158,15 @@ module Flagnetic
         @client.detail(flag_key, default: default_value, context: context(evaluation_context))
       end
 
-      def context(evaluation_context) = Mapping.context(evaluation_context, @unit_type)
+      # integer_detail narrows before the client counts and exposes the
+      # evaluation, where the client can. A flagnetic release without
+      # int_detail narrows after, as the provider always did.
+      def integer_detail(flag_key, default_value, evaluation_context)
+        ctx = context(evaluation_context)
+        return @client.int_detail(flag_key, default: default_value, context: ctx) if @client.respond_to?(:int_detail)
 
-      def present?(value) = value.is_a?(String) && !value.empty?
+        integral(@client.detail(flag_key, default: default_value, context: ctx), default_value)
+      end
 
       # integral narrows a served number to an Integer; one that is not
       # whole is a type mismatch, served as the fallback the client's own
@@ -177,6 +183,10 @@ module Flagnetic
                               ruleset_version: served.ruleset_version, received_at: served.received_at,
                               stage: served.stage)
       end
+
+      def context(evaluation_context) = Mapping.context(evaluation_context, @unit_type)
+
+      def present?(value) = value.is_a?(String) && !value.empty?
 
       # announce sends the state init found: ERROR on a revoked key, else
       # READY, followed by STALE when only a last good ruleset is held.

@@ -58,6 +58,26 @@ class ExposuresTest < Minitest::Test
     assert_equal "control", c.recorder.exposures.first.variation_key
   end
 
+  def test_exposure_sends_the_assignment_of_its_own_context_when_two_contexts_join_alike
+    c = offline
+    spaced = { units: { "anonymous" => "a x " } }
+    split = { units: { "anonymous" => "a", "x" => "" } }
+    c.string("auto_off", default: "", context: spaced)
+    c.string("auto_off", default: "", context: split)
+    c.exposure("auto_off", context: spaced)
+    assert_equal ["a x "], c.recorder.exposures.map(&:unit_id)
+  end
+
+  def test_exposure_tells_an_integer_unit_id_from_its_string
+    c = offline
+    named = { units: { "anonymous" => "42" } }
+    numbered = { units: { "anonymous" => 42 } }
+    c.string("auto_off", default: "", context: named)
+    c.string("auto_off", default: "", context: numbered)
+    c.exposure("auto_off", context: named)
+    assert_equal ["42"], c.recorder.exposures.map(&:unit_id)
+  end
+
   def test_exposure_sends_nothing_for_a_flag_never_evaluated_with_an_experiment
     c = offline
     c.exposure("auto_off", context: ASSIGNED)
@@ -186,18 +206,13 @@ class ExposuresTest < Minitest::Test
   end
 
   def test_an_exposure_with_an_invalid_unit_id_is_scrubbed_and_sent
-    @server.publish(document(1))
+    @server.publish(FIXTURE["ruleset"])
     c = client(flush_interval: 3600, stream: false)
     c.ready(timeout: 2)
-    exposures = c.instance_variable_get(:@exposures)
-    record = Flagnetic.const_get(:Exposures)::ExposureRecord.new(
-      experiment: Struct.new(:key, :unit_type, :unit_id, :variation, :override)
-                        .new("checkout_v2", "anonymous", "u-\xFF", "control", false),
-      reason: :experiment, ruleset_version: 1
-    )
-    exposures.__send__(:emit, { units: { "anonymous" => "x" } }, "auto_on", record)
+    c.string("auto_on", default: "", context: { units: { "anonymous" => "u-\xFF" } })
     c.flush(timeout: 2)
-    assert_equal "u-\uFFFD", @server.events_requests.first.events.first["unit_id"]
+    exposures = @server.events_requests.flat_map(&:events).select { |e| e["type"] == "exposure" }
+    assert_equal(["u-\uFFFD"], exposures.map { |e| e["unit_id"] })
   end
 
   # The guard: an event that still does not encode (whatever the reason) is
@@ -283,6 +298,37 @@ class ExposuresTest < Minitest::Test
     assert(dropped.all? { |(level, f)| level == :warn && f[:kind] == "exposure_or_alias" && f[:capacity] == 10_000 })
   end
 
+  def test_a_full_queue_logs_one_warning_per_flush_with_the_count
+    @server.on_events { |_| [500, {}, ""] }
+    @server.publish(document(1))
+    c = client(flush_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    10_000.times { |i| c.alias("anonymous", "d-#{i}", "user", "u-#{i}") }
+    # Held up by the failing server, the queue is full and drops one event per enqueue.
+    c.flush(timeout: 2)
+    before = logged(:queue_dropped).count { |(_, f)| f[:cause] == "queue_full" }
+    50.times { |i| c.alias("anonymous", "e-#{i}", "user", "u-#{i}") }
+    assert_equal before, logged(:queue_dropped).count { |(_, f)| f[:cause] == "queue_full" },
+                 "a drop logged by itself"
+    c.flush(timeout: 2)
+    dropped = logged(:queue_dropped).select { |(_, f)| f[:cause] == "queue_full" }
+    assert_equal before + 1, dropped.size
+    assert_operator dropped.last[1][:events], :>=, 50
+  end
+
+  def test_an_exposure_or_alias_after_close_sends_nothing_and_is_logged_once
+    @server.publish(document(1))
+    c = client(stream: false)
+    c.ready(timeout: 2)
+    c.close
+    requests = @server.events_requests.size
+    c.alias("anonymous", "d-1", "user", "u-1")
+    c.alias("anonymous", "d-2", "user", "u-2")
+    c.exposure("auto_on", context: ASSIGNED)
+    assert_equal requests, @server.events_requests.size
+    assert_equal [[:warn, { cause: "closed" }]], logged(:exposure_skipped)
+  end
+
   def test_a_rejected_event_is_never_sent_again_and_is_logged
     @server.on_events do |request|
       ids = request.events.map { |e| e["event_id"] }
@@ -299,6 +345,22 @@ class ExposuresTest < Minitest::Test
     c.flush(timeout: 2)
     assert_equal 1, @server.events_requests.size
     assert_equal ["out_of_window"], logged(:queue_dropped).first[1][:rejected]
+  end
+
+  { "null" => "null", "true" => "true", "rejected_numbers" => '{"rejected":[1]}',
+    "rejected_string" => '{"rejected":"x"}' }.each do |name, body|
+    define_method(:"test_a_202_answer_#{name}_is_accepted_and_nothing_is_lost") do
+      @server.on_events { |_| [202, { "Content-Type" => "application/json" }, body] }
+      @server.publish(document(1))
+      c = client(stream: false)
+      c.ready(timeout: 2)
+      c.alias("anonymous", "d-1", "user", "u-1")
+      c.flush(timeout: 2)
+      c.alias("anonymous", "d-2", "user", "u-2")
+      c.flush(timeout: 2)
+      assert_equal([%w[d-1], %w[d-2]], @server.events_requests.map { |r| r.events.map { |e| e["from_unit_id"] } })
+      assert_empty logged(:worker_failed)
+    end
   end
 
   def test_another_4xx_drops_the_batch

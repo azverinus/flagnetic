@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -297,6 +299,10 @@ class EventQueue:
         self._retry_at: float | None = None
         self._failures = 0
         self._full = False
+        # Events dropped for a full queue and not yet logged: an outage fills the queue and every
+        # record after it drops one, so the log carries a count at most once per flush interval.
+        self._overflowed = 0
+        self._overflow_logged = -math.inf
 
     def record(self, event: Event) -> None:
         try:
@@ -321,16 +327,28 @@ class EventQueue:
                 del self._queue[:over]
             full = len(self._queue) >= self._timing.batch_size and not self._full
             self._full = self._full or full
+            if over > 0:
+                self._overflowed += over
         if over > 0:
-            self._log(
-                logging.WARNING,
-                _events.QUEUE_DROPPED,
-                cause="queue_full",
-                dropped=over,
-                capacity=self._timing.capacity,
-            )
+            self._log_overflow(time.monotonic())
         if full:
             self._wake()
+
+    def _log_overflow(self, now: float, *, force: bool = False) -> None:
+        with self._lock:
+            if not self._overflowed or not (
+                force or now - self._overflow_logged >= self._timing.flush_interval
+            ):
+                return
+            dropped, self._overflowed = self._overflowed, 0
+            self._overflow_logged = now
+        self._log(
+            logging.WARNING,
+            _events.QUEUE_DROPPED,
+            cause="queue_full",
+            dropped=dropped,
+            capacity=self._timing.capacity,
+        )
 
     def deadline(self) -> float:
         if self._retry_at is not None:
@@ -339,6 +357,8 @@ class EventQueue:
 
     def run(self, now: float, *, flush: bool = False, final: bool = False) -> None:
         """Sends what is due: on the interval, a full batch, a flush, or one last time at close."""
+        # The drops the rate limit held back are reported with the next flush or interval.
+        self._log_overflow(time.monotonic(), force=flush or final or now >= self._next_flush)
         retrying = self._retry_at is not None
         if retrying and now < self._retry_at and not final:  # type: ignore[operator]
             return
@@ -367,6 +387,12 @@ class EventQueue:
                 self._dropped(sent, len(batch))
                 continue
             if final:
+                with self._lock:
+                    undelivered = len(self._queue)
+                lost: dict[str, Any] = {"cause": "closing", "events": undelivered}
+                if sent.status:
+                    lost["status"] = sent.status
+                self._log(logging.WARNING, _events.QUEUE_DROPPED, **lost)
                 return
             self._failures += 1
             cap = (

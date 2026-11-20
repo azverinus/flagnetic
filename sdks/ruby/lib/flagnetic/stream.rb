@@ -3,7 +3,7 @@
 require "net/http"
 
 module Flagnetic
-  # Stream is one request of the change stream, read on a thread of its own
+  # Stream is one request of the ruleset stream, read on a thread of its own
   # so that the worker can keep its timers while the stream is quiet. What
   # happens is posted to the worker's inbox as [:stream, id, kind, ...]:
   #

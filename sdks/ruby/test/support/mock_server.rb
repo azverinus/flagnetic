@@ -8,7 +8,7 @@ require "stringio"
 # MockServer is an in-process SDK API: one thread per connection, one
 # request per connection. By default it behaves like the platform: the
 # ruleset endpoint serves the current document with ETag and If-None-Match,
-# the change stream writes `retry`, the current version when Last-Event-ID
+# the ruleset stream writes `retry`, the current version when Last-Event-ID
 # is below it, and every later version, and the events endpoint answers
 # 202 accepting every event it was sent. Tests replace any endpoint with a
 # script, publish new versions, and drop or close open streams.
@@ -32,7 +32,7 @@ class MockServer
     end
   end
 
-  # Stream is one open change stream connection.
+  # Stream is one open ruleset stream connection.
   class Stream
     attr_reader :request
 

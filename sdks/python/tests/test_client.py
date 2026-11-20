@@ -527,7 +527,7 @@ def test_without_a_logger_events_go_to_the_flagnetic_logger(caplog: pytest.LogCa
     assert loaded[0].levelno == logging.INFO
 
 
-def test_a_refused_stream_key_stays_down_and_is_reported_once(clients: Any) -> None:
+def test_a_refused_stream_key_stays_down_until_the_next_fetch_and_is_reported_once(clients: Any) -> None:
     logs = Logs()
     stream_requests: list[Request] = []
 
@@ -541,7 +541,9 @@ def test_a_refused_stream_key_stays_down_and_is_reported_once(clients: Any) -> N
             )
         return Response(200, JSON, RULESET)
 
-    client = clients(MockServer(handler), stream=True, logger=logs, _time_divisor=100)
+    client = clients(
+        MockServer(handler), stream=True, logger=logs, _time_divisor=100, _down_poll_interval=3600
+    )
     assert client.ready(5) is flagnetic.Stage.FRESH
     time.sleep(0.5)
     assert len(stream_requests) == 1
@@ -587,6 +589,30 @@ def test_stream_frames_split_across_writes_and_lines_ended_any_way_are_read(clie
         )
         == []
     )
+
+
+def test_a_dropped_stream_brings_the_next_fetch_within_the_down_poll(clients: Any) -> None:
+    fetches: list[Request] = []
+    refuse_stream = threading.Event()
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            if refuse_stream.is_set():
+                return Response(503)
+            return Response(200, {"Content-Type": "text/event-stream"}, stream=True)
+        fetches.append(request)
+        return Response(200, JSON, RULESET)
+
+    server = MockServer(handler)
+    # The stream is up, so the next fetch is an hour out (36 s compressed); the down poll is 0.3 s.
+    client = clients(server, stream=True, poll_interval=3600, _time_divisor=100, _down_poll_interval=30)
+    assert client.ready(5) is flagnetic.Stage.FRESH
+    assert eventually(lambda: [] if fetches else ["no fetch"]) == []
+    server.stream_send(b": hb\n\n")
+    refuse_stream.set()
+    before = len(fetches)
+    server.stream_close()
+    assert eventually(lambda: [] if len(fetches) > before else ["no safety poll"], 5) == []
 
 
 def test_a_malformed_ruleset_event_drops_the_stream_and_it_reconnects(clients: Any) -> None:
@@ -892,3 +918,49 @@ def test_a_new_ruleset_version_with_the_condition_is_logged_again(clients: Any) 
     served[0] = json.dumps({**INVALID, "version": 8}).encode()
     assert eventually(lambda: [] if logs.count("condition_invalid") == 2 * once else ["waiting"]) == []
     assert sorted({line["ruleset_version"] for line in logs.named("condition_invalid")}) == [7, 8]
+
+
+def test_the_sdk_key_is_in_no_repr(clients: Any) -> None:
+    client = clients(serving(RULESET))
+    assert SDK_KEY not in repr(client)
+    assert SDK_KEY not in repr(client._online)
+
+
+@pytest.mark.parametrize("platform", ["linux\n", "lin\x00ux", "linüx"])
+def test_a_platform_that_cannot_be_in_a_header_is_refused_at_construction(platform: str) -> None:
+    with pytest.raises(ValueError, match="platform"):
+        flagnetic.Client(SDK_KEY, "http://127.0.0.1:1", platform=platform, stream=False)
+
+
+def test_a_stream_slow_to_send_headers_does_not_keep_the_first_fetch_waiting(clients: Any) -> None:
+    release = threading.Event()
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            release.wait(10)
+            return Response(500)
+        return Response(200, JSON, RULESET)
+
+    try:
+        client = clients(MockServer(handler), stream=True, request_timeout=30)
+        started = time.monotonic()
+        assert client.ready(5) is flagnetic.Stage.FRESH
+        assert time.monotonic() - started < 4
+    finally:
+        release.set()
+
+
+def test_a_stream_refused_once_reopens_after_a_fetch_succeeds(clients: Any) -> None:
+    streams: list[Request] = []
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            streams.append(request)
+            if len(streams) == 1:
+                return Response(403)
+            return Response(200, {"Content-Type": "text/event-stream"}, stream=True)
+        return Response(200, JSON, RULESET)
+
+    client = clients(MockServer(handler), stream=True, _time_divisor=100, _down_poll_interval=30)
+    assert client.ready(5) is flagnetic.Stage.FRESH
+    assert eventually(lambda: [] if len(streams) >= 2 else ["the stream stayed stopped"], 5) == []

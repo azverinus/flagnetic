@@ -25,6 +25,15 @@ class ClientTest < Minitest::Test
     assert c.bool(:on, default: false, context: { units: { user: "u-1" } })
   end
 
+  def test_int_detail_narrows_before_it_is_counted
+    c = offline({ "float_limit" => 5.0, "ratio" => 2.5 })
+    whole = c.int_detail("float_limit", default: 0)
+    assert_equal [5, :fallthrough], [whole.value, whole.reason]
+    assert_kind_of Integer, whole.value
+    refused = c.int_detail("ratio", default: 7)
+    assert_equal [7, :fallback, :type_mismatch], [refused.value, refused.reason, refused.error_code]
+  end
+
   def test_int_serves_a_whole_number_as_an_integer
     c = offline({ "limit" => 5, "float_limit" => 5.0, "ratio" => 2.5, "copy" => "hi" })
     assert_equal 5, c.int("limit", default: 0)
@@ -164,6 +173,28 @@ class ClientTest < Minitest::Test
     assert_empty c.local_overrides.list
     assert_equal [["on"]], changes
     assert_equal 1, logged(:override_refused).size
+  end
+
+  # A set that has passed its look at the held ruleset and waits for the
+  # client's mutex while a protected ruleset is installed must be refused,
+  # not stored after the clear.
+  def test_an_override_set_while_a_protected_ruleset_is_installed_is_not_kept
+    c = offline({ "on" => true }, allow_overrides: true)
+    protected_ruleset = Flagnetic::Eval::Ruleset.decode(JSON.generate(document(2, { "on" => true }, protected: true)))
+    mutex = c.instance_variable_get(:@mutex)
+    result = nil
+    mutex.synchronize do
+      setter = Thread.new do
+        result = assert_raises(Flagnetic::LocalOverrideRefused) do
+          c.local_overrides.set("on", false)
+        end
+      end
+      Thread.pass until setter.status == "sleep"
+      loaded = Flagnetic.const_get(:FallbackChain)::Loaded
+      c.instance_variable_set(:@loaded, loaded.new(ruleset: protected_ruleset, received_at: Time.now, stage: :fresh))
+    end
+    Thread.pass while result.nil?
+    assert_empty c.local_overrides.list
   end
 
   def test_local_overrides_on_a_client_fed_by_the_server

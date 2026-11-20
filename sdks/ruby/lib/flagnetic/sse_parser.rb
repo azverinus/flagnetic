@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Flagnetic
-  # SSEParser reads the text/event-stream format of the change stream by the
+  # SSEParser reads the text/event-stream format of the ruleset stream by the
   # WHATWG rules: CRLF, LF or CR end a line, even when split between reads;
   # a blank line dispatches the event gathered so far; lines starting with
   # a colon are comments; data lines join with newlines; the last event ID
@@ -32,8 +32,9 @@ module Flagnetic
       @id = nil
     end
 
-    # feed parses the next bytes of the stream, yielding [:event, Event],
-    # [:retry, milliseconds] and [:comment, text] as they complete.
+    # feed parses the next bytes of the stream, yielding [:event, Event]
+    # and [:comment, text] as they complete. A retry field is read and
+    # ignored: the worker backs off on its own schedule.
     def feed(chunk, &)
       bytes = chunk.b
       if @skip_lf && !bytes.empty?
@@ -84,7 +85,6 @@ module Flagnetic
       when "event" then @type = value
       when "data" then append_data(value)
       when "id" then @id = value unless value.include?("\u0000")
-      when "retry" then yield :retry, value.to_i if value.match?(/\A\d+\z/)
       end
     end
 

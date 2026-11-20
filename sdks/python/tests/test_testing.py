@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
 import flagnetic
 from flagnetic import testing
+from flagnetic._overrides import LocalOverrideRefused, LocalOverrides
 from protocol import Logs, read, read_json
 
 CONTEXT = flagnetic.Context(**read_json("scenarios.json")["context"])
@@ -212,3 +215,29 @@ def test_an_offline_client_makes_no_request_and_flush_and_close_return_at_once()
 
 def test_testing_clients_are_not_collected_as_tests() -> None:
     assert getattr(testing.TestClient, "__test__", True) is False
+
+
+def test_a_number_override_a_double_cannot_hold_is_refused() -> None:
+    client = testing.from_values({"n": 1.5}, allow_overrides=True)
+    try:
+        with pytest.raises(TypeError):
+            client.local_overrides.set("n", 10**400)
+        assert client.local_overrides.list() == {}
+        assert client.get_detail(flagnetic.Context(units={"user": "u"}), "n", 0.0).value == 1.5
+    finally:
+        client.close()
+
+
+def test_an_override_set_while_the_environment_turns_protected_is_not_kept() -> None:
+    open_env = SimpleNamespace(protected=False, environment_key="dev", flag=lambda _key: None)
+    protected = SimpleNamespace(protected=True, environment_key="prod", flag=lambda _key: None)
+    looks = iter([open_env, protected])
+    overrides = LocalOverrides(
+        True,
+        lambda: cast(Any, next(looks)),
+        lambda *_a, **_k: None,
+        lambda _k: None,
+    )
+    with pytest.raises(LocalOverrideRefused):
+        overrides.set("checkout", True)
+    assert overrides.list() == {}

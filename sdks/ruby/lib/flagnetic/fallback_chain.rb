@@ -6,10 +6,12 @@ module Flagnetic
   # FallbackChain is the part of Client that holds the ruleset: it loads
   # the store and offline documents, applies each fetch outcome and moves
   # the stage. Every method is private; the background thread calls handle_fetch,
-  # held_version and key_revoked.
+  # held_version, stream_connected and key_revoked.
   module FallbackChain
-    # Loaded is the held ruleset and when it was received.
-    Loaded = Struct.new(:ruleset, :received_at, keyword_init: true)
+    # Loaded is the held ruleset, when it was received and the stage it is
+    # held at. The stage is part of it so that a getter, reading it once,
+    # never pairs a ruleset with the stage of another.
+    Loaded = Struct.new(:ruleset, :received_at, :stage, keyword_init: true)
 
     private
 
@@ -22,7 +24,7 @@ module Flagnetic
         raise OfflineError, "offline ruleset: #{cause}"
       end
 
-      swap(ruleset, received_at: Time.now, stage: :fresh, source: "offline")
+      swap(ruleset, received_at: @timing.wall_now.call, stage: :fresh, source: "offline")
     rescue OfflineError
       raise
     rescue StandardError => e
@@ -78,11 +80,11 @@ module Flagnetic
     # evaluation may have changed, local overrides dropped by a protected
     # environment included.
     def swap(ruleset, received_at:, stage:, source:)
-      # The ruleset and its stage change together, so no getter sees one
-      # without the other.
+      # The ruleset and its stage change together, and a getter reads both
+      # from the one Loaded, so none sees one without the other.
       previous, previous_stage = @mutex.synchronize do
         p = [@loaded, @stage]
-        @loaded = Loaded.new(ruleset: ruleset, received_at: received_at).freeze
+        @loaded = Loaded.new(ruleset: ruleset, received_at: received_at, stage: stage).freeze
         @stage = stage
         p
       end
@@ -133,6 +135,7 @@ module Flagnetic
       previous = @mutex.synchronize do
         p = @stage
         @stage = stage
+        @loaded = Loaded.new(**@loaded.to_h, stage: stage).freeze if @loaded
         p
       end
       stage_changed(previous, stage)
@@ -174,7 +177,7 @@ module Flagnetic
       held = held_version
       return fetch_failed("version #{ruleset.version} is below the held #{held}") if held && ruleset.version < held
 
-      changed = swap(ruleset, received_at: Time.now, stage: :fresh, source: "fetch")
+      changed = swap(ruleset, received_at: @timing.wall_now.call, stage: :fresh, source: "fetch")
       succeeded
       persist(json)
       fire_change(changed)
@@ -198,7 +201,7 @@ module Flagnetic
     # failed moves fresh to last_good and marks the held ruleset stale;
     # last_good and built_in stay.
     def failed
-      @mutex.synchronize { @stale_since ||= Time.now }
+      @mutex.synchronize { @stale_since ||= @timing.wall_now.call }
       move_to(:last_good) if @stage == :fresh
     end
 

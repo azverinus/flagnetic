@@ -20,7 +20,6 @@ import ssl
 import threading
 import time
 import zlib
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
 from urllib.parse import urlsplit
@@ -39,6 +38,9 @@ DEFAULT_REQUEST_TIMEOUT = 10.0
 DEFAULT_POLL_INTERVAL = 300.0
 MIN_POLL_INTERVAL = 30.0
 DEFAULT_DOWN_POLL_INTERVAL = 30.0
+# How long the first fetch waits for the first attempt to open the stream: a stream endpoint slow to
+# answer must not keep the ruleset from being fetched.
+FIRST_STREAM_WAIT = 2.0
 RETRY_BASE = 1.0
 RETRY_CAP = 300.0
 UNAUTHORIZED_CAP = 900.0
@@ -89,6 +91,7 @@ class Waits:
     """
 
     request_timeout: float
+    first_stream: float
     poll: float
     down_poll: float
     retry_base: float
@@ -111,6 +114,7 @@ class Waits:
         poll = DEFAULT_POLL_INTERVAL if poll_interval is None else poll_interval
         return cls(
             request_timeout=request_timeout,
+            first_stream=min(request_timeout, FIRST_STREAM_WAIT / divisor),
             poll=max(poll / divisor, MIN_POLL_INTERVAL / divisor),
             down_poll=down_poll_interval / divisor,
             retry_base=RETRY_BASE / divisor,
@@ -235,8 +239,6 @@ class Delivery:
         schema_version: int,
         reporter: Reporter | None = None,
         ingest: Ingest | None = None,
-        ssl_context: ssl.SSLContext | None = None,
-        sleep_hook: Callable[[], None] | None = None,
     ) -> None:
         self._host = host
         self._reporter = reporter
@@ -254,7 +256,6 @@ class Delivery:
         self._stream_enabled = stream
         self._agent = agent
         self._schema_version = schema_version
-        self._ssl_context = ssl_context
         self._closing = threading.Event()
         self._wake_read, self._wake_write = socket.socketpair()
         self._wake_read.setblocking(False)
@@ -282,6 +283,8 @@ class Delivery:
         self._parser = EventStreamParser()
         self._stream_connected = False
         self._stream_stopped = False
+        self._fetch_successes = 0
+        self._reopen_after = 0
         self._stream_failures = 0
         self._next_stream = 0.0
         # The stream has delivered a heartbeat, which is what makes it stable.
@@ -469,9 +472,11 @@ class Delivery:
 
     def _connection(self, secure: bool, stream: bool) -> http.client.HTTPConnection:
         timeout = self._waits.request_timeout
+        if stream and not self._first_attempt_done:
+            timeout = self._waits.first_stream
         if secure:
             cls = _SecureStreamConnection if stream else http.client.HTTPSConnection
-            return cls(self._netloc_host, self._port, timeout=timeout, context=self._ssl_context)
+            return cls(self._netloc_host, self._port, timeout=timeout)
         cls_plain = _StreamConnection if stream else http.client.HTTPConnection
         return cls_plain(self._netloc_host, self._port, timeout=timeout)
 
@@ -493,6 +498,12 @@ class Delivery:
             )
         else:
             self._fetch_failures = 0
+            self._fetch_successes += 1
+            if self._stream_stopped and self._fetch_successes > self._reopen_after:
+                # The key that was refused on the stream answers the fetch: a restored key, or a
+                # refusal that was a proxy's, so the stream is tried again.
+                self._stream_stopped = False
+                self._next_stream = now
             if self._target != self._announced:
                 self._announced, self._catch_ups = self._target, 0
             if self._host.held_version() < self._announced and self._catch_ups < len(self._waits.catch_up):
@@ -653,6 +664,9 @@ class Delivery:
                 status=resp.status,
             )
             self._stream_stopped = True
+            # The fetch that follows a refusal at startup shows nothing the refusal did not: the
+            # stream is tried again by the one after it.
+            self._reopen_after = max(self._fetch_successes, 1)
             return
         if resp.status != 200:
             conn.close()
@@ -754,6 +768,10 @@ class Delivery:
         self._host.log(level, _events.SSE_DROPPED, cause=cause, error=error, reconnect=True)
         now = time.monotonic()
         self._drop_stream_connection()
+        # The fetch scheduled while the stream was up may be a poll interval away; without the
+        # stream, a change is noticed only by fetching, so the safety poll takes over at once.
+        if self._next_fetch is not None and self._next_fetch > now + self._waits.down_poll:
+            self._next_fetch = now + self._waits.down_poll
         if self._stream_stable:
             self._stream_failures = 0
         if errored:
