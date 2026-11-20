@@ -428,7 +428,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Signing in through an auth provider: the identity context decides who
 	// signs in, the access context opens the session.
 	ssoAccess := appaccess.NewSSO(accessStore, settings, audit, d.Clock, d.IDs, rand.Reader, sessionKey)
-	oidcClient := oidc.NewClient()
+	oidcClient := oidc.NewClient(d.Clock)
 	identities := identityDirectory{store: identityStore}
 	waysIn := appaccess.NewWaysIn(accessStore, identities, settings)
 	authenticateSession := appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey)

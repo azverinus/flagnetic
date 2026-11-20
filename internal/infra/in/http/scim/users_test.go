@@ -426,8 +426,11 @@ func TestPatchingAUserAddsReplacesAndRemoves(t *testing.T) {
 	if doc := r.json(t); doc["displayName"] != "Many" || doc["externalId"] != "ext-many" {
 		t.Errorf("replace without a path = %s", r.body)
 	}
-	if r := patchOf(op("replace", "name.givenName", "Jo"), op("replace", "title", "x")); r.status != http.StatusBadRequest {
-		t.Errorf("an unmapped attribute after a mapped one = %d, want 400: %s", r.status, r.body)
+	if r := patchOf(op("replace", "name.givenName", "Jo"), op("replace", "title", "x")); r.status != http.StatusOK {
+		t.Errorf("an unmapped attribute after a mapped one = %d, want 200: %s", r.status, r.body)
+	}
+	if r := patchOf(op("replace", "displayName", "Kept"), op("replace", "groups", []any{})); r.status != http.StatusBadRequest {
+		t.Errorf("a read-only attribute after a mapped one = %d, want 400: %s", r.status, r.body)
 	}
 	if got := e.call(t, token, http.MethodGet, "/Users/"+member, "").json(t); got["displayName"] != "Many" {
 		t.Errorf("a refused patch changed the user: %v", got)
@@ -442,7 +445,7 @@ func TestPatchingAUserAddsReplacesAndRemoves(t *testing.T) {
 		"active is a boolean":    {[]map[string]any{op("replace", "active", 5)}, "invalidValue"},
 		"userName not removable": {[]map[string]any{op("remove", "userName", nil)}, "invalidValue"},
 		"groups are read only":   {[]map[string]any{op("add", "groups", []any{})}, "mutability"},
-		"an unmapped attribute":  {[]map[string]any{op("replace", "title", "x")}, "noTarget"},
+		"a malformed path":       {[]map[string]any{op("replace", "emails[", "x")}, "invalidPath"},
 		"a taken email":          {[]map[string]any{op("replace", "userName", address)}, ""},
 	} {
 		if c.want == "" {
@@ -510,6 +513,40 @@ func TestADirectoryChangingAMembersEmailEndsTheirPasswordAndResets(t *testing.T)
 	}
 }
 
+// Emails are one address when they differ only in the case of ASCII letters.
+// An address that only Unicode folding equates with the member's (U+212A
+// KELVIN SIGN folds to k) is another address: moving the member there ends
+// their password, and its domain is judged like any other.
+func TestADirectoryMovingAMemberToAnAddressOnlyUnicodeFoldingEquatesIsAMove(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t, "kelvin.example")
+	token := e.createToken(t, management.ScimTokenCreate{Provider: slug}).Value
+	local := "k" + random()
+	existing := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail(local+"@kelvin.example"))
+	member := e.mustCreate(t, token, userBody(existing.Email, nil))
+	if member != existing.ID.String() {
+		t.Fatalf("POST /Users = %s, want the member %s adopted", member, existing.ID)
+	}
+
+	r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "userName", local+"@Kelvin.example"))))
+	if r.status != http.StatusBadRequest {
+		t.Errorf("PATCH userName to a domain the provider does not list = %d: %s, want 400", r.status, r.body)
+	}
+
+	moved := "K" + local[1:] + "@kelvin.example"
+	r = e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "userName", moved))))
+	if r.status != http.StatusOK || r.json(t)["userName"] != moved {
+		t.Fatalf("PATCH userName = %d: %s", r.status, r.body)
+	}
+	updated := e.audited(t, "member.updated", member)
+	if len(updated) == 0 {
+		t.Fatal("no member.updated entry")
+	}
+	if is, _ := updated[0].After.(map[string]any); is["password_removed"] != true {
+		t.Errorf("member.updated after = %v, want the password removed", updated[0].After)
+	}
+}
+
 func TestDeactivatingAUserEndsItsTokensAndResetsAndReactivatingRestoresIt(t *testing.T) {
 	e := start(t)
 	token := e.token(t, e.provider(t))
@@ -568,6 +605,44 @@ func TestDeactivatingAUserEndsItsTokensAndResetsAndReactivatingRestoresIt(t *tes
 		t.Fatal(err)
 	}
 	assertProblem(t, "the member's token after reactivation", res.StatusCode(), res.Body, http.StatusUnauthorized, "token_revoked")
+}
+
+// Entra puts every change of one user into one PATCH, and its default
+// mappings send attributes the instance does not map. A leaver's deactivation
+// must not be lost to them.
+func TestADeactivationCarryingUnmappedAttributesStillDeactivates(t *testing.T) {
+	e := start(t)
+	token := e.token(t, e.provider(t))
+	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
+	memberID, err := id.Parse[access.Member](member)
+	if err != nil {
+		t.Fatal(err)
+	}
+	personal := testkit.Client(t, e.srv, testkit.PersonalToken(t, testkit.Pool(t), memberID, "script"))
+
+	r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(
+		op("Replace", "title", "x"),
+		op("Replace", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department", "y"),
+		op("Replace", "active", "False"),
+	)))
+	if r.status != http.StatusOK || r.json(t)["active"] != false {
+		t.Fatalf("PATCH title and active=False = %d: %s", r.status, r.body)
+	}
+	if m := e.member(t, member); m.Status != management.MemberStatusDeactivated {
+		t.Errorf("member status = %s, want deactivated", m.Status)
+	}
+	res, err := personal.GetMeWithResponse(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertProblem(t, "the member's token", res.StatusCode(), res.Body, http.StatusUnauthorized, "token_revoked")
+
+	// A full replace carrying attributes the instance does not map is no
+	// different.
+	put := e.call(t, token, http.MethodPut, "/Users/"+member, marshal(t, userBody(e.member(t, member).Email, map[string]any{"title": "x", "active": true})))
+	if put.status != http.StatusOK || put.json(t)["active"] != true {
+		t.Errorf("PUT with an unmapped attribute = %d: %s", put.status, put.body)
+	}
 }
 
 func TestDeletingAUserDeactivatesItAndKeepsTheRow(t *testing.T) {
@@ -728,4 +803,54 @@ func TestAControlCharacterInAProvisioningRequestIsRefused(t *testing.T) {
 	id := e.mustCreate(t, token, userBody(email("example.com"), nil))
 	r := e.call(t, token, http.MethodPatch, "/Users/"+id, marshal(t, patch(op("replace", "displayName", "x\x00"))))
 	assertScimError(t, "a patched name with NUL", r, http.StatusBadRequest, "invalidValue")
+}
+
+// The directory deprovisioning the last active instance admin is refused like
+// any other deactivation of them: the instance is never left without one.
+func TestADirectoryCannotDeactivateTheLastActiveInstanceAdmin(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	srv := testkit.StartServer(t, testkit.WithBaseURL(publicURL), testkit.WithPool(pool))
+	founder := testkit.NewBrowser(t, srv.URL)
+	testkit.Bootstrap(t, pool)
+	founder.SignIn(t, testkit.InstanceAdminEmail, testkit.InstanceAdminPassword)
+	e := env{srv: srv, admin: founder.ClientWithResponses, browser: founder}
+	slug := e.provider(t)
+	token := e.token(t, slug)
+
+	// The directory's member becomes an instance admin through a group the
+	// provider maps to it.
+	member := e.mustCreate(t, token, userBody(email("example.com"), nil))
+	e.mapGroups(t, slug, adminMapping("admins"))
+	e.mustCreateGroup(t, token, groupBody("admins", map[string]any{"members": memberRefs(member)}))
+	if got := e.member(t, member); !got.InstanceAdmin {
+		t.Fatalf("the provisioned member = %+v, want an instance admin through the mapping", got)
+	}
+
+	// Every other instance admin goes: the founder is deactivated by a second
+	// admin, who then deactivates themselves, while the provisioned member
+	// remains.
+	second := testkit.NewMember(t, pool, testkit.AsInstanceAdmin())
+	other := testkit.NewBrowser(t, srv.URL)
+	other.SignIn(t, second.Email, second.Password)
+	founders := do(other.ListMembersWithResponse(t.Context(), &management.ListMembersParams{Q: ptr(testkit.InstanceAdminEmail)}))
+	if founders.JSON200 == nil || len(founders.JSON200.Items) != 1 {
+		t.Fatalf("GET /members?q=%s = %d: %s", testkit.InstanceAdminEmail, founders.StatusCode(), founders.Body)
+	}
+	for _, id := range []string{founders.JSON200.Items[0].Id.String(), second.ID.String()} {
+		if res := do(other.DeactivateMemberWithResponse(t.Context(), id)); res.StatusCode() != http.StatusOK {
+			t.Fatalf("deactivating %s = %d: %s", id, res.StatusCode(), res.Body)
+		}
+	}
+
+	r := e.call(t, token, http.MethodPatch, "/Users/"+member, marshal(t, patch(op("replace", "active", false))))
+	assertScimError(t, "deactivating the last instance admin", r, http.StatusConflict, "")
+	if !strings.Contains(string(r.body), "instance admin") {
+		t.Errorf("the refusal = %s, want it to name the instance admin", r.body)
+	}
+	if got := e.call(t, token, http.MethodGet, "/Users/"+member, "").json(t); got["active"] != true {
+		t.Errorf("the user after the refusal = %v, want it still active", got)
+	}
+	if res := e.call(t, token, http.MethodDelete, "/Users/"+member, ""); res.status != http.StatusConflict {
+		t.Errorf("DELETE of the last instance admin = %d: %s, want 409", res.status, res.body)
+	}
 }

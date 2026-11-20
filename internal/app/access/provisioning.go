@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -190,7 +189,7 @@ func (p *Provisioning) Update(ctx context.Context, cmd UpdateProvisionedCommand)
 		return access.Member{}, err
 	}
 	was, is := map[string]any{}, map[string]any{}
-	if !strings.EqualFold(before.Email, after.Email) {
+	if !access.SameEmail(before.Email, after.Email) {
 		if _, err = p.store.ConsumePasswordResets(ctx, after.ID, now); err != nil {
 			return access.Member{}, err
 		}

@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -166,6 +167,9 @@ func (h *CreateSCIMGroup) Handle(ctx context.Context, req SCIMRequest, state ide
 		if err != nil {
 			return err
 		}
+		if err = h.d.boundTouched(ctx, p, identity.TouchedMembers(identity.GroupState{}, state)); err != nil {
+			return err
+		}
 		if err = h.d.checkJoining(ctx, req, nil, state.Members); err != nil {
 			return err
 		}
@@ -280,6 +284,9 @@ func (d SCIMGroupDeps) change(ctx context.Context, req SCIMRequest, group identi
 		if sameGroup(before.GroupState, after) {
 			return nil
 		}
+		if err = d.boundTouched(ctx, p, identity.TouchedMembers(before.GroupState, after)); err != nil {
+			return err
+		}
 		if err = d.checkJoining(ctx, req, before.Members, after.Members); err != nil {
 			return err
 		}
@@ -294,6 +301,25 @@ func (d SCIMGroupDeps) change(ctx context.Context, req SCIMRequest, group identi
 		return d.record(ctx, req, governance.Record{Action: "scim_group.updated", Entity: groupEntity(out), Before: b, After: a})
 	})
 	return out, err
+}
+
+// boundTouched refuses a change that touches more than
+// identity.MaxTouchedMembers members while the provider has group mappings
+// to run for them: tooMany. Without mappings nothing runs and the change is
+// as large as the directory sends it. Deleting a group is never refused, so
+// that a group of any size can be removed.
+func (d SCIMGroupDeps) boundTouched(ctx context.Context, p identity.Provider, touched []identity.MemberID) error {
+	if len(touched) <= identity.MaxTouchedMembers {
+		return nil
+	}
+	mappings, err := d.Mappings.GroupMappings(ctx, p.ID)
+	if err != nil || len(mappings) == 0 {
+		return err
+	}
+	return &identity.ScimError{
+		Type:   "tooMany",
+		Detail: fmt.Sprintf("the change touches %d members, and at most %d may be touched in one request while the provider has group mappings", len(touched), identity.MaxTouchedMembers),
+	}
 }
 
 // checkJoining refuses a member who joins (is in after and not in before)

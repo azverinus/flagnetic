@@ -256,3 +256,25 @@ func TestGrantWritesAreAudited(t *testing.T) {
 		}
 	}
 }
+
+// A grant is removed through the project it belongs to: the owner of one
+// project who names another project's grant under their own path finds
+// nothing, and the other project's grant stays.
+func TestAnOwnerCannotRemoveAnotherProjectsGrantThroughTheirOwnProjectPath(t *testing.T) {
+	srv := testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	admin := testkit.InstanceAdminSession(t, srv)
+	a, b := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
+	owner := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(a), owner.ID, access.RoleOwner)
+	held := grant(t, admin, b.Key, testkit.NewMember(t, pool).ID, "developer")
+	c := signedIn(t, srv, owner).ClientWithResponses
+
+	res := do(c.DeleteGrantWithResponse(t.Context(), a.Key, held.Id.String()))
+
+	assertProblem(t, "a grant of another project under this project's path", res.StatusCode(), res.Body, http.StatusNotFound, "not_found")
+	grants := do(admin.ListGrantsWithResponse(t.Context(), b.Key))
+	if grants.JSON200 == nil || len(grants.JSON200.Items) != 1 || grants.JSON200.Items[0].Id != held.Id {
+		t.Errorf("the other project's grants after the refused removal = %d %s, want its grant kept", grants.StatusCode(), grants.Body)
+	}
+}

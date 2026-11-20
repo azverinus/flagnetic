@@ -21,6 +21,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgidentity "github.com/azverinus/flagnetic/internal/infra/out/postgres/identity"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -917,5 +918,53 @@ func TestASignInCompletedWhileAProviderIsChangedWaitsForTheChange(t *testing.T) 
 	}
 	if me := signedIn(t, b); me == nil || me.Member == nil || me.Member.Email != email {
 		t.Errorf("signed in as %v, want %s", me, email)
+	}
+}
+
+// An address that differs from a member's only by a letter Unicode folds into
+// an ASCII one (U+212A KELVIN SIGN is k) is another address: whoever claims it
+// is not the member, however the database's collation folds.
+func TestAnEmailThatOnlyUnicodeFoldingEquatesLinksNoMember(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	e := start(t)
+	slug := e.forged(t, idp, func(p *provider) { p.autoProvision, p.linkByEmail = false, true })
+	kate := testkit.NewMember(t, testkit.Pool(t), testkit.WithEmail("kate"+strings.ToLower(rand.Text()[:6])+"@example.com"))
+	forged := "\u212A" + kate.Email[1:]
+
+	idp.NextClaims(map[string]any{"sub": "sub-forged", "email": forged, "email_verified": true})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	wantError(t, e.signIn(t, b, slug, "", e.opts()), b, "member_not_found")
+	if n := len(e.audited(t, "identity.linked", "member_email", kate.Email)); n != 0 {
+		t.Errorf("%d identities linked to %s, want none", n, kate.Email)
+	}
+
+	// The same address in ASCII, in another case, still is the member.
+	idp.NextClaims(map[string]any{"sub": "sub-real", "email": strings.ToUpper(kate.Email[:1]) + kate.Email[1:], "email_verified": true})
+	b = testkit.NewBrowser(t, e.srv.URL)
+	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {
+		t.Errorf("the sign-in with the address in another case ended at %s", v.URL)
+	}
+}
+
+// Every instant the server reasons about is the application clock's. A token
+// the wall clock still holds valid is expired when the application clock
+// reads two hours later, as SAML assertions already are.
+func TestAnIDTokenExpiredByTheApplicationClockIsRefused(t *testing.T) {
+	idp := testkit.StartForgingIDP(t)
+	// The identity provider signs tokens valid for an hour from the wall clock.
+	c := clock.NewFake(time.Now().Add(2 * time.Hour))
+	e := start(t, testkit.WithClock(c))
+	slug := e.forged(t, idp, nil)
+
+	idp.NextClaims(map[string]any{"email": uniqueEmail()})
+	b := testkit.NewBrowser(t, e.srv.URL)
+	wantError(t, e.signIn(t, b, slug, "", e.opts()), b, "sso_failed")
+
+	// A token valid at the application clock's time signs in.
+	address := uniqueEmail()
+	idp.NextClaims(map[string]any{"email": address, "iat": c.Now().Unix(), "exp": c.Now().Add(time.Hour).Unix()})
+	b = testkit.NewBrowser(t, e.srv.URL)
+	if v := e.signIn(t, b, slug, "", e.opts()); v.URL.Path != "/" {
+		t.Errorf("a token valid by the application clock ended at %s", v.URL)
 	}
 }

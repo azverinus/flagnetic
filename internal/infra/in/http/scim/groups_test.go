@@ -3,6 +3,7 @@ package scim_test
 import (
 	"net/http"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -634,4 +635,79 @@ func deref[T any](p *T) (v T) {
 		v = *p
 	}
 	return v
+}
+
+// users provisions n members through token, several at a time.
+func (e env) users(t *testing.T, token string, n int) []string {
+	t.Helper()
+	out := make([]string, n)
+	var wg sync.WaitGroup
+	next := make(chan int)
+	for range 16 {
+		wg.Go(func() {
+			for i := range next {
+				r := e.create(t, token, userBody(email("example.com"), nil))
+				if r.status != http.StatusCreated {
+					t.Errorf("POST /Users = %d: %s", r.status, r.body)
+					continue
+				}
+				out[i] = r.json(t)["id"].(string)
+			}
+		})
+	}
+	for i := range n {
+		next <- i
+	}
+	close(next)
+	wg.Wait()
+	if t.Failed() {
+		t.FailNow()
+	}
+	return out
+}
+
+// Running the mappings for a member holds the provider and the instance
+// admins until the request commits, so a request touching tens of thousands
+// of members would stop every sign-in and every change of access meanwhile.
+func TestAGroupWriteTouchingTooManyMembersIsRefusedWhereTheProviderHasMappings(t *testing.T) {
+	e := start(t)
+	slug := e.provider(t)
+	token := e.token(t, slug)
+	project := e.project(t)
+	name := "Big " + random()
+	e.mapGroups(t, slug, projectMapping(name, project, "developer"))
+	members := e.users(t, token, 1001)
+
+	assertScimError(t, "a group of 1001 members",
+		e.call(t, token, http.MethodPost, "/Groups", marshal(t, groupBody(name, map[string]any{"members": memberRefs(members...)}))),
+		http.StatusBadRequest, "tooMany")
+	if found := e.call(t, token, http.MethodGet, "/Groups?excludedAttributes=members&filter="+escape(`displayName eq "`+name+`"`), ""); found.json(t)["totalResults"] != float64(0) {
+		t.Errorf("the refused group was stored: %s", found.body)
+	}
+
+	group := e.mustCreateGroup(t, token, groupBody(name, map[string]any{"members": memberRefs(members[:1000]...)}))
+	e.wantRoles(t, "a group of 1000 members", project, members[999], management.GrantSourceSso, "developer")
+	e.wantRoles(t, "a member left out", project, members[1000], management.GrantSourceSso)
+
+	// A change within the bound is made, however large the group is.
+	e.patch(t, token, "/Groups/"+group, map[string]any{"op": "Add", "path": "members", "value": memberRefs(members[1000])})
+	e.wantRoles(t, "the 1001st member", project, members[1000], management.GrantSourceSso, "developer")
+
+	// A rename touches every member.
+	assertScimError(t, "a rename of a group of 1001 members",
+		e.call(t, token, http.MethodPatch, "/Groups/"+group, marshal(t, map[string]any{
+			"schemas": []string{patchOpSchema}, "Operations": []map[string]any{{"op": "Replace", "path": "displayName", "value": name + " renamed"}},
+		})), http.StatusBadRequest, "tooMany")
+
+	// Deleting is never refused.
+	if r := e.call(t, token, http.MethodDelete, "/Groups/"+group, ""); r.status != http.StatusNoContent {
+		t.Errorf("DELETE /Groups = %d: %s", r.status, r.body)
+	}
+	e.wantRoles(t, "after the delete", project, members[0], management.GrantSourceSso)
+
+	// Without mappings nothing runs for the members, and the group is as
+	// large as the directory sends it.
+	other := e.token(t, e.provider(t))
+	unmapped := e.users(t, other, 1001)
+	e.mustCreateGroup(t, other, groupBody("Unmapped "+random(), map[string]any{"members": memberRefs(unmapped...)}))
 }

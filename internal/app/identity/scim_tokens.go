@@ -23,9 +23,22 @@ type SCIMTokenRecord struct {
 	ProviderSlug string
 }
 
-// scimTokenBinding is what a SCIM token's sealed hash is bound to, so one
-// copied into another token's row does not open there.
-func scimTokenBinding(t identity.SCIMTokenID) secret.Binding {
+// scimTokenBinding is what a SCIM token's sealed hash is bound to: the row,
+// the provider the token acts for and when it expires, so one copied into
+// another token's row does not open there, and a token whose provider or
+// expiry was changed in the database no longer opens.
+func scimTokenBinding(t identity.SCIMToken) secret.Binding {
+	expires := "never"
+	if t.ExpiresAt != nil {
+		expires = t.ExpiresAt.UTC().Truncate(time.Microsecond).Format(time.RFC3339Nano)
+	}
+	return secret.Row("scim_tokens", t.ID.String()+"/"+t.Provider.String()+"/"+expires)
+}
+
+// legacySCIMTokenBinding is what a hash sealed before the provider and the
+// expiry were bound is bound to: the row alone. Such a hash still opens, and
+// is sealed again on its first use.
+func legacySCIMTokenBinding(t identity.SCIMTokenID) secret.Binding {
 	return secret.Row("scim_tokens", t.String())
 }
 
@@ -50,6 +63,8 @@ type SCIMTokenStore interface {
 	// revoked at or after revokedSince, with its sealed
 	// hash: the few an instance holds, all of which authentication opens.
 	AuthenticableSCIMTokens(ctx context.Context, revokedSince time.Time) ([]SealedSCIMToken, error)
+	// ResealSCIMToken replaces the sealed hash of the token.
+	ResealSCIMToken(ctx context.Context, token identity.SCIMTokenID, sealedHash string) error
 	// RecordSCIMTokenUse records that token was presented at at, unless a use
 	// not before notBefore is recorded already, so replicas coalesce.
 	RecordSCIMTokenUse(ctx context.Context, token identity.SCIMTokenID, at, notBefore time.Time) error
@@ -139,11 +154,16 @@ func (h *CreateSCIMToken) Handle(ctx context.Context, cmd CreateSCIMTokenCommand
 		if err != nil {
 			return err
 		}
-		token, value, err := identity.NewSCIMToken(id.New[identity.SCIMToken](h.d.IDs), provider.ID, cmd.ExpiresAt, now, h.d.Random)
+		// The database keeps microseconds, and the seal binds what it keeps.
+		var expiresAt *time.Time
+		if cmd.ExpiresAt != nil {
+			expiresAt = new(cmd.ExpiresAt.UTC().Truncate(time.Microsecond))
+		}
+		token, value, err := identity.NewSCIMToken(id.New[identity.SCIMToken](h.d.IDs), provider.ID, expiresAt, now, h.d.Random)
 		if err != nil {
 			return err
 		}
-		sealed, err := h.d.Sealer.Seal(secret.PurposeSCIMToken, token.Hash[:], scimTokenBinding(token.ID))
+		sealed, err := h.d.Sealer.Seal(secret.PurposeSCIMToken, token.Hash[:], scimTokenBinding(token))
 		if err != nil {
 			return err
 		}
@@ -248,16 +268,24 @@ func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.A
 	}
 	// Every token is opened and compared, whichever matches first, so the
 	// time taken does not tell how many tokens precede the match.
-	var match *SealedSCIMToken
+	var (
+		match         *SealedSCIMToken
+		matchedLegacy bool
+	)
 	for i := range tokens {
-		plain, openErr := h.opener.Open(secret.PurposeSCIMToken, tokens[i].SealedHash, scimTokenBinding(tokens[i].ID))
+		plain, openErr := h.opener.Open(secret.PurposeSCIMToken, tokens[i].SealedHash, scimTokenBinding(tokens[i].SCIMToken))
+		legacy := false
+		if openErr != nil {
+			plain, openErr = h.opener.Open(secret.PurposeSCIMToken, tokens[i].SealedHash, legacySCIMTokenBinding(tokens[i].ID))
+			legacy = openErr == nil
+		}
 		if openErr != nil || len(plain) != len(hash) {
 			continue
 		}
 		var stored identity.SCIMTokenHash
 		copy(stored[:], plain)
 		if stored.Equal(hash) && match == nil {
-			match = &tokens[i]
+			match, matchedLegacy = &tokens[i], legacy
 		}
 	}
 	if match == nil {
@@ -266,6 +294,9 @@ func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.A
 	if !match.Usable(now, match.ProviderEnabled) {
 		return SCIMCaller{}, identity.ErrInvalidSCIMToken
 	}
+	if matchedLegacy {
+		h.reseal(ctx, match)
+	}
 	if match.UseToRecord(now) {
 		// A use that cannot be written changes nothing the caller depends on.
 		if err = h.d.Store.RecordSCIMTokenUse(ctx, match.ID, now, now.Add(-identity.SCIMTokenUseInterval)); err != nil {
@@ -273,6 +304,22 @@ func (h *SCIMAuthenticator) Handle(ctx context.Context, value string, ip netip.A
 		}
 	}
 	return SCIMCaller{Token: match.ID, Hint: match.Hint, Provider: match.Provider, ProviderSlug: match.ProviderSlug}, nil
+}
+
+// reseal binds the hash of a token sealed before the provider and the expiry
+// were bound to them. A hash that cannot be sealed again changes nothing the
+// caller depends on: it opens as it did, and is tried again at the next use.
+func (h *SCIMAuthenticator) reseal(ctx context.Context, t *SealedSCIMToken) {
+	plain, err := h.opener.Open(secret.PurposeSCIMToken, t.SealedHash, legacySCIMTokenBinding(t.ID))
+	if err == nil {
+		var sealed string
+		if sealed, err = h.d.Sealer.Seal(secret.PurposeSCIMToken, plain, scimTokenBinding(t.SCIMToken)); err == nil {
+			err = h.d.Store.ResealSCIMToken(ctx, t.ID, sealed)
+		}
+	}
+	if err != nil {
+		h.logger.WarnContext(ctx, "binding the sealed hash of a SCIM token to its provider", "error", err.Error())
+	}
 }
 
 // fail counts one failure of the source ip comes from and returns why the

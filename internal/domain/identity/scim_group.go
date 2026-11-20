@@ -215,7 +215,7 @@ func applyGroupOperation(g *GroupState, self, op string, o PatchOperation) error
 func applyGroupPath(g *GroupState, op, path string, value any, hasValue bool) error {
 	parsed, err := filter.ParsePath([]byte(path))
 	if err != nil {
-		return scimErr("invalidSyntax", "the path %q is not valid: %v", path, err)
+		return scimErr("invalidPath", "the path %q is not valid: %v", path, err)
 	}
 	ap := parsed.AttributePath
 	if ap.URIPrefix != nil && !strings.EqualFold(*ap.URIPrefix, GroupSchema) {
@@ -333,6 +333,14 @@ func memberRefs(value any) ([]MemberID, error) {
 	}
 	return out, nil
 }
+
+// MaxTouchedMembers is how many members one group write may touch where the
+// provider has group mappings. Every member touched has the mappings run for
+// them while the write holds the provider and the instance admins, which
+// every other change of access and every sign-in through the provider waits
+// for, so a write of tens of thousands of members would stop them for as long
+// as it takes. A directory splits a larger change into requests of this size.
+const MaxTouchedMembers = 1000
 
 // TouchedMembers returns the members a change of a group from before to
 // after may give or take access: those who joined or left it, and every

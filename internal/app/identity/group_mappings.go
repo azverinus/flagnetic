@@ -66,6 +66,10 @@ type ProjectDirectory interface {
 type ProviderAccess interface {
 	// KnownRole reports whether name is a built-in role.
 	KnownRole(name string) bool
+	// LockInstanceAdmins serializes, until the unit of work ends, every
+	// change that could leave the instance without an active instance admin;
+	// it is taken after the provider and before any member or identity.
+	LockInstanceAdmins(ctx context.Context) error
 	// ReplaceAccess makes the access the provider's mappings give the member
 	// as listed, in the unit of work ctx carries.
 	ReplaceAccess(ctx context.Context, cmd AccessCommand) (AccessChange, error)
@@ -205,6 +209,14 @@ func (h *ReplaceGroupMappings) Handle(ctx context.Context, cmd ReplaceGroupMappi
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		p, err := lockProvider(ctx, h.d.Providers, cmd.Slug)
 		if err != nil {
+			return err
+		}
+		// The admins are held before the claims are read: an unlink or a SCIM
+		// change that holds them deletes a claim and takes back its grants,
+		// and a replacement that read the claim before waiting for them
+		// would grant again from groups that are gone, grants no later edit
+		// of the mappings takes back.
+		if err = h.d.Access.LockInstanceAdmins(ctx); err != nil {
 			return err
 		}
 		current, err := h.d.Mappings.GroupMappingsVersion(ctx, p.ID)

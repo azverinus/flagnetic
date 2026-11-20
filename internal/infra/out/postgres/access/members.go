@@ -47,8 +47,11 @@ func scanMember() ([]any, func() access.Member) {
 	}
 }
 
-// MemberByEmail returns the member whose email is email whatever its case,
-// with their password hash ("" for none); ErrNotFound when there is none.
+// MemberByEmail returns the member whose email is email whatever the case of
+// its ASCII letters, with their password hash ("" for none); ErrNotFound when
+// there is none. PostgreSQL's lower() under a non-C collation also folds
+// letters outside ASCII (U+212A KELVIN SIGN to k), so what the lookup finds is
+// checked to be the same address under ASCII folding, else it is not found.
 func (s *Store) MemberByEmail(ctx context.Context, email string) (access.Member, string, error) {
 	dest, member := scanMember()
 	var hash *string
@@ -60,10 +63,14 @@ func (s *Store) MemberByEmail(ctx context.Context, email string) (access.Member,
 	if err != nil {
 		return access.Member{}, "", fmt.Errorf("reading a member by email: %w", err)
 	}
-	if hash == nil {
-		return member(), "", nil
+	found := member()
+	if !access.SameEmail(found.Email, email) {
+		return access.Member{}, "", appaccess.ErrNotFound
 	}
-	return member(), *hash, nil
+	if hash == nil {
+		return found, "", nil
+	}
+	return found, *hash, nil
 }
 
 // MemberByID returns the member with the identifier; ErrNotFound when

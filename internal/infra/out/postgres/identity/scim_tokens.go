@@ -108,6 +108,14 @@ func (s *Store) AuthenticableSCIMTokens(ctx context.Context, revokedSince time.T
 	return out, rows.Err()
 }
 
+// ResealSCIMToken replaces the sealed hash of the token.
+func (s *Store) ResealSCIMToken(ctx context.Context, token identity.SCIMTokenID, sealedHash string) error {
+	if _, err := s.db(ctx).Exec(ctx, `UPDATE scim_tokens SET token_hash_sealed = $2 WHERE id = $1`, token.Bytes(), sealedHash); err != nil {
+		return fmt.Errorf("sealing a SCIM token again: %w", err)
+	}
+	return nil
+}
+
 // RecordSCIMTokenUse records that token was presented at at.
 func (s *Store) RecordSCIMTokenUse(ctx context.Context, token identity.SCIMTokenID, at, notBefore time.Time) error {
 	_, err := s.db(ctx).Exec(ctx, `

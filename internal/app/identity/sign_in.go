@@ -602,18 +602,24 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 	if err := h.d.Members.HoldAuthSettings(ctx); err != nil {
 		return secret.String{}, err
 	}
-	if claims.HasGroups {
-		// Replacing the mappings holds the provider until it has run them for
-		// every claim stored, so a sign-in waits for it and then applies the
-		// new ones: otherwise it could store its claim just after the
-		// replacement looked for claims, and apply the mappings that are gone.
-		// The provider is held before anything is written: linking an
-		// identity or storing the claim refers to the provider's row, and two
-		// sign-ins that each referred to it first would then wait on each
-		// other to hold it.
-		if _, err := h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
-			return secret.String{}, err
-		}
+	// Every sign-in takes the locks in the one order every change of access
+	// takes: the provider, then the instance admins, then the identity and
+	// the member. Replacing the mappings holds the provider until it has run
+	// them for every claim stored, so a sign-in waits for it and then applies
+	// the new ones: otherwise it could store its claim just after the
+	// replacement looked for claims, and apply the mappings that are gone.
+	// Linking an identity or storing the claim refers to the provider's row,
+	// so it is held before anything is written: two sign-ins that each
+	// referred to it first would then wait on each other to hold it. The
+	// instance admins come before the identity and the member: a change made
+	// by an instance admin, by SCIM or by unlinking an identity holds them
+	// while it waits for the member or the identity this sign-in already
+	// holds, and a sign-in that gives the member access takes them after.
+	if _, err := h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
+		return secret.String{}, err
+	}
+	if err := h.d.Members.LockInstanceAdmins(ctx); err != nil {
+		return secret.String{}, err
 	}
 	found, err := h.d.Identities.IdentityBySubject(ctx, p.ID, claims.Subject)
 	hasIdentity := err == nil
@@ -664,19 +670,13 @@ func (h *CompleteSignIn) signIn(ctx context.Context, p identity.Provider, claims
 		return secret.String{}, &unresolved{err: err, member: member, known: known}
 	}
 	// A sign-in without a groups claim of a member the provider claimed groups
-	// for before stores an empty claim, so it holds the provider like one that
-	// stores a claim does, still before anything is written. The member is
-	// asked whichever way they were found: one whose identity was unlinked and
-	// who is linked again by email keeps the claim stored before.
+	// for before stores an empty claim. The member is asked whichever way
+	// they were found: one whose identity was unlinked and who is linked again
+	// by email keeps the claim stored before.
 	claimedBefore := false
 	if !claims.HasGroups && (in.Linked != nil || in.Provisioned != nil || in.ByEmail != nil) {
 		if claimedBefore, err = h.d.Mappings.HasGroupClaim(ctx, p.ID, member.ID); err != nil {
 			return secret.String{}, err
-		}
-		if claimedBefore {
-			if _, err = h.d.Providers.LockProvider(ctx, p.Slug); err != nil {
-				return secret.String{}, err
-			}
 		}
 	}
 	now := h.d.now()

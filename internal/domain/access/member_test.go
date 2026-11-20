@@ -330,3 +330,22 @@ func isProvisioned(err error) bool {
 	e, ok := apperrors.From(err)
 	return ok && e.Kind == apperrors.KindConflict && e.Code == "member_provisioned"
 }
+
+// Emails are ASCII-case-insensitive byte strings: U+212A KELVIN SIGN folds to
+// k under Unicode rules, and an address written with it is another address.
+func TestEmailsAreTheSameIgnoringTheCaseOfAsciiLettersOnly(t *testing.T) {
+	for _, tc := range []struct {
+		a, b string
+		same bool
+	}{
+		{"Kate@Example.COM", "kate@example.com", true},
+		{"Kate@example.com", "kate@example.com", false},
+		{"Kate@example.com", "KATE@EXAMPLE.com", true},
+		{"Ünal@example.com", "ünal@example.com", false},
+		{"kate@example.com", "kate@example.co", false},
+	} {
+		if got := access.SameEmail(tc.a, tc.b); got != tc.same {
+			t.Errorf("SameEmail(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.same)
+		}
+	}
+}

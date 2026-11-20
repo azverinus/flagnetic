@@ -557,13 +557,10 @@ func TestAnEmailChangeEndsTheMembersOpenPasswordResetsAndInvitations(t *testing.
 	admin := testkit.InstanceAdminSession(t, srv)
 	m := testkit.NewMember(t, pool)
 	issued := issueReset(t, admin, m.ID)
-	// An invitation the member still holds: the store is the only way to
-	// see it, as no page opens an invitation of an active member.
-	store := pgaccess.NewStore(pool)
-	inv, _ := access.NewInvitation(id.New[access.Invitation](id.NewSource(testkit.Clock())), m.ID, testkit.Clock().Now(), rand.Reader)
-	if err := store.CreateInvitation(t.Context(), inv); err != nil {
-		t.Fatal(err)
-	}
+	// An invitation the member holds: an invited member, reached through the
+	// API like any other.
+	invited := invite(t, admin, "Invited")
+	link := *invited.Invitation.Url
 
 	// A change of the display name alone leaves both open.
 	if res := do(admin.UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{DisplayName: ptr("Renamed")})); res.JSON200 == nil {
@@ -572,17 +569,22 @@ func TestAnEmailChangeEndsTheMembersOpenPasswordResetsAndInvitations(t *testing.
 	if got := resetOpened(t, srv, issued.Url); got.JSON200 == nil {
 		t.Fatalf("a rename ended the reset: %d: %s", got.StatusCode(), got.Body)
 	}
+	if res := do(admin.UpdateMemberWithResponse(t.Context(), invited.Member.Id.String(), management.MemberPatch{DisplayName: ptr("Renamed")})); res.JSON200 == nil {
+		t.Fatalf("rename of the invited member = %d: %s", res.StatusCode(), res.Body)
+	}
+	if got := opened(t, srv, link); got.JSON200 == nil {
+		t.Fatalf("a rename ended the invitation: %d: %s", got.StatusCode(), got.Body)
+	}
 
 	moved := "moved-" + strings.ToLower(rand.Text()[:10]) + "@example.com"
 	if res := do(admin.UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{Email: ptr(moved)})); res.JSON200 == nil {
 		t.Fatalf("change the email = %d: %s", res.StatusCode(), res.Body)
 	}
 	wantResetGone(t, srv, issued.Url, "after an email change")
-	got, _, err := store.InvitationByHash(t.Context(), inv.Hash)
-	if err != nil {
-		t.Fatal(err)
+	moved = "moved-" + strings.ToLower(rand.Text()[:10]) + "@example.com"
+	if res := do(admin.UpdateMemberWithResponse(t.Context(), invited.Member.Id.String(), management.MemberPatch{Email: ptr(moved)})); res.JSON200 == nil {
+		t.Fatalf("change the invited member's email = %d: %s", res.StatusCode(), res.Body)
 	}
-	if got.ConsumedAt == nil {
-		t.Error("the member's invitation is still open after an email change")
-	}
+	got := opened(t, srv, link)
+	assertProblem(t, "the invitation after an email change", got.StatusCode(), got.Body, http.StatusGone, "invitation_gone")
 }

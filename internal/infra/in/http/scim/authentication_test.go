@@ -23,6 +23,12 @@ func TestDiscoveryDocumentsAreRFCListResponsesBehindABearer(t *testing.T) {
 		doc["filter"].(map[string]any)["maxResults"] != 100.0 || doc["sort"].(map[string]any)["supported"] != false {
 		t.Errorf("ServiceProviderConfig = %d %s, want patch and filter supported, bulk and sort not", config.status, config.body)
 	}
+	// RFC 7643 §5 requires etag and the bulk limits, even when unsupported.
+	etag, _ := doc["etag"].(map[string]any)
+	bulk, _ := doc["bulk"].(map[string]any)
+	if etag["supported"] != false || bulk["maxOperations"] != 0.0 || bulk["maxPayloadSize"] != 0.0 {
+		t.Errorf("ServiceProviderConfig etag = %v, bulk = %v, want etag unsupported and bulk limits of zero", etag, bulk)
+	}
 
 	for _, path := range []string{"/ResourceTypes", "/Schemas"} {
 		r := e.call(t, token, http.MethodGet, path, "")
@@ -54,7 +60,7 @@ func TestABearerThatIsNoLiveTokenIsRefusedAlike(t *testing.T) {
 		"a personal access token": personal, "a revoked token": revoked.Value,
 	} {
 		r := e.call(t, token, http.MethodGet, "/ServiceProviderConfig", "")
-		assertScimError(t, name, r, http.StatusUnauthorized, "invalidCredentials")
+		assertScimError(t, name, r, http.StatusUnauthorized, "")
 		if r.header.Get("WWW-Authenticate") != "Bearer" {
 			t.Errorf("%s: WWW-Authenticate = %q, want Bearer", name, r.header.Get("WWW-Authenticate"))
 		}
@@ -63,7 +69,7 @@ func TestABearerThatIsNoLiveTokenIsRefusedAlike(t *testing.T) {
 		t.Errorf("a token before its expiry = %d, want 200", r.status)
 	}
 	c.Advance(time.Hour)
-	assertScimError(t, "an expired token", e.call(t, expiring, http.MethodGet, "/ServiceProviderConfig", ""), http.StatusUnauthorized, "invalidCredentials")
+	assertScimError(t, "an expired token", e.call(t, expiring, http.MethodGet, "/ServiceProviderConfig", ""), http.StatusUnauthorized, "")
 	if r := e.call(t, good, http.MethodGet, "/ServiceProviderConfig", ""); r.status != http.StatusOK {
 		t.Errorf("a token that does not expire = %d, want 200", r.status)
 	}
@@ -80,7 +86,7 @@ func TestADisabledProvidersTokenIsRefusedUntilItIsEnabledAgain(t *testing.T) {
 		}
 	}
 	disable()
-	assertScimError(t, "a disabled provider's token", e.call(t, token, http.MethodGet, "/Users", ""), http.StatusUnauthorized, "invalidCredentials")
+	assertScimError(t, "a disabled provider's token", e.call(t, token, http.MethodGet, "/Users", ""), http.StatusUnauthorized, "")
 	if res, err := e.browser.EnableAuthProviderWithResponse(t.Context(), slug); err != nil || res.JSON200 == nil {
 		t.Fatalf("enabling: %v, %d: %s", err, res.StatusCode(), res.Body)
 	}

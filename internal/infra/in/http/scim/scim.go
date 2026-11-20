@@ -191,8 +191,8 @@ func write(w http.ResponseWriter, status int, v any) {
 // scimStatuses are the statuses RFC 7644 pairs with the scimTypes the
 // instance answers.
 var scimStatuses = map[string]int{
-	"invalidFilter": http.StatusBadRequest, "invalidSyntax": http.StatusBadRequest, "invalidValue": http.StatusBadRequest,
-	"mutability": http.StatusBadRequest, "noTarget": http.StatusBadRequest, "uniqueness": http.StatusConflict,
+	"invalidFilter": http.StatusBadRequest, "invalidPath": http.StatusBadRequest, "invalidSyntax": http.StatusBadRequest, "invalidValue": http.StatusBadRequest,
+	"mutability": http.StatusBadRequest, "noTarget": http.StatusBadRequest, "tooMany": http.StatusBadRequest, "uniqueness": http.StatusConflict,
 }
 
 // fail answers err as the SCIM refusal it stands for, in one place.
@@ -228,7 +228,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusInternalServerError, "", "internal error")
 	case appErr.Kind == apperrors.KindUnauthenticated:
 		w.Header().Set("WWW-Authenticate", "Bearer")
-		writeError(w, http.StatusUnauthorized, "invalidCredentials", "a valid SCIM token is required in Authorization: Bearer")
+		writeError(w, http.StatusUnauthorized, "", "a valid SCIM token is required in Authorization: Bearer")
 	case appErr.Kind == apperrors.KindRateLimited:
 		w.Header().Set("Retry-After", strconv.Itoa(int(appErr.RetryAfter.Seconds())+1))
 		writeError(w, http.StatusTooManyRequests, "", appErr.Detail)
@@ -304,7 +304,14 @@ func (a *api) GetServiceProviderConfig(w http.ResponseWriter, _ *http.Request) {
 			MaxResults *int  `json:"maxResults,omitempty"`
 			Supported  *bool `json:"supported,omitempty"`
 		}{Supported: yes(), MaxResults: new(defaultCount)},
-		Bulk: &supported{Supported: no()}, ChangePassword: &supported{Supported: no()}, Sort: &supported{Supported: no()},
+		// RFC 7643 §5 requires etag and the bulk limits even when unsupported.
+		Bulk: &struct {
+			MaxOperations  *int  `json:"maxOperations,omitempty"`
+			MaxPayloadSize *int  `json:"maxPayloadSize,omitempty"`
+			Supported      *bool `json:"supported,omitempty"`
+		}{Supported: no(), MaxOperations: new(0), MaxPayloadSize: new(0)},
+		Etag:           &supported{Supported: no()},
+		ChangePassword: &supported{Supported: no()}, Sort: &supported{Supported: no()},
 		AuthenticationSchemes: &[]struct {
 			Description *string `json:"description,omitempty"`
 			Name        *string `json:"name,omitempty"`

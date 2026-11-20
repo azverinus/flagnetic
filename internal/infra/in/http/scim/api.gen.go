@@ -163,11 +163,16 @@ type ServiceProviderConfig struct {
 		Type        *string `json:"type,omitempty"`
 	} `json:"authenticationSchemes,omitempty"`
 	Bulk *struct {
-		Supported *bool `json:"supported,omitempty"`
+		MaxOperations  *int  `json:"maxOperations,omitempty"`
+		MaxPayloadSize *int  `json:"maxPayloadSize,omitempty"`
+		Supported      *bool `json:"supported,omitempty"`
 	} `json:"bulk,omitempty"`
 	ChangePassword *struct {
 		Supported *bool `json:"supported,omitempty"`
 	} `json:"changePassword,omitempty"`
+	Etag *struct {
+		Supported *bool `json:"supported,omitempty"`
+	} `json:"etag,omitempty"`
 	Filter *struct {
 		MaxResults *int  `json:"maxResults,omitempty"`
 		Supported  *bool `json:"supported,omitempty"`
@@ -487,7 +492,7 @@ type ClientInterface interface {
 
 	// CreateUserWithBody Provision a member
 	//
-	// Creates an active member managed by SCIM, with no credential:
+	// Creates an active provisioned member, with no credential:
 	// `userName` (wins over `emails[primary].value` when both are sent
 	// and differ) becomes the member's email. A taken email is 409
 	// `uniqueness`.
@@ -499,7 +504,7 @@ type ClientInterface interface {
 
 	// CreateUserWithApplicationScimPlusJSONBody Provision a member
 	//
-	// Creates an active member managed by SCIM, with no credential:
+	// Creates an active provisioned member, with no credential:
 	// `userName` (wins over `emails[primary].value` when both are sent
 	// and differ) becomes the member's email. A taken email is 409
 	// `uniqueness`.
@@ -525,9 +530,15 @@ type ClientInterface interface {
 
 	// PatchUserWithBody Patch a member's mapped attributes
 	//
-	// `add`, `replace` and `remove` on `userName`, `emails`,
-	// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-	// and `active`. `active: false` deactivates in the same
+	// `add` and `replace` on `userName`, `emails`, `displayName`,
+	// `name.givenName`, `name.familyName`, `externalId` and `active`;
+	// `remove` on `displayName` and `externalId` only (`userName`,
+	// `emails` and `active` cannot be removed: 400 `invalidValue`).
+	// Attributes the instance does not map (`title`, phone numbers, the
+	// enterprise extension) are ignored, so a patch that also carries
+	// `active: false` still deactivates; `id`, `groups` and `meta` are
+	// read only (400 `mutability`) and a path that does not parse is 400
+	// `invalidPath`. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -538,9 +549,15 @@ type ClientInterface interface {
 
 	// PatchUserWithApplicationScimPlusJSONBody Patch a member's mapped attributes
 	//
-	// `add`, `replace` and `remove` on `userName`, `emails`,
-	// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-	// and `active`. `active: false` deactivates in the same
+	// `add` and `replace` on `userName`, `emails`, `displayName`,
+	// `name.givenName`, `name.familyName`, `externalId` and `active`;
+	// `remove` on `displayName` and `externalId` only (`userName`,
+	// `emails` and `active` cannot be removed: 400 `invalidValue`).
+	// Attributes the instance does not map (`title`, phone numbers, the
+	// enterprise extension) are ignored, so a patch that also carries
+	// `active: false` still deactivates; `id`, `groups` and `meta` are
+	// read only (400 `mutability`) and a path that does not parse is 400
+	// `invalidPath`. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -552,7 +569,8 @@ type ClientInterface interface {
 	// ReplaceUserWithBody Replace a member's mapped attributes
 	//
 	// Replaces `userName`/`emails`, `displayName`/`name` and
-	// `externalId` at once. `active: false` deactivates in the same
+	// `externalId` at once. Attributes the instance does not map are
+	// ignored. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -564,7 +582,8 @@ type ClientInterface interface {
 	// ReplaceUserWithApplicationScimPlusJSONBody Replace a member's mapped attributes
 	//
 	// Replaces `userName`/`emails`, `displayName`/`name` and
-	// `externalId` at once. `active: false` deactivates in the same
+	// `externalId` at once. Attributes the instance does not map are
+	// ignored. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -830,7 +849,7 @@ func (c *Client) ListUsers(ctx context.Context, params *ListUsersParams, reqEdit
 
 // CreateUserWithBody Provision a member
 //
-// Creates an active member managed by SCIM, with no credential:
+// Creates an active provisioned member, with no credential:
 // `userName` (wins over `emails[primary].value` when both are sent
 // and differ) becomes the member's email. A taken email is 409
 // `uniqueness`.
@@ -852,7 +871,7 @@ func (c *Client) CreateUserWithBody(ctx context.Context, contentType string, bod
 
 // CreateUserWithApplicationScimPlusJSONBody Provision a member
 //
-// Creates an active member managed by SCIM, with no credential:
+// Creates an active provisioned member, with no credential:
 // `userName` (wins over `emails[primary].value` when both are sent
 // and differ) becomes the member's email. A taken email is 409
 // `uniqueness`.
@@ -908,9 +927,15 @@ func (c *Client) GetUser(ctx context.Context, id UserID, reqEditors ...RequestEd
 
 // PatchUserWithBody Patch a member's mapped attributes
 //
-// `add`, `replace` and `remove` on `userName`, `emails`,
-// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-// and `active`. `active: false` deactivates in the same
+// `add` and `replace` on `userName`, `emails`, `displayName`,
+// `name.givenName`, `name.familyName`, `externalId` and `active`;
+// `remove` on `displayName` and `externalId` only (`userName`,
+// `emails` and `active` cannot be removed: 400 `invalidValue`).
+// Attributes the instance does not map (`title`, phone numbers, the
+// enterprise extension) are ignored, so a patch that also carries
+// `active: false` still deactivates; `id`, `groups` and `meta` are
+// read only (400 `mutability`) and a path that does not parse is 400
+// `invalidPath`. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //
@@ -931,9 +956,15 @@ func (c *Client) PatchUserWithBody(ctx context.Context, id UserID, contentType s
 
 // PatchUserWithApplicationScimPlusJSONBody Patch a member's mapped attributes
 //
-// `add`, `replace` and `remove` on `userName`, `emails`,
-// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-// and `active`. `active: false` deactivates in the same
+// `add` and `replace` on `userName`, `emails`, `displayName`,
+// `name.givenName`, `name.familyName`, `externalId` and `active`;
+// `remove` on `displayName` and `externalId` only (`userName`,
+// `emails` and `active` cannot be removed: 400 `invalidValue`).
+// Attributes the instance does not map (`title`, phone numbers, the
+// enterprise extension) are ignored, so a patch that also carries
+// `active: false` still deactivates; `id`, `groups` and `meta` are
+// read only (400 `mutability`) and a path that does not parse is 400
+// `invalidPath`. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //
@@ -955,7 +986,8 @@ func (c *Client) PatchUserWithApplicationScimPlusJSONBody(ctx context.Context, i
 // ReplaceUserWithBody Replace a member's mapped attributes
 //
 // Replaces `userName`/`emails`, `displayName`/`name` and
-// `externalId` at once. `active: false` deactivates in the same
+// `externalId` at once. Attributes the instance does not map are
+// ignored. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //
@@ -977,7 +1009,8 @@ func (c *Client) ReplaceUserWithBody(ctx context.Context, id UserID, contentType
 // ReplaceUserWithApplicationScimPlusJSONBody Replace a member's mapped attributes
 //
 // Replaces `userName`/`emails`, `displayName`/`name` and
-// `externalId` at once. `active: false` deactivates in the same
+// `externalId` at once. Attributes the instance does not map are
+// ignored. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //
@@ -1860,7 +1893,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateUserWithBodyWithResponse Provision a member
 	//
-	// Creates an active member managed by SCIM, with no credential:
+	// Creates an active provisioned member, with no credential:
 	// `userName` (wins over `emails[primary].value` when both are sent
 	// and differ) becomes the member's email. A taken email is 409
 	// `uniqueness`.
@@ -1872,7 +1905,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateUserWithApplicationScimPlusJSONBodyWithResponse Provision a member
 	//
-	// Creates an active member managed by SCIM, with no credential:
+	// Creates an active provisioned member, with no credential:
 	// `userName` (wins over `emails[primary].value` when both are sent
 	// and differ) becomes the member's email. A taken email is 409
 	// `uniqueness`.
@@ -1902,9 +1935,15 @@ type ClientWithResponsesInterface interface {
 
 	// PatchUserWithBodyWithResponse Patch a member's mapped attributes
 	//
-	// `add`, `replace` and `remove` on `userName`, `emails`,
-	// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-	// and `active`. `active: false` deactivates in the same
+	// `add` and `replace` on `userName`, `emails`, `displayName`,
+	// `name.givenName`, `name.familyName`, `externalId` and `active`;
+	// `remove` on `displayName` and `externalId` only (`userName`,
+	// `emails` and `active` cannot be removed: 400 `invalidValue`).
+	// Attributes the instance does not map (`title`, phone numbers, the
+	// enterprise extension) are ignored, so a patch that also carries
+	// `active: false` still deactivates; `id`, `groups` and `meta` are
+	// read only (400 `mutability`) and a path that does not parse is 400
+	// `invalidPath`. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -1915,9 +1954,15 @@ type ClientWithResponsesInterface interface {
 
 	// PatchUserWithApplicationScimPlusJSONBodyWithResponse Patch a member's mapped attributes
 	//
-	// `add`, `replace` and `remove` on `userName`, `emails`,
-	// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-	// and `active`. `active: false` deactivates in the same
+	// `add` and `replace` on `userName`, `emails`, `displayName`,
+	// `name.givenName`, `name.familyName`, `externalId` and `active`;
+	// `remove` on `displayName` and `externalId` only (`userName`,
+	// `emails` and `active` cannot be removed: 400 `invalidValue`).
+	// Attributes the instance does not map (`title`, phone numbers, the
+	// enterprise extension) are ignored, so a patch that also carries
+	// `active: false` still deactivates; `id`, `groups` and `meta` are
+	// read only (400 `mutability`) and a path that does not parse is 400
+	// `invalidPath`. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -1929,7 +1974,8 @@ type ClientWithResponsesInterface interface {
 	// ReplaceUserWithBodyWithResponse Replace a member's mapped attributes
 	//
 	// Replaces `userName`/`emails`, `displayName`/`name` and
-	// `externalId` at once. `active: false` deactivates in the same
+	// `externalId` at once. Attributes the instance does not map are
+	// ignored. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -1941,7 +1987,8 @@ type ClientWithResponsesInterface interface {
 	// ReplaceUserWithApplicationScimPlusJSONBodyWithResponse Replace a member's mapped attributes
 	//
 	// Replaces `userName`/`emails`, `displayName`/`name` and
-	// `externalId` at once. `active: false` deactivates in the same
+	// `externalId` at once. Attributes the instance does not map are
+	// ignored. `active: false` deactivates in the same
 	// transaction, revoking sessions and tokens; `active: true`
 	// reactivates. A taken email is 409 `uniqueness`.
 	//
@@ -3134,7 +3181,7 @@ func (c *ClientWithResponses) ListUsersWithResponse(ctx context.Context, params 
 
 // CreateUserWithBodyWithResponse Provision a member
 //
-// Creates an active member managed by SCIM, with no credential:
+// Creates an active provisioned member, with no credential:
 // `userName` (wins over `emails[primary].value` when both are sent
 // and differ) becomes the member's email. A taken email is 409
 // `uniqueness`.
@@ -3152,7 +3199,7 @@ func (c *ClientWithResponses) CreateUserWithBodyWithResponse(ctx context.Context
 
 // CreateUserWithApplicationScimPlusJSONBodyWithResponse Provision a member
 //
-// Creates an active member managed by SCIM, with no credential:
+// Creates an active provisioned member, with no credential:
 // `userName` (wins over `emails[primary].value` when both are sent
 // and differ) becomes the member's email. A taken email is 409
 // `uniqueness`.
@@ -3200,9 +3247,15 @@ func (c *ClientWithResponses) GetUserWithResponse(ctx context.Context, id UserID
 
 // PatchUserWithBodyWithResponse Patch a member's mapped attributes
 //
-// `add`, `replace` and `remove` on `userName`, `emails`,
-// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-// and `active`. `active: false` deactivates in the same
+// `add` and `replace` on `userName`, `emails`, `displayName`,
+// `name.givenName`, `name.familyName`, `externalId` and `active`;
+// `remove` on `displayName` and `externalId` only (`userName`,
+// `emails` and `active` cannot be removed: 400 `invalidValue`).
+// Attributes the instance does not map (`title`, phone numbers, the
+// enterprise extension) are ignored, so a patch that also carries
+// `active: false` still deactivates; `id`, `groups` and `meta` are
+// read only (400 `mutability`) and a path that does not parse is 400
+// `invalidPath`. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //
@@ -3219,9 +3272,15 @@ func (c *ClientWithResponses) PatchUserWithBodyWithResponse(ctx context.Context,
 
 // PatchUserWithApplicationScimPlusJSONBodyWithResponse Patch a member's mapped attributes
 //
-// `add`, `replace` and `remove` on `userName`, `emails`,
-// `displayName`, `name.givenName`, `name.familyName`, `externalId`
-// and `active`. `active: false` deactivates in the same
+// `add` and `replace` on `userName`, `emails`, `displayName`,
+// `name.givenName`, `name.familyName`, `externalId` and `active`;
+// `remove` on `displayName` and `externalId` only (`userName`,
+// `emails` and `active` cannot be removed: 400 `invalidValue`).
+// Attributes the instance does not map (`title`, phone numbers, the
+// enterprise extension) are ignored, so a patch that also carries
+// `active: false` still deactivates; `id`, `groups` and `meta` are
+// read only (400 `mutability`) and a path that does not parse is 400
+// `invalidPath`. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //
@@ -3239,7 +3298,8 @@ func (c *ClientWithResponses) PatchUserWithApplicationScimPlusJSONBodyWithRespon
 // ReplaceUserWithBodyWithResponse Replace a member's mapped attributes
 //
 // Replaces `userName`/`emails`, `displayName`/`name` and
-// `externalId` at once. `active: false` deactivates in the same
+// `externalId` at once. Attributes the instance does not map are
+// ignored. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //
@@ -3257,7 +3317,8 @@ func (c *ClientWithResponses) ReplaceUserWithBodyWithResponse(ctx context.Contex
 // ReplaceUserWithApplicationScimPlusJSONBodyWithResponse Replace a member's mapped attributes
 //
 // Replaces `userName`/`emails`, `displayName`/`name` and
-// `externalId` at once. `active: false` deactivates in the same
+// `externalId` at once. Attributes the instance does not map are
+// ignored. `active: false` deactivates in the same
 // transaction, revoking sessions and tokens; `active: true`
 // reactivates. A taken email is 409 `uniqueness`.
 //

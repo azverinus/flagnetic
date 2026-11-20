@@ -131,7 +131,7 @@ func TestPatchingAGroupRefusesWhatItCannotDo(t *testing.T) {
 		"members that are no list":        {[]identity.PatchOperation{{Op: "add", Path: "members", Value: "x"}}, "invalidValue"},
 		"adding by filter":                {[]identity.PatchOperation{{Op: "add", Path: `members[value eq "` + self + `"]`}}, "invalidValue"},
 		"a filter on something else":      {[]identity.PatchOperation{{Op: "remove", Path: `members[display eq "x"]`}}, "invalidFilter"},
-		"a path that does not parse":      {[]identity.PatchOperation{{Op: "remove", Path: `members[`}}, "invalidSyntax"},
+		"a path that does not parse":      {[]identity.PatchOperation{{Op: "remove", Path: `members[`}}, "invalidPath"},
 		"an unmapped attribute":           {[]identity.PatchOperation{{Op: "replace", Path: "description", Value: "x"}}, "noTarget"},
 		"another schema":                  {[]identity.PatchOperation{{Op: "replace", Path: "urn:other:displayName", Value: "x"}}, "noTarget"},
 		"the id":                          {[]identity.PatchOperation{{Op: "replace", Path: "id", Value: self}}, "mutability"},
