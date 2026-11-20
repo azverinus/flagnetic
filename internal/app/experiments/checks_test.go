@@ -151,3 +151,52 @@ func TestTheFinalCheckCountsWithoutHoldingTheProjectsWrites(t *testing.T) {
 		t.Errorf("sample_ratio = %+v, want final", srm)
 	}
 }
+
+// blockingExposures never answers the raw count before its context ends, as a
+// count over more exposures than its bound allows.
+type blockingExposures struct{ *pgevents.Store }
+
+func (blockingExposures) FirstExposureCountsReceivedBy(ctx context.Context, _ workspace.EnvironmentID,
+	_ experiments.ExperimentID, _ time.Time,
+) (map[string]int64, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// A stopped experiment whose raw count outruns its bound still gets its final
+// check, from the rollup's aggregates.
+func TestTheFinalCheckCompletesWhenTheRawCountOutrunsItsBound(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := setUp(t, admin)
+	if res, err := admin.StartExperimentWithResponse(t.Context(), p.Key, "title_test",
+		&management.StartExperimentParams{IfMatch: ptr(`"1"`)}); err != nil || res.JSON200 == nil {
+		t.Fatalf("start: %v", err)
+	}
+	if res, err := admin.StopExperimentWithResponse(t.Context(), p.Key, "title_test",
+		&management.StopExperimentParams{IfMatch: ptr(`"2"`)}, management.ExperimentStop{Outcome: "removed"}); err != nil || res.JSON200 == nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	pool := testkit.Pool(t)
+	c := clock.NewFake(time.Now().Add(2 * time.Minute))
+	store, flagStore := pgexperiments.NewStore(pool), pgflags.NewStore(pool)
+	events := pgevents.NewStore(pool)
+	err := appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
+		Tx: postgres.NewTransactor(pool), Lock: store, Running: store, Pending: store, Final: blockingExposures{events},
+		Retention: 30 * 24 * time.Hour, RawCountTimeout: 200 * time.Millisecond, Projects: store, Store: store, Holders: flagStore,
+		FirstExposures: events, Exposures: events, Checks: store,
+		Recorder: appexperiments.NewRecorder(testkit.Record(pool), c, id.NewSource(c)),
+	}).Handle(t.Context())
+	if err != nil {
+		t.Fatalf("round: %v", err)
+	}
+	res, err := admin.GetExperimentExposuresWithResponse(t.Context(), p.Key, "title_test",
+		&management.GetExperimentExposuresParams{Environment: "staging"})
+	if err != nil || res.JSON200 == nil {
+		t.Fatalf("exposures: %v", err)
+	}
+	if srm := res.JSON200.SampleRatio; srm == nil || !srm.Final {
+		t.Errorf("sample_ratio = %+v, want final", srm)
+	}
+}

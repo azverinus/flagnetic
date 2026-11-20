@@ -22,6 +22,13 @@ const CheckInterval = 10 * time.Minute
 // hangs rolls back alone and leaves the round time for the others.
 const experimentCheckTimeout = 30 * time.Second
 
+// rawCountTimeout bounds counting a stopped experiment's first exposures from
+// the raw rows, within experimentCheckTimeout. The count sorts every exposure
+// the experiment has, so on a large one it can outlast the whole check; past
+// this bound the check takes the rollup's aggregates instead, leaving time to
+// store the result.
+const rawCountTimeout = 20 * time.Second
+
 // finalCheckDelay is how long after a stop its final sample-ratio check
 // waits: longer than an ingest request can run, so that no exposure received
 // by the stop is still in a transaction the rollup's watermark cannot see
@@ -378,14 +385,17 @@ type RunChecksDeps struct {
 	Final   FinalExposures
 	// Retention is how long raw exposures are kept: an experiment started
 	// before it may have lost raw rows its final check would count.
-	Retention      time.Duration
-	Projects       ProjectLocker
-	Store          Reader
-	Holders        Holders
-	FirstExposures FirstExposures
-	Exposures      ExposureActivity
-	Checks         CheckStore
-	Recorder       Recorder
+	Retention time.Duration
+	// RawCountTimeout bounds the final check's count from raw rows; zero
+	// means rawCountTimeout.
+	RawCountTimeout time.Duration
+	Projects        ProjectLocker
+	Store           Reader
+	Holders         Holders
+	FirstExposures  FirstExposures
+	Exposures       ExposureActivity
+	Checks          CheckStore
+	Recorder        Recorder
 }
 
 // RunChecks runs the checks of every running experiment once, and takes the
@@ -471,7 +481,9 @@ func (h *RunChecks) one(ctx context.Context, check checker, listed experiments.E
 // what was received after the stop by now, which stays out. An experiment
 // started before the raw rows' retention may have lost some of them, which
 // would leave units out and shift others to a later exposure, so it takes the
-// rollup's aggregates instead. It runs in the environments the stop checked,
+// rollup's aggregates instead, as does one whose raw count outruns
+// rawCountTimeout: a large experiment's count would otherwise never finish
+// and the check stay pending. It runs in the environments the stop checked,
 // is stored final at the round's time, and raises or clears the sample-ratio
 // alert as a running check does. Before then the stop's result stays as it
 // is, for the next round.
@@ -502,18 +514,27 @@ func (h *RunChecks) final(ctx context.Context, check checker, listed experiments
 		return err
 	}
 	rawKept := e.StartedAt != nil && !e.StartedAt.Before(now.Add(-h.d.Retention))
-	counted := make(map[workspace.EnvironmentID]map[string]int64, len(envs))
-	for _, env := range envs {
-		var first map[string]int64
-		if rawKept {
-			first, err = h.d.Final.FirstExposureCountsReceivedBy(ctx, env, e.ID, *e.StoppedAt)
-		} else {
-			first, err = check.counts.FirstExposureCounts(ctx, env, e.ID)
+	var counted map[workspace.EnvironmentID]map[string]int64
+	if rawKept {
+		counted, err = h.countRaw(ctx, envs, e.ID, *e.StoppedAt)
+		if err != nil && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			// The raw count outran its bound: the aggregates are close
+			// enough to judge the split and let the check complete.
+			counted, err = nil, nil
 		}
 		if err != nil {
 			return err
 		}
-		counted[env] = first
+	}
+	if counted == nil {
+		counted = make(map[workspace.EnvironmentID]map[string]int64, len(envs))
+		for _, env := range envs {
+			first, err := check.counts.FirstExposureCounts(ctx, env, e.ID)
+			if err != nil {
+				return err
+			}
+			counted[env] = first
+		}
 	}
 
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
@@ -548,6 +569,28 @@ func (h *RunChecks) final(ctx context.Context, check checker, listed experiments
 			return counted[env], nil
 		}, governance.Request{})
 	})
+}
+
+// countRaw counts envs' first exposures received by by from the raw rows,
+// within the raw count's own bound.
+func (h *RunChecks) countRaw(ctx context.Context, envs []workspace.EnvironmentID, experiment experiments.ExperimentID,
+	by time.Time,
+) (map[workspace.EnvironmentID]map[string]int64, error) {
+	bound := h.d.RawCountTimeout
+	if bound == 0 {
+		bound = rawCountTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, bound)
+	defer cancel()
+	counted := make(map[workspace.EnvironmentID]map[string]int64, len(envs))
+	for _, env := range envs {
+		first, err := h.d.Final.FirstExposureCountsReceivedBy(ctx, env, experiment, by)
+		if err != nil {
+			return nil, err
+		}
+		counted[env] = first
+	}
+	return counted, nil
 }
 
 // finalDue reports whether e is the stopped experiment listed and its final
