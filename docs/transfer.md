@@ -211,7 +211,7 @@ Anyone who can read a project exports it:
 GET /api/v1/projects/{project}/export?format=json|yaml
 ```
 
-The answer is `application/json` or `application/yaml` with a `Content-Disposition` naming the file and an `ETag`: the identifier of the project's latest audit entry, quoted (a project with no audit entry has none), which an import can send back as [`If-Match`](#dry-runs-and-if-match). An unknown `format` is `400`.
+The answer is `application/json` or `application/yaml` with a `Content-Disposition` naming the file and an `ETag`: a quoted tag of the project's history that every later change moves, whatever clock wrote it (a project with no audit entry has none; the text is opaque), which an import can send back as [`If-Match`](#dry-runs-and-if-match). An unknown `format` is `400`.
 
 ## Importing
 
@@ -282,7 +282,7 @@ An entity equal to the document is not written. An import that changes nothing w
 
 Add `dry_run=true` to any import to see what it would do. The whole transaction runs, including every check the database makes, and is rolled back: the answer is the one the real import would give, and nothing is written, bumped or recorded.
 
-A dry run into an existing project (merge, replace or Firebase), like an export, answers with an `ETag`: the identifier of the project's latest audit entry, quoted. A create has no project to move, so it has no `ETag` and takes no `If-Match`. Send it back as `If-Match` on the real import and the import is applied only if the project has not moved since: otherwise it is refused `412 version_mismatch` before any write, so you never apply a diff you did not see. Without the header an import applies to the project as it is.
+A dry run into an existing project (merge, replace or Firebase), like an export, answers with an `ETag`: the same opaque tag of the project's history, quoted. A create has no project to move, so it has no `ETag` and takes no `If-Match`. Send it back as `If-Match` on the real import and the import is applied only if the project has not moved since: otherwise it is refused `412 version_mismatch` before any write, so you never apply a diff you did not see. Without the header an import applies to the project as it is.
 
 A document that breaks a rule is refused `422 invalid_document`, whole, with `errors[{pointer, code, detail, params}]`: a JSON Pointer into the document and the code an ordinary write would use (`invalid_flag`, `invalid_configuration`, `type_immutable`, `unknown_field`, `required`, …). Every fault found is reported, so one run fixes the file.
 

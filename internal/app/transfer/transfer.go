@@ -8,7 +8,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
-	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
@@ -72,9 +71,10 @@ type Members interface {
 // History tells how far a project's history has come, which the audit log
 // of the governance context keeps.
 type History interface {
-	// LatestProjectEntry returns the identifier of the newest audit entry of
-	// project, the zero identifier when it has none.
-	LatestProjectEntry(ctx context.Context, project workspace.ProjectID) (governance.EntryID, error)
+	// ProjectState returns the opaque tag of the state project's history has
+	// reached, which every change recorded in it moves on, whatever the
+	// identifiers of its entries; "" when it has none.
+	ProjectState(ctx context.Context, project workspace.ProjectID) (string, error)
 }
 
 // errProjectNotFound answers a project deleted since the request found it.

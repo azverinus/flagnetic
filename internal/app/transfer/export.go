@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
-	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/transfer"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 )
@@ -38,15 +37,15 @@ type Exported struct {
 	Project workspace.Project
 	// Document is the document written in the format asked for.
 	Document []byte
-	// Latest is the newest audit entry of the project when the document was
-	// read, which any later change to the project moves on; the zero
-	// identifier when the project has none.
-	Latest governance.EntryID
+	// State is the tag of the project's history when the document was read,
+	// which any later change to the project moves on; "" when the project has
+	// none.
+	State string
 }
 
 // Handle returns the document of the project q names. Everything it holds is
 // read in one snapshot, so it is the project as it was at one instant, and
-// Latest is the newest entry of that instant: an import naming it as the
+// State is the history's tag at that instant: an import naming it as the
 // state it was based on is refused when the project has moved on since.
 // An unknown project is the not_found refusal.
 func (h *ExportProject) Handle(ctx context.Context, q ExportQuery) (Exported, error) {
@@ -63,7 +62,7 @@ func (h *ExportProject) Handle(ctx context.Context, q ExportQuery) (Exported, er
 			return errProjectNotFound
 		}
 		s.Project = ps[0]
-		if out.Latest, err = h.d.History.LatestProjectEntry(ctx, q.Project); err != nil {
+		if out.State, err = h.d.History.ProjectState(ctx, q.Project); err != nil {
 			return err
 		}
 		return h.read(ctx, q.Project, &s)

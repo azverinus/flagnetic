@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
@@ -701,5 +702,36 @@ func TestAMergeThatOnlyDeclaresAnAttributeOrAUnitTypeMovesEveryEnvironmentsRules
 	mustMerge(t, f.admin, k, doc)
 	if got := bumped(t, "a unit type", after, rulesetVersions(t, f.project)); len(got) != len(after) {
 		t.Errorf("environments moved on by a new unit type = %v, want every one", got)
+	}
+}
+
+func TestAnImportBasedOnAStateIsRefusedAfterAChangeRecordedWithAnEarlierIdentifier(t *testing.T) {
+	// Two replicas of one instance whose clocks disagree: what B records is
+	// later than what A recorded before it, with a smaller identifier.
+	pool := testkit.FreshPool(t)
+	token := testkit.Bootstrap(t, pool)
+	ahead, behind := testkit.Clock(), testkit.Clock()
+	ahead.Advance(time.Hour)
+	a := testkit.Client(t, testkit.StartServer(t, testkit.WithPool(pool), testkit.WithClock(ahead)), token)
+	b := testkit.Client(t, testkit.StartServer(t, testkit.WithPool(pool), testkit.WithClock(behind)), token)
+
+	k := createProject(t, a, projectKey()).Key
+	flag := createFlag(t, a, k, management.FlagCreate{Key: "matching_v2", Type: "boolean", Name: "Matching v2"})
+	doc := exported(t, a, k)
+	entry(t, doc, "flags", "matching_v2")["name"] = "Matching, v2"
+	tag := mergeInto(t, a, k, doc, mergeOptions{dryRun: true}).HTTPResponse.Header.Get("ETag")
+	if tag == "" {
+		t.Fatal("a dry run answered no ETag")
+	}
+
+	if res := updateFlag(t, b, k, "matching_v2", flag.Version, management.FlagPatch{Description: ptr("Changed meanwhile")}); res.JSON200 == nil {
+		t.Fatalf("update = %d %s", res.StatusCode(), res.Body)
+	}
+
+	res := mergeInto(t, a, k, doc, mergeOptions{ifMatch: tag})
+	assertProblem(t, "an import on a state a change with a smaller identifier moved", res.StatusCode(), res.Body,
+		http.StatusPreconditionFailed, "version_mismatch")
+	if got := entry(t, exported(t, a, k), "flags", "matching_v2")["name"]; got == "Matching, v2" {
+		t.Error("a refused import was applied")
 	}
 }

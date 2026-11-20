@@ -43,8 +43,8 @@ func (l *AuditLog) Append(ctx context.Context, e governance.Entry) error {
 	_, err = pgxtx.Querier(ctx, l.pool).Exec(ctx, `
 		INSERT INTO audit_entries (id, occurred_at, project_id, environment_id,
 		    actor_kind, actor_id, actor_name, actor_member_id,
-		    action, entity_kind, entity_id, entity_key, before, after, kill_switch, request_id, change_request_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid, $9, $10, $11, $12, $13, $14, $15, NULLIF($16, ''), $17)`,
+		    action, entity_kind, entity_id, entity_key, before, after, kill_switch, request_id, change_request_id, seq)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid, $9, $10, $11, $12, $13, $14, $15, NULLIF($16, ''), $17, nextval('audit_entry_seq'))`,
 		e.ID.Bytes(), e.OccurredAt, optional(e.Project), optional(e.Environment),
 		string(e.Actor.Kind), e.Actor.ID, e.Actor.Name, e.Actor.MemberID,
 		e.Action, e.Entity.Kind, e.Entity.ID, e.Entity.Key, before, after, e.KillSwitch, e.RequestID, optional(e.ChangeRequest))
@@ -217,20 +217,30 @@ func (l *AuditLog) Entry(ctx context.Context, project workspace.ProjectID, entry
 	return e, err
 }
 
-// LatestProjectEntry returns the identifier of the newest entry of project,
-// which a change to anything in the project moves on; the zero identifier
-// when the project has none.
-func (l *AuditLog) LatestProjectEntry(ctx context.Context, project workspace.ProjectID) (governance.EntryID, error) {
-	var entryID [16]byte
+// ProjectState returns the opaque tag of the state project's history has
+// reached, which a change to anything in the project moves on; "" when the
+// project has no entry. It is the newest commit sequence number, not the
+// newest identifier: identifiers are minted from each replica's clock, so a
+// change committed later may carry a smaller one. Entries written before the
+// sequence existed have none and rank last, tagged by their identifier.
+func (l *AuditLog) ProjectState(ctx context.Context, project workspace.ProjectID) (string, error) {
+	var (
+		entryID [16]byte
+		seq     *int64
+	)
 	err := pgxtx.Querier(ctx, l.pool).QueryRow(ctx,
-		`SELECT id FROM audit_entries WHERE project_id = $1 ORDER BY id DESC LIMIT 1`, project.Bytes()).Scan(&entryID)
+		`SELECT id, seq FROM audit_entries WHERE project_id = $1 ORDER BY seq DESC NULLS LAST, id DESC LIMIT 1`,
+		project.Bytes()).Scan(&entryID, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return governance.EntryID{}, nil
+		return "", nil
 	}
 	if err != nil {
-		return governance.EntryID{}, fmt.Errorf("reading the latest audit entry of a project: %w", err)
+		return "", fmt.Errorf("reading the state of a project's history: %w", err)
 	}
-	return id.FromBytes[governance.Entry](entryID), nil
+	if seq != nil {
+		return "s" + strconv.FormatInt(*seq, 10), nil
+	}
+	return id.FromBytes[governance.Entry](entryID).String(), nil
 }
 
 // RecordedVersion returns the values the newest entry of project recording
