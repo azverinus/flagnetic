@@ -46,6 +46,8 @@ type reply struct {
 	retryAfter string
 	// networkError drops the connection instead of answering.
 	networkError bool
+	// hang answers nothing until the SDK gives up on the request.
+	hang bool
 }
 
 const accepted = `{"accepted": 1, "duplicates": 0, "dropped_rows": 0, "rejected": []}`
@@ -107,6 +109,10 @@ func (m *ingestMock) serveEvents(w http.ResponseWriter, r *http.Request) {
 	select {
 	case m.arrived <- struct{}{}:
 	default:
+	}
+	if a.hang {
+		<-r.Context().Done()
+		return
 	}
 	if a.networkError {
 		if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
@@ -764,6 +770,27 @@ func TestCloseFlushesTheCurrentWindow(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 	assertRows(t, rowsOf(m.nth(1).wire.Events[0]), []row{{"new_checkout", "on", "rule", 1}})
+}
+
+func TestCloseLogsTheRowsOfAWindowTheRefusedKeyKept(t *testing.T) {
+	var l logs
+	m := newIngestMock(t, reply{status: http.StatusUnauthorized})
+	c, _ := summaryClient(t, m, flagnetic.WithLogger(l.logger()))
+	c.Bool(context.Background(), linux, "new_checkout", false)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := c.Close(ctx); err == nil {
+		t.Fatal("Close returned nil with the window refused")
+	}
+	var closing []logEntry
+	for _, e := range l.named(flagnetic.EventQueueDropped) {
+		if e.Fields["cause"] == "closing" {
+			closing = append(closing, e)
+		}
+	}
+	if len(closing) != 1 || closing[0].Fields["rows"] != 1 || closing[0].Fields["kind"] != "evaluation_summary" {
+		t.Fatalf("queue_dropped with cause closing = %v, want one naming the 1 summary row kept", closing)
+	}
 }
 
 func TestCloseReturnsWithinItsFlushTimeoutWhileTheBatchHangs(t *testing.T) {

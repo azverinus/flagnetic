@@ -807,6 +807,39 @@ func TestCloseDuringTheBackoffSendsTheQueuedEventsAgain(t *testing.T) {
 	}
 }
 
+func TestCloseCutShortDuringASendLogsTheEventsOfThatSend(t *testing.T) {
+	var l logs
+	m := newExperimentMock(t, reply{hang: true})
+	c := onExperiments(t, m, flagnetic.WithLogger(l.logger()), ceiling())
+	c.Alias(context.Background(), "anonymous", "d-1", "user", "u-1")
+	c.Alias(context.Background(), "anonymous", "d-2", "user", "u-1")
+
+	// The batch is in flight, outside the queue, when ctx ends Close: the
+	// cancelled send puts its events back, and the closing line counts
+	// them once the loop has ended, after Close has returned.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	if err := c.Close(ctx); err == nil {
+		t.Fatal("Close returned nil with the batch unanswered")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		var closing []logEntry
+		for _, e := range l.named(flagnetic.EventQueueDropped) {
+			if e.Fields["cause"] == "closing" {
+				closing = append(closing, e)
+			}
+		}
+		if len(closing) == 1 && closing[0].Fields["events"] == 2 {
+			return
+		}
+		if len(closing) > 1 || time.Now().After(deadline) {
+			t.Fatalf("queue_dropped with cause closing = %v, want one naming the 2 events of the cut send", closing)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestCloseOfAPlatformThatKeepsFailingReturnsTheErrorAndLogsWhatIsLeft(t *testing.T) {
 	var l logs
 	m := newExperimentMock(t, reply{status: http.StatusServiceUnavailable})

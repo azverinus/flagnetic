@@ -900,18 +900,32 @@ func (c *Client) Close(ctx context.Context) error {
 	flushCtx, stopFlush := context.WithTimeout(ctx, closeFlushTimeout)
 	flushErr := c.flushAll(flushCtx)
 	stopFlush()
-	// Whatever the flush could not deliver is gone with the loops: say so.
-	c.exposures.stop()
-	c.summaries.stop()
 	c.cancel()
 	c.markReady()
+	// Whatever the flush could not deliver is gone with the loops: say so
+	// once they have ended, so a send the cancel cut short has put its
+	// events back and a tick between the flush and the cancel has not
+	// delivered events the line would call dropped. When ctx ends first,
+	// the line follows the loops' end after Close has returned.
 	select {
 	case <-c.done:
 	case <-ctx.Done():
+		go func() {
+			<-c.done
+			c.stopQueues()
+		}()
 		return ctx.Err()
 	}
+	c.stopQueues()
 	if c.ownsHTTP {
 		c.http.CloseIdleConnections()
 	}
 	return flushErr
+}
+
+// stopQueues ends the exposure queue and the summary window at Close and
+// logs what they still hold as dropped.
+func (c *Client) stopQueues() {
+	c.exposures.stop()
+	c.summaries.stop()
 }

@@ -70,9 +70,12 @@ const (
 	// EventQueueDropped (warn): counts were given up on rather than sent
 	// again — a batch the platform refused with a 4xx other than 429,
 	// events it rejected, rows it dropped for naming a flag it does not
-	// have, or a window whose interval began over an hour ago. Fields:
-	// kind, cause, the event IDs or row count given up on, and the counts
-	// of a 202 answer where there was one.
+	// have, a window whose interval began over an hour ago, events over a
+	// full queue's capacity (cause queue_full, once per flush interval),
+	// what Close could not deliver (cause closing) or the first exposure
+	// or alias recorded after Close (cause closed). Fields: kind, cause,
+	// the event IDs, events or rows count given up on, and the counts of a
+	// 202 answer where there was one.
 	EventQueueDropped Event = "queue_dropped"
 	// EventStoreFailed (warn): the store file could not be loaded or saved.
 	// Fields: path, op (load or save), cause.

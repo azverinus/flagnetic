@@ -235,7 +235,7 @@ type exposures struct {
 	// full costs one line per flush interval, not one per event.
 	overflowed atomic.Int64
 
-	// closing is set by Close once its last flush is done: nothing reads
+	// closing is set by Close once its loops have ended: nothing reads
 	// the queue after it, so an event arriving then is not queued.
 	// afterClose makes the log line about it one line.
 	closing    atomic.Bool
@@ -497,7 +497,12 @@ func (q *exposures) enqueue(e event) {
 		q.record(e)
 		return
 	}
+	// closing is read under queueMu, which stop also holds while it sets
+	// the flag and counts the queue: an event is either counted there or
+	// refused here, never appended after the count.
+	q.queueMu.Lock()
 	if q.closing.Load() {
+		q.queueMu.Unlock()
 		q.afterClose.Do(func() {
 			q.log(slog.LevelWarn, EventQueueDropped, map[string]any{
 				"kind": eventQueueKind, "cause": "closed", "events": 1,
@@ -505,7 +510,6 @@ func (q *exposures) enqueue(e event) {
 		})
 		return
 	}
-	q.queueMu.Lock()
 	q.queue = append(q.queue, e)
 	dropped := q.trim()
 	waiting := len(q.queue)
@@ -581,17 +585,21 @@ func (q *exposures) putBack(events []event) {
 	q.reportDropped(dropped)
 }
 
-// stop ends the queue's life at Close, after its last flush: what is still
+// stop ends the queue's life at Close, after its loop: what is still
 // queued is logged as dropped, and events recorded from now on are not
 // queued. It returns how many events were still queued.
 func (q *exposures) stop() int {
-	if q == nil || q.offline() || !q.closing.CompareAndSwap(false, true) {
+	if q == nil || q.offline() {
 		return 0
 	}
-	q.reportOverflow()
 	q.queueMu.Lock()
+	if !q.closing.CompareAndSwap(false, true) {
+		q.queueMu.Unlock()
+		return 0
+	}
 	left := len(q.queue)
 	q.queueMu.Unlock()
+	q.reportOverflow()
 	if left > 0 {
 		q.log(slog.LevelWarn, EventQueueDropped, map[string]any{
 			"kind": eventQueueKind, "cause": "closing", "events": left,
