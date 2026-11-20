@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/transfer"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
@@ -423,13 +422,20 @@ func TestARolloutSaltARuleKeepsIsNotReusedByAnotherFlag(t *testing.T) {
 	}
 }
 
+// The limits of a project's flags and segments, which a direct write refuses
+// going over.
+const (
+	maxFlags    = 5_000
+	maxSegments = 1_000
+)
+
 func TestADocumentThatLeavesMoreOfAnEntityThanAProjectHoldsIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 	current := existing()
 	many := clone(t, current)
-	for i := range flags.MaxFlags {
+	for i := range maxFlags {
 		many.Flags = append(many.Flags, transfer.Flag{Key: "flag_" + strconv.Itoa(i), Type: "boolean", Name: "Flag"})
 	}
-	for i := range flags.MaxSegments {
+	for i := range maxSegments {
 		many.Segments = append(many.Segments, transfer.Segment{Key: "segment_" + strconv.Itoa(i), Name: "Segment"})
 	}
 
@@ -459,7 +465,7 @@ func TestADocumentThatLeavesMoreOfAnEntityThanAProjectHoldsIsRefusedBeforeAnythi
 		t.Errorf("merging the project's own document = %v", err)
 	}
 	full := clone(t, current)
-	for i := range flags.MaxFlags - len(current.Flags) {
+	for i := range maxFlags - len(current.Flags) {
 		full.Flags = append(full.Flags, transfer.Flag{Key: "flag_" + strconv.Itoa(i), Type: "boolean", Name: "Flag"})
 	}
 	if err := transfer.CheckMerge(full, current); err != nil && slices.ContainsFunc(violationsOf(err), func(v apperrors.Violation) bool { return v.Code == "too_many" }) {
