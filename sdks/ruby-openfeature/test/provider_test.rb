@@ -66,6 +66,14 @@ class ProviderTest < Minitest::Test
     assert_equal "fallback", d.flag_metadata["flagnetic_reason"]
   end
 
+  def test_integer_refused_is_counted_as_the_fallback_and_never_exposed
+    provider, client = of_provider
+    d = client.fetch_integer_details(flag_key: "auto_ratio", default_value: 7, evaluation_context: user)
+    assert_equal [7, "TYPE_MISMATCH"], [d.value, d.error_code]
+    assert_empty provider.client.recorder.exposures
+    assert_equal [["auto_ratio", "fallback"]], provider.client.recorder.summary.map { |r| [r.flag, r.reason.to_s] }
+  end
+
   def test_integer_of_a_string_flag_is_a_type_mismatch
     _, client = of_provider
     d = client.fetch_integer_details(flag_key: "greeting", default_value: 7, evaluation_context: user)
