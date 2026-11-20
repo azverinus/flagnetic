@@ -92,7 +92,7 @@ func TestAliasesAreCheckedAgainstTheDeclaredUnitTypes(t *testing.T) {
 	}
 }
 
-func TestAnAliasLinksItsPairOnceKeepingTheEarliestTime(t *testing.T) {
+func TestAnAliasLinksItsPairOnce(t *testing.T) {
 	srv, p, value := eventsServer(t)
 	_, staging := p.sdkKey(t, "staging", management.SdkKeyKindClient)
 	earliest := protocolTime.Add(-3 * time.Hour)
