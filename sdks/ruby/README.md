@@ -77,7 +77,7 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 
 Every request, the change stream included, goes through `Net::HTTP`, so the proxy configured for the process (`http_proxy`, `https_proxy`, `no_proxy`) applies.
 
-After `fork` the child starts its own background thread on its first call; `after_fork` starts it at once, so a worker that has not served a request yet already follows the stream.
+After `fork` the child starts its own background thread on its first call, so a child that never evaluates opens no stream; `after_fork` starts it at once, so a worker that has not served a request yet already follows the stream.
 
 Local overrides replace a flag's value inside this process and are refused in a protected environment:
 
@@ -146,7 +146,7 @@ A condition this SDK cannot evaluate although the server accepted it, such as a 
 
 Under Rails the gem loads a railtie (nothing of it loads without Rails) that sets `Flagnetic.client` up without an initializer. The SDK key and base URL come from the first of `config.flagnetic.sdk_key` and `config.flagnetic.base_url`, the `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BASE_URL` environment variables, and credentials (`flagnetic.sdk_key`, `flagnetic.base_url`). Without both and without `offline_file`, building the client in production raises `Flagnetic::NotConfigured`, naming what is missing and where to set it, so a deployment that lost its key fails at boot (in console, runner and rake, on first use) instead of serving built-in defaults to every user; in any other environment the client serves built-in defaults and logs `client_not_configured`.
 
-A server or job process builds the client at boot and waits up to `ready_timeout` seconds for the ruleset; `rails console`, `rails runner` and rake build it on first use, so a task that never asks for a flag makes no request. Every forked child (Puma cluster mode, Unicorn) starts its own background thread at once, and every process closes its client at exit, which flushes what it queued. Local overrides are allowed in every environment but production, where no setting enables them.
+A server or job process builds the client at boot and waits up to `ready_timeout` seconds for the ruleset; `rails console`, `rails runner` and rake build it on first use, so a task that never asks for a flag makes no request. Every forked child (Puma cluster mode, Unicorn) starts its own background thread on its first call, and every process closes its client at exit, which flushes what it queued. Local overrides are allowed in every environment but production, where no setting enables them.
 
 | `config.flagnetic.` | |
 |---|---|

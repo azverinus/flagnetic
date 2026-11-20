@@ -5,31 +5,33 @@ require "net/http"
 require "socket"
 
 # Puma in cluster mode: the application boots in the master, which forks
-# two workers. Each worker must run its own background thread from the
-# moment it is forked, not from its first request, and flush what it
-# counted when it shuts down.
+# two workers. A worker runs its own background thread from its first call,
+# not from the fork, so a worker that never evaluates opens no stream; it
+# flushes what it counted when it shuts down.
 class PumaTest < Minitest::Test
   include AppProcess
 
-  def test_each_worker_runs_its_own_background_thread_after_fork_and_flushes_on_shutdown
+  def test_each_worker_runs_its_own_background_thread_from_its_first_call_and_flushes_on_shutdown
     port = free_port
     out = File.join(@dir, "puma.log")
     output = -> { File.exist?(out) ? File.read(out, encoding: "UTF-8").scrub : "" }
     pid = Process.spawn(env(PORT: port.to_s), "bundle", "exec", "puma", "-C", "config/puma.rb",
                         chdir: APP, %i[out err] => out)
 
-    # Before any request, each worker has connected its own stream, as has
-    # the master the application booted in.
+    # Before any request only the master, which the application booted in,
+    # has connected a stream: the workers were forked and evaluated nothing.
     workers = eventually(30) do
       found = output.call.scan(/Worker \d+ \(PID: (\d+)\) booted/).flatten.map(&:to_i)
       found if found.size == 2
     end
     assert workers, output.call
     connected = -> { logged(:sse_connected).map { |e| e["pid"] }.uniq }
-    assert eventually(15) { (workers - connected.call).empty? && connected.call.size == 3 },
-           "sse_connected from #{connected.call}, workers #{workers}\n#{output.call}"
+    assert eventually(15) { connected.call.size == 1 }, "sse_connected from #{connected.call}\n#{output.call}"
+    sleep 1
+    assert_equal 1, connected.call.size, "a worker opened a stream before it evaluated: #{connected.call}"
 
-    # A change reaches every worker over its own stream.
+    # Each worker's first request starts its own stream, and a change then
+    # reaches every worker over it.
     @server.publish(document(2, enabled: false))
     seen = {}
     served = 0
@@ -39,6 +41,7 @@ class PumaTest < Minitest::Test
       seen[body["pid"]] = body["value"]
       seen.size == 2 && seen.values.none?
     end, "workers: #{seen}")
+    assert_empty workers - connected.call, "sse_connected from #{connected.call}, workers #{workers}"
 
     # Shutdown closes each worker's client, which flushes its summary.
     Process.kill("TERM", pid)

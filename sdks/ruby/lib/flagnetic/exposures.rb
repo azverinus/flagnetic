@@ -59,6 +59,10 @@ module Flagnetic
       @flushed_at = now
       @revoked_logged = false
       @send_mutex = Mutex.new
+      # Events dropped for a full queue since the last flush logged them:
+      # an outage fills the queue and every enqueue after it drops one, so
+      # the log carries one count per flush instead of one line per event.
+      @overflowed = 0
     end
 
     # offline? reports whether events go to the Recorder rather than to the
@@ -133,6 +137,7 @@ module Flagnetic
     def flush_once(budget)
       return true if offline?
 
+      log_overflowed
       deadline = now + budget
       return true unless wait_for_send_lock(deadline)
 
@@ -280,9 +285,7 @@ module Flagnetic
         excess.positive? ? @queue.shift(excess).size : 0
       end
       @wake.call
-      return unless dropped.positive?
-
-      log(:warn, :queue_dropped, kind: kind, cause: "queue_full", events: dropped, capacity: @capacity)
+      overflowed(dropped)
     end
 
     def take = @mutex.synchronize { @queue.dup.tap { @queue.clear } }
@@ -299,6 +302,17 @@ module Flagnetic
         excess = @queue.size - @capacity
         excess.positive? ? @queue.shift(excess).size : 0
       end
+      overflowed(dropped)
+    end
+
+    def overflowed(dropped)
+      @mutex.synchronize { @overflowed += dropped } if dropped.positive?
+    end
+
+    # log_overflowed reports the events dropped for a full queue since it
+    # last did, as one line.
+    def log_overflowed
+      dropped = @mutex.synchronize { @overflowed.tap { @overflowed = 0 } }
       return unless dropped.positive?
 
       log(:warn, :queue_dropped, kind: kind, cause: "queue_full", events: dropped, capacity: @capacity)

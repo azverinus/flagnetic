@@ -71,7 +71,6 @@ module Flagnetic
       def boot(app)
         config = app.config.flagnetic
         Flagnetic.client_builder = -> { build(app) }
-        Process.singleton_class.prepend(ForkHook) unless Process.singleton_class < ForkHook
         start = config.start.nil? ? !one_off? : config.start
         Flagnetic.client if start
       end
@@ -83,13 +82,6 @@ module Flagnetic
         client = new_client(app)
         at_exit { client.close(timeout: config.close_timeout) }
         client
-      end
-
-      # after_fork starts the background thread of a forked child: a Puma
-      # or Unicorn worker then follows the change stream before its first
-      # request. A client not built yet is left to be built on first use.
-      def after_fork
-        Flagnetic.client.after_fork if Flagnetic.client?
       end
 
       private
@@ -146,16 +138,6 @@ module Flagnetic
       # for.
       def one_off?
         @one_off || defined?(::Rails::Console) || defined?(::Rails::Command::RunnerCommand) ? true : false
-      end
-    end
-
-    # ForkHook runs Railtie.after_fork in every forked child (Ruby 3.1's
-    # Process._fork, which every fork goes through).
-    module ForkHook
-      def _fork
-        pid = super
-        Railtie.after_fork if pid.zero?
-        pid
       end
     end
   end

@@ -293,6 +293,37 @@ class ExposuresTest < Minitest::Test
     assert(dropped.all? { |(level, f)| level == :warn && f[:kind] == "exposure_or_alias" && f[:capacity] == 10_000 })
   end
 
+  def test_a_full_queue_logs_one_warning_per_flush_with_the_count
+    @server.on_events { |_| [500, {}, ""] }
+    @server.publish(document(1))
+    c = client(flush_interval: 3600, stream: false)
+    c.ready(timeout: 2)
+    10_000.times { |i| c.alias("anonymous", "d-#{i}", "user", "u-#{i}") }
+    # Held up by the failing server, the queue is full and drops one event per enqueue.
+    c.flush(timeout: 2)
+    before = logged(:queue_dropped).count { |(_, f)| f[:cause] == "queue_full" }
+    50.times { |i| c.alias("anonymous", "e-#{i}", "user", "u-#{i}") }
+    assert_equal before, logged(:queue_dropped).count { |(_, f)| f[:cause] == "queue_full" },
+                 "a drop logged by itself"
+    c.flush(timeout: 2)
+    dropped = logged(:queue_dropped).select { |(_, f)| f[:cause] == "queue_full" }
+    assert_equal before + 1, dropped.size
+    assert_operator dropped.last[1][:events], :>=, 50
+  end
+
+  def test_an_exposure_or_alias_after_close_sends_nothing_and_is_logged_once
+    @server.publish(document(1))
+    c = client(stream: false)
+    c.ready(timeout: 2)
+    c.close
+    requests = @server.events_requests.size
+    c.alias("anonymous", "d-1", "user", "u-1")
+    c.alias("anonymous", "d-2", "user", "u-2")
+    c.exposure("auto_on", context: ASSIGNED)
+    assert_equal requests, @server.events_requests.size
+    assert_equal [[:warn, { cause: "closed" }]], logged(:exposure_skipped)
+  end
+
   def test_a_rejected_event_is_never_sent_again_and_is_logged
     @server.on_events do |request|
       ids = request.events.map { |e| e["event_id"] }
@@ -321,7 +352,7 @@ class ExposuresTest < Minitest::Test
       c.flush(timeout: 2)
       c.alias("anonymous", "d-2", "user", "u-2")
       c.flush(timeout: 2)
-      assert_equal [%w[d-1], %w[d-2]], @server.events_requests.map { |r| r.events.map { |e| e["from_unit_id"] } }
+      assert_equal([%w[d-1], %w[d-2]], @server.events_requests.map { |r| r.events.map { |e| e["from_unit_id"] } })
       assert_empty logged(:worker_failed)
     end
   end

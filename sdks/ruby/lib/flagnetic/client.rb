@@ -18,7 +18,9 @@ module Flagnetic
   # Fork: the first call in a forked child (Puma cluster mode, Unicorn)
   # sees the new process ID and starts the child's own background thread;
   # the child keeps serving the ruleset it inherited meanwhile. after_fork
-  # starts it at once, from a fork hook.
+  # starts it at once, for an application that wants a worker to follow the
+  # ruleset before its first call; a child that never evaluates opens no
+  # stream.
   #
   # Getters never raise: any failure serves the built-in default with
   # reason fallback and a log event.
@@ -211,6 +213,8 @@ module Flagnetic
     # deduplication by event ID is what analysis relies on. It never raises.
     def exposure(key, context: nil)
       ensure_worker
+      return if closed_for_events?
+
       @exposures&.exposure(context, key.to_s)
       nil
     rescue StandardError => e
@@ -225,6 +229,8 @@ module Flagnetic
     # raises.
     def alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
       ensure_worker
+      return if closed_for_events?
+
       @exposures&.add_alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
       nil
     rescue StandardError => e
@@ -269,8 +275,9 @@ module Flagnetic
     # after_fork starts a forked child's background thread now rather than
     # on the child's first call, so a worker that has not served a request
     # yet already follows the change stream. It does nothing in the process
-    # that built the client and never raises. The Rails integration calls
-    # it from a fork hook.
+    # that built the client and never raises. Nothing calls it by itself:
+    # a fork-per-job runner that never evaluates would open a stream per
+    # child.
     def after_fork
       ensure_worker unless @closed
       nil
@@ -480,7 +487,8 @@ module Flagnetic
     end
 
     def base(loaded, **fields)
-      Detail.new(ruleset_version: loaded&.ruleset&.version, received_at: loaded&.received_at, stage: @stage, **fields)
+      Detail.new(ruleset_version: loaded&.ruleset&.version, received_at: loaded&.received_at,
+                 stage: loaded ? loaded.stage : @stage, **fields)
     end
 
     def fallback(loaded, default, code)
@@ -523,6 +531,16 @@ module Flagnetic
       end
     end
 
+    # closed_for_events? tells whether an exposure or alias would only sit
+    # in a queue nothing sends any more; the first one after close is
+    # logged and none is recorded.
+    def closed_for_events?
+      return false unless @closed && @exposures && !@exposures.offline?
+
+      once(%i[exposure_skipped closed]) { log(:warn, :exposure_skipped, cause: "closed") }
+      true
+    end
+
     def once(key)
       first = @mutex.synchronize { @once.key?(key) ? false : (@once[key] = true) }
       yield if first
@@ -544,18 +562,31 @@ module Flagnetic
       end
 
       ensure_worker
-      loaded = @loaded
-      if loaded&.ruleset&.protected?
-        log(:warn, :override_refused, flag: key, reason: "protected", environment: loaded.ruleset.environment.key)
-        raise LocalOverrideRefused, "local override of #{key.inspect} refused: the environment " \
-                                    "#{loaded.ruleset.environment.key.inspect} is protected"
-      end
-      flag = loaded&.ruleset&.flag(key)
+      refuse_protected(key, @loaded)
+      flag = @loaded&.ruleset&.flag(key)
       type = flag ? flag.type : Client.__send__(:type_of, value)
       normalized = LocalOverrides.__send__(:normalize, type, value)
-      @mutex.synchronize { @overrides = @overrides.merge(key => [type, normalized].freeze).freeze }
+      # Looked at again under the mutex a swap takes before it clears the
+      # overrides: one stored after a swap to a protected ruleset cleared
+      # them would be served once the environment is unprotected.
+      refused = @mutex.synchronize do
+        held = @loaded
+        next held if held&.ruleset&.protected?
+
+        @overrides = @overrides.merge(key => [type, normalized].freeze).freeze
+        nil
+      end
+      refuse_protected(key, refused)
       log(:warn, :override_set, flag: key)
       fire_change([key])
+    end
+
+    def refuse_protected(key, loaded)
+      return unless loaded&.ruleset&.protected?
+
+      log(:warn, :override_refused, flag: key, reason: "protected", environment: loaded.ruleset.environment.key)
+      raise LocalOverrideRefused, "local override of #{key.inspect} refused: the environment " \
+                                  "#{loaded.ruleset.environment.key.inspect} is protected"
     end
 
     def remove_local_overrides(keys)

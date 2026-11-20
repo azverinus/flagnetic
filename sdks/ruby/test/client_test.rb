@@ -175,6 +175,28 @@ class ClientTest < Minitest::Test
     assert_equal 1, logged(:override_refused).size
   end
 
+  # A set that has passed its look at the held ruleset and waits for the
+  # client's mutex while a protected ruleset is installed must be refused,
+  # not stored after the clear.
+  def test_an_override_set_while_a_protected_ruleset_is_installed_is_not_kept
+    c = offline({ "on" => true }, allow_overrides: true)
+    protected_ruleset = Flagnetic::Eval::Ruleset.decode(JSON.generate(document(2, { "on" => true }, protected: true)))
+    mutex = c.instance_variable_get(:@mutex)
+    result = nil
+    mutex.synchronize do
+      setter = Thread.new do
+        result = assert_raises(Flagnetic::LocalOverrideRefused) do
+          c.local_overrides.set("on", false)
+        end
+      end
+      Thread.pass until setter.status == "sleep"
+      c.instance_variable_set(:@loaded, Flagnetic.const_get(:FallbackChain)::Loaded.new(ruleset: protected_ruleset,
+                                                                                        received_at: Time.now, stage: :fresh))
+    end
+    Thread.pass while result.nil?
+    assert_empty c.local_overrides.list
+  end
+
   def test_local_overrides_on_a_client_fed_by_the_server
     @server.publish(document(1, { "on" => true }))
     c = client(allow_overrides: true)
