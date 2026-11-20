@@ -283,6 +283,8 @@ class Delivery:
         self._parser = EventStreamParser()
         self._stream_connected = False
         self._stream_stopped = False
+        self._fetch_successes = 0
+        self._reopen_after = 0
         self._stream_failures = 0
         self._next_stream = 0.0
         # The stream has delivered a heartbeat, which is what makes it stable.
@@ -496,7 +498,8 @@ class Delivery:
             )
         else:
             self._fetch_failures = 0
-            if self._stream_stopped:
+            self._fetch_successes += 1
+            if self._stream_stopped and self._fetch_successes > self._reopen_after:
                 # The key that was refused on the stream answers the fetch: a restored key, or a
                 # refusal that was a proxy's, so the stream is tried again.
                 self._stream_stopped = False
@@ -661,6 +664,9 @@ class Delivery:
                 status=resp.status,
             )
             self._stream_stopped = True
+            # The fetch that follows a refusal at startup shows nothing the refusal did not: the
+            # stream is tried again by the one after it.
+            self._reopen_after = max(self._fetch_successes, 1)
             return
         if resp.status != 200:
             conn.close()
