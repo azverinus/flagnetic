@@ -482,6 +482,8 @@ func (r *mergeRun) writeUnitTypes(ctx context.Context) error {
 		if err == nil {
 			r.changes.UnitTypes.Created = append(r.changes.UnitTypes.Created, u.Key)
 			r.wrote = true
+			// Every ruleset declares the unit types, so a new one changes them all.
+			r.allMoved = true
 		}
 	}
 	for _, c := range r.plan.UnitTypes.Updated {
@@ -519,6 +521,8 @@ func (r *mergeRun) writeAttributes(ctx context.Context) error {
 		if err == nil {
 			r.changes.Attributes.Created = append(r.changes.Attributes.Created, a.Key)
 			r.wrote = true
+			// Every ruleset declares the attributes, so a new one changes them all.
+			r.allMoved = true
 		}
 	}
 	for _, c := range r.plan.Attributes.Updated {

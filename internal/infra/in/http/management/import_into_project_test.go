@@ -684,3 +684,22 @@ func TestAMergeDeclaresAndRenamesUnitTypesAndAttributes(t *testing.T) {
 	res := mergeInto(t, f.admin, k, bad)
 	assertProblem(t, "a key shared by a unit type and an attribute", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_document")
 }
+
+func TestAMergeThatOnlyDeclaresAnAttributeOrAUnitTypeMovesEveryEnvironmentsRulesetOn(t *testing.T) {
+	f := exportedProject(t)
+	k := f.project.Key
+	doc := exported(t, f.admin, k)
+	doc["attributes"] = append(doc["attributes"].([]any), map[string]any{"key": "region", "type": "string", "name": "Region", "description": ""})
+	before := rulesetVersions(t, f.project)
+	mustMerge(t, f.admin, k, doc)
+	after := rulesetVersions(t, f.project)
+	if got := bumped(t, "an attribute", before, after); len(got) != len(before) {
+		t.Errorf("environments moved on by a new attribute = %v, want every one", got)
+	}
+
+	doc["unit_types"] = append(doc["unit_types"].([]any), map[string]any{"key": "account", "name": "Account", "description": ""})
+	mustMerge(t, f.admin, k, doc)
+	if got := bumped(t, "a unit type", after, rulesetVersions(t, f.project)); len(got) != len(after) {
+		t.Errorf("environments moved on by a new unit type = %v, want every one", got)
+	}
+}
