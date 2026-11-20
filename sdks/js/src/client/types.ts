@@ -82,7 +82,7 @@ export interface Status {
  *   `store`, `bootstrap`, `offline`), ruleset_version, flags.
  * - `fetch_failed` (warn): a remote evaluation failed; the held values keep
  *   serving. Fields: cause, status?, code?, retry_in_ms.
- * - `sse_connected` (info) and `sse_dropped` (warn): the change stream.
+ * - `sse_connected` (info) and `sse_dropped` (warn): the ruleset stream.
  *   Fields of the drop: cause, retry_in_ms.
  * - `stage_changed` (warn when leaving `fresh`, else info). Fields: from, to.
  * - `key_revoked` (error): 401 or 403, logged once until a fetch succeeds. Fields: status.
@@ -189,7 +189,7 @@ export interface ClientOptions {
    */
   readonly store?: ClientStore | false;
   /**
-   * Whether to hold the change stream, which brings a change within seconds
+   * Whether to hold the ruleset stream, which brings a change within seconds
    * at the cost of one connection per tab: false by default.
    */
   readonly stream?: boolean;

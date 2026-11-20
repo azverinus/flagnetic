@@ -1,5 +1,5 @@
 // A mock of the server's SDK API at the one seam a browser client uses:
-// `fetch`, for remote evaluation, events and the change stream. It runs
+// `fetch`, for remote evaluation, events and the ruleset stream. It runs
 // unchanged in Node and in a browser, because it stands in for the global
 // instead of listening on a socket. A stream answer is a response whose
 // body stays open: the test writes frames to it and may end it.
@@ -12,7 +12,7 @@ export interface Reply {
   readonly body?: string;
   /** Drop the connection instead of answering. */
   readonly networkError?: boolean;
-  /** Keep the response open as the change stream; `text/event-stream` unless headers are given. */
+  /** Keep the response open as the ruleset stream; `text/event-stream` unless headers are given. */
   readonly stream?: boolean;
 }
 

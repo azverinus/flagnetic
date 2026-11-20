@@ -1,6 +1,6 @@
 // The browser client's behaviour the protocol fixtures leave to each SDK:
 // construction, browser storage (a store that throws included), bootstrap,
-// the refetch triggers a tab has, the change stream, the persisted event
+// the refetch triggers a tab has, the ruleset stream, the persisted event
 // queue, local overrides and offline mode. It runs in Node and in a real
 // browser, on a virtual clock, against the mock of `fetch` in
 // test/support/mock-network.ts.
@@ -681,7 +681,7 @@ describe("refetch triggers", () => {
 
 // ---------------------------------------------------------------- the stream
 
-describe("the change stream", () => {
+describe("the ruleset stream", () => {
   test("the stream is off unless asked for", async () => {
     const h = harness();
     h.client({ store: false });
@@ -793,7 +793,7 @@ describe("the change stream", () => {
   });
 });
 
-describe("the change stream, refused", () => {
+describe("the ruleset stream, refused", () => {
   test("a stream answering 401 stays closed, logs key_revoked once, and opens again after an evaluation succeeds", async () => {
     const h = harness();
     h.client({ store: false, stream: true, pollInterval: 30_000 });

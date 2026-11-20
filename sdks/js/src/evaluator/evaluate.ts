@@ -471,7 +471,6 @@ class Evaluation {
           if (inclusion >= s.traffic_allocation) continue;
           const variationBucket = bucket(s.variation_salt, id);
           const assigned = assign(s.weights, variationBucket);
-          if (assigned === undefined) return errorResult("inconsistent_ruleset", influence.influenced);
           const r = serve(f, assigned, { reason: "experiment", ...ruleId, override_influenced: influence.influenced });
           if (r.reason === "error") return r;
           return withExperiment(r, {
@@ -549,13 +548,16 @@ class Evaluation {
 
 // assign walks weights in list order; variation i covers
 // [sum(w_0..w_{i-1}), sum(w_0..w_i)).
-function assign(weights: readonly WeightDocument[], b: number): string | undefined {
+// Decoding refuses weights that do not sum to 10,000, so every bucket falls
+// in one; the empty name the loop would end on is not a variation, which
+// serve turns into inconsistent_ruleset.
+function assign(weights: readonly WeightDocument[], b: number): string {
   let upper = 0;
   for (const w of weights) {
     upper += w.weight;
     if (b < upper) return w.variation;
   }
-  return undefined;
+  return "";
 }
 
 // serve completes a result with a variation of f, or turns it into

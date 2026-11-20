@@ -17,7 +17,7 @@ import { defaultBeacon, defaultPage, type Page } from "./page.js";
 import { Recorder } from "./recorder.js";
 import { serveDetail, type ServeBase } from "./serve.js";
 import { defaultStore, SafeStore, sameUnits, StoreKeys } from "./storage.js";
-import { ChangeStream, defaultStreamTiming, type StreamTiming } from "./stream.js";
+import { RulesetStream, defaultStreamTiming, type StreamTiming } from "./stream.js";
 import {
   copyJson,
   fitsFlagType,
@@ -61,7 +61,7 @@ const defaults = {
   batchSize: 100,
   capacity: 1_000,
   storedUnitSets: 4,
-  /** How long the first evaluation waits for the change stream to connect. */
+  /** How long the first evaluation waits for the ruleset stream to connect. */
   streamFirstWait: 2_000,
   /** The most (experiment, unit, variation) triples the in-process exposure suppressor holds. */
   exposureMemory: 1_000,
@@ -160,7 +160,7 @@ export class FlagneticClient {
   private readonly served = new Map<string, Detail>();
   private readonly ingest: Ingest | undefined;
   private readonly recorder: Recorder | undefined;
-  private stream: ChangeStream | undefined;
+  private stream: RulesetStream | undefined;
   private readonly streamTiming: Partial<StreamTiming> | undefined;
   private readonly unlisten: () => void;
 
@@ -302,11 +302,11 @@ export class FlagneticClient {
     if (!this.deferred) this.begin();
   }
 
-  // begin opens the change stream when it is on and starts the first
+  // begin opens the ruleset stream when it is on and starts the first
   // evaluation, which with the stream waits for it to open.
   private begin(): void {
     if (this.options.stream === true) {
-      this.stream = new ChangeStream(
+      this.stream = new RulesetStream(
         {
           url: `${this.baseUrl}${SDK_API_PATH}/stream`,
           sdkKey: this.sdkKey,
@@ -470,7 +470,7 @@ export class FlagneticClient {
   }
 
   /**
-   * Stops the timers and the change stream and flushes best effort within
+   * Stops the timers and the ruleset stream and flushes best effort within
    * the close timeout. Values keep serving afterwards.
    */
   async close(): Promise<void> {
@@ -918,7 +918,7 @@ export class FlagneticClient {
         if (res.status === 401 || res.status === 403) {
           this.unauthorized = true;
           this.once("revoked", "error", "key_revoked", { status: res.status });
-          // The change stream carries the same key: it stays closed until
+          // The ruleset stream carries the same key: it stays closed until
           // an evaluation succeeds again.
           this.stream?.close();
         }

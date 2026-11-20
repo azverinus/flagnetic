@@ -53,7 +53,7 @@ export interface EventTiming {
   readonly detailMemory: number;
 }
 
-export const defaultEventTiming: EventTiming = {
+const defaultEventTiming: EventTiming = {
   flushInterval: 2_000,
   batchSize: 500,
   capacity: 10_000,
@@ -861,9 +861,6 @@ export class LocalOverrides {
 }
 
 export { LocalOverrideRefused, LocalOverridesNotAllowed };
-
-/** The flag type a value belongs to: boolean, string, number, anything else JSON. */
-export { flagTypeOf as typeOfValue } from "../internal/detail.js";
 
 function frozenJson(v: JsonValue): JsonValue {
   const copy = JSON.parse(JSON.stringify(v)) as JsonValue;
