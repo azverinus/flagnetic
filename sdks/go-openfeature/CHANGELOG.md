@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/go-openfeature/v0.1.1...sdks/go-openfeature/v0.1.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **sdks:** close the Go SDK and provider review findings ([#406](https://github.com/azverinus/flagnetic/issues/406)) ([3d12bd8](https://github.com/azverinus/flagnetic/commit/3d12bd8eb37c8daa4547ef381512d16aedca243b))
+
+
+### Dependencies
+
+* **sdk-go-openfeature:** Bump the Go SDK from 0.1.0 to 0.1.1 ([#404](https://github.com/azverinus/flagnetic/issues/404)) ([9226485](https://github.com/azverinus/flagnetic/commit/92264857f0f33fe6b8ed6baec68d0e858d842404))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/go-openfeature/v0.1.0...sdks/go-openfeature/v0.1.1) (2026-11-11)
 
 
