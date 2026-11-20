@@ -234,6 +234,36 @@ func (e CredentialMethod) Valid() bool {
 	}
 }
 
+// Defines values for DocumentAttributeType.
+const (
+	DocumentAttributeTypeBoolean DocumentAttributeType = "boolean"
+	DocumentAttributeTypeDate    DocumentAttributeType = "date"
+	DocumentAttributeTypeList    DocumentAttributeType = "list"
+	DocumentAttributeTypeNumber  DocumentAttributeType = "number"
+	DocumentAttributeTypeSemver  DocumentAttributeType = "semver"
+	DocumentAttributeTypeString  DocumentAttributeType = "string"
+)
+
+// Valid indicates whether the value is a known member of the DocumentAttributeType enum.
+func (e DocumentAttributeType) Valid() bool {
+	switch e {
+	case DocumentAttributeTypeBoolean:
+		return true
+	case DocumentAttributeTypeDate:
+		return true
+	case DocumentAttributeTypeList:
+		return true
+	case DocumentAttributeTypeNumber:
+		return true
+	case DocumentAttributeTypeSemver:
+		return true
+	case DocumentAttributeTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EvaluationSource.
 const (
 	EvaluationSourceRemoteEvaluation EvaluationSource = "remote_evaluation"
@@ -2015,13 +2045,14 @@ type DiscoveredAttributeList struct {
 
 // DocumentAttribute defines model for DocumentAttribute.
 type DocumentAttribute struct {
-	Description *string `json:"description,omitempty"`
-	Key         string  `json:"key"`
-	Name        string  `json:"name"`
-
-	// Type `string`, `number`, `boolean`, `semver` or `date`.
-	Type string `json:"type"`
+	Description *string               `json:"description,omitempty"`
+	Key         string                `json:"key"`
+	Name        string                `json:"name"`
+	Type        DocumentAttributeType `json:"type"`
 }
+
+// DocumentAttributeType defines model for DocumentAttribute.Type.
+type DocumentAttributeType string
 
 // DocumentCondition One comparison inside a rule or a segment. An `attribute` condition
 // names an `attribute`, an operator (`op`) and a `value` (none for
@@ -10258,8 +10289,7 @@ type ClientInterface interface {
 	// requests, audit entries, events, the standard attributes and the
 	// discovered attributes are never in it.
 	//
-	// The `ETag` is the identifier of the project's latest audit entry,
-	// quoted: a later change to the project, whatever it touches, moves it.
+	// The `ETag` is an opaque tag of the project's history, quoted: a later change to the project, whatever it touches, moves it.
 	// Reading the project is all it takes, so nothing is audited.
 	//
 	// Corresponds with GET /projects/{project}/export (the `ExportProject` operationId).
@@ -10823,8 +10853,8 @@ type ClientInterface interface {
 	//
 	// With `dry_run` the whole import runs, every check the database makes
 	// included, and is rolled back: same answer, nothing written. Every
-	// answer to a dry run carries an `ETag`, the identifier of the project's
-	// latest audit entry, which an import can send as `If-Match` to be
+	// answer to a dry run carries an `ETag`, an opaque tag of the project's
+	// history, which an import can send as `If-Match` to be
 	// refused when the project has moved since.
 	//
 	// Every entity that differs is written through the context that owns it
@@ -10919,8 +10949,8 @@ type ClientInterface interface {
 	//
 	// With `dry_run` the whole import runs, every check the database makes
 	// included, and is rolled back: same answer, nothing written. Every
-	// answer to a dry run carries an `ETag`, the identifier of the project's
-	// latest audit entry, which an import can send as `If-Match` to be
+	// answer to a dry run carries an `ETag`, an opaque tag of the project's
+	// history, which an import can send as `If-Match` to be
 	// refused when the project has moved since.
 	//
 	// Every entity that differs is written through the context that owns it
@@ -16050,8 +16080,7 @@ func (c *Client) StopExperiment(ctx context.Context, project ProjectKey, experim
 // requests, audit entries, events, the standard attributes and the
 // discovered attributes are never in it.
 //
-// The `ETag` is the identifier of the project's latest audit entry,
-// quoted: a later change to the project, whatever it touches, moves it.
+// The `ETag` is an opaque tag of the project's history, quoted: a later change to the project, whatever it touches, moves it.
 // Reading the project is all it takes, so nothing is audited.
 //
 // Corresponds with GET /projects/{project}/export (the `ExportProject` operationId).
@@ -16915,8 +16944,8 @@ func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, bo
 //
 // With `dry_run` the whole import runs, every check the database makes
 // included, and is rolled back: same answer, nothing written. Every
-// answer to a dry run carries an `ETag`, the identifier of the project's
-// latest audit entry, which an import can send as `If-Match` to be
+// answer to a dry run carries an `ETag`, an opaque tag of the project's
+// history, which an import can send as `If-Match` to be
 // refused when the project has moved since.
 //
 // Every entity that differs is written through the context that owns it
@@ -17021,8 +17050,8 @@ func (c *Client) ImportProjectWithBody(ctx context.Context, project ProjectKey, 
 //
 // With `dry_run` the whole import runs, every check the database makes
 // included, and is rolled back: same answer, nothing written. Every
-// answer to a dry run carries an `ETag`, the identifier of the project's
-// latest audit entry, which an import can send as `If-Match` to be
+// answer to a dry run carries an `ETag`, an opaque tag of the project's
+// history, which an import can send as `If-Match` to be
 // refused when the project has moved since.
 //
 // Every entity that differs is written through the context that owns it
@@ -32404,8 +32433,7 @@ type ClientWithResponsesInterface interface {
 	// requests, audit entries, events, the standard attributes and the
 	// discovered attributes are never in it.
 	//
-	// The `ETag` is the identifier of the project's latest audit entry,
-	// quoted: a later change to the project, whatever it touches, moves it.
+	// The `ETag` is an opaque tag of the project's history, quoted: a later change to the project, whatever it touches, moves it.
 	// Reading the project is all it takes, so nothing is audited.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -32993,8 +33021,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// With `dry_run` the whole import runs, every check the database makes
 	// included, and is rolled back: same answer, nothing written. Every
-	// answer to a dry run carries an `ETag`, the identifier of the project's
-	// latest audit entry, which an import can send as `If-Match` to be
+	// answer to a dry run carries an `ETag`, an opaque tag of the project's
+	// history, which an import can send as `If-Match` to be
 	// refused when the project has moved since.
 	//
 	// Every entity that differs is written through the context that owns it
@@ -33089,8 +33117,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// With `dry_run` the whole import runs, every check the database makes
 	// included, and is rolled back: same answer, nothing written. Every
-	// answer to a dry run carries an `ETag`, the identifier of the project's
-	// latest audit entry, which an import can send as `If-Match` to be
+	// answer to a dry run carries an `ETag`, an opaque tag of the project's
+	// history, which an import can send as `If-Match` to be
 	// refused when the project has moved since.
 	//
 	// Every entity that differs is written through the context that owns it
@@ -54548,8 +54576,7 @@ func (c *ClientWithResponses) StopExperimentWithResponse(ctx context.Context, pr
 // requests, audit entries, events, the standard attributes and the
 // discovered attributes are never in it.
 //
-// The `ETag` is the identifier of the project's latest audit entry,
-// quoted: a later change to the project, whatever it touches, moves it.
+// The `ETag` is an opaque tag of the project's history, quoted: a later change to the project, whatever it touches, moves it.
 // Reading the project is all it takes, so nothing is audited.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -55317,8 +55344,8 @@ func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Contex
 //
 // With `dry_run` the whole import runs, every check the database makes
 // included, and is rolled back: same answer, nothing written. Every
-// answer to a dry run carries an `ETag`, the identifier of the project's
-// latest audit entry, which an import can send as `If-Match` to be
+// answer to a dry run carries an `ETag`, an opaque tag of the project's
+// history, which an import can send as `If-Match` to be
 // refused when the project has moved since.
 //
 // Every entity that differs is written through the context that owns it
@@ -55419,8 +55446,8 @@ func (c *ClientWithResponses) ImportProjectWithBodyWithResponse(ctx context.Cont
 //
 // With `dry_run` the whole import runs, every check the database makes
 // included, and is rolled back: same answer, nothing written. Every
-// answer to a dry run carries an `ETag`, the identifier of the project's
-// latest audit entry, which an import can send as `If-Match` to be
+// answer to a dry run carries an `ETag`, an opaque tag of the project's
+// history, which an import can send as `If-Match` to be
 // refused when the project has moved since.
 //
 // Every entity that differs is written through the context that owns it

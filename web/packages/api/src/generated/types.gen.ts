@@ -4144,10 +4144,7 @@ export type DocumentUnitType = {
 
 export type DocumentAttribute = {
   key: string;
-  /**
-   * `string`, `number`, `boolean`, `semver` or `date`.
-   */
-  type: string;
+  type: "string" | "number" | "boolean" | "semver" | "date" | "list";
   name: string;
   description?: string;
 };

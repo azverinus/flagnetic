@@ -34,8 +34,8 @@ func (a *api) ExportProject(ctx context.Context, req ExportProjectRequestObject)
 		format: format, body: exported.Document,
 		filename: exported.Project.Key + "-" + a.opts.clock().Now().UTC().Format("20060102T150405Z") + "." + format.Extension(),
 	}
-	if !exported.Latest.IsZero() {
-		d.etag = `"` + exported.Latest.String() + `"`
+	if exported.State != "" {
+		d.etag = `"` + exported.State + `"`
 	}
 	return d, nil
 }
@@ -206,8 +206,8 @@ func (a *api) importProject(r *http.Request, params ImportProjectParams) (Import
 		return nil, err
 	}
 	out := ImportProject200JSONResponse{Body: importResultOut(res)}
-	if res.DryRun && !res.Latest.IsZero() {
-		etag := `"` + res.Latest.String() + `"`
+	if res.DryRun && res.State != "" {
+		etag := `"` + res.State + `"`
 		out.Headers.ETag = &etag
 	}
 	return out, nil
@@ -295,8 +295,8 @@ func (a *api) importFirebaseTemplate(r *http.Request, params ImportFirebaseTempl
 		return nil, err
 	}
 	out := ImportFirebaseTemplate200JSONResponse{Body: firebaseResultOut(res)}
-	if res.DryRun && !res.Latest.IsZero() {
-		etag := `"` + res.Latest.String() + `"`
+	if res.DryRun && res.State != "" {
+		etag := `"` + res.State + `"`
 		out.Headers.ETag = &etag
 	}
 	return out, nil

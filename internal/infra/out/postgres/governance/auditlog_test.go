@@ -189,3 +189,40 @@ func TestNoticesAfterAnEntryIncludeOnesRecordedJustBeforeItThatCommittedLater(t 
 		t.Errorf("replayed %v, want the late entry and the one heard, oldest first", got)
 	}
 }
+
+func TestAProjectsStateMovesOnWithEveryEntryWhateverItsIdentifier(t *testing.T) {
+	c := testkit.Clock()
+	ids := testkit.IDs(c)
+	log := pggovernance.NewAuditLog(testkit.FreshPool(t))
+	project := id.New[workspace.Project](ids)
+	system := governance.Request{Actor: governance.Actor{Kind: governance.ActorSystem, ID: "system", Name: "system"}}
+	record := func(at time.Time, entryID governance.EntryID) {
+		t.Helper()
+		e, err := governance.NewEntry(entryID, at, system, governance.Record{Project: project, Action: "flag.updated",
+			Entity: governance.Entity{Kind: "flag", ID: "x", Key: "x"}})
+		if err == nil {
+			err = log.Append(t.Context(), e)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if state, err := log.ProjectState(t.Context(), project); err != nil || state != "" {
+		t.Fatalf("state of a project without entries = %q, %v, want none", state, err)
+	}
+	ahead := testkit.Clock()
+	ahead.Advance(time.Hour)
+	late := id.New[governance.Entry](testkit.IDs(c))
+	record(testkit.Start, id.New[governance.Entry](testkit.IDs(ahead)))
+	first, err := log.ProjectState(t.Context(), project)
+	if err != nil || first == "" {
+		t.Fatalf("state = %q, %v", first, err)
+	}
+	// The second entry is committed later but minted from an earlier instant.
+	record(testkit.Start, late)
+	second, err := log.ProjectState(t.Context(), project)
+	if err != nil || second == first {
+		t.Errorf("state after an entry with a smaller identifier = %q, %v, want it moved from %q", second, err, first)
+	}
+}

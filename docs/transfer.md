@@ -211,7 +211,7 @@ Anyone who can read a project exports it:
 GET /api/v1/projects/{project}/export?format=json|yaml
 ```
 
-The answer is `application/json` or `application/yaml` with a `Content-Disposition` naming the file and an `ETag`: the identifier of the project's latest audit entry, quoted (a project with no audit entry has none), which an import can send back as [`If-Match`](#dry-runs-and-if-match). An unknown `format` is `400`.
+The answer is `application/json` or `application/yaml` with a `Content-Disposition` naming the file and an `ETag`: a quoted tag of the project's history that every later change moves, whatever clock wrote it (a project with no audit entry has none; the text is opaque), which an import can send back as [`If-Match`](#dry-runs-and-if-match). An unknown `format` is `400`.
 
 ## Importing
 
@@ -282,7 +282,7 @@ An entity equal to the document is not written. An import that changes nothing w
 
 Add `dry_run=true` to any import to see what it would do. The whole transaction runs, including every check the database makes, and is rolled back: the answer is the one the real import would give, and nothing is written, bumped or recorded.
 
-A dry run into an existing project (merge, replace or Firebase), like an export, answers with an `ETag`: the identifier of the project's latest audit entry, quoted. A create has no project to move, so it has no `ETag` and takes no `If-Match`. Send it back as `If-Match` on the real import and the import is applied only if the project has not moved since: otherwise it is refused `412 version_mismatch` before any write, so you never apply a diff you did not see. Without the header an import applies to the project as it is.
+A dry run into an existing project (merge, replace or Firebase), like an export, answers with an `ETag`: the same opaque tag of the project's history, quoted. A create has no project to move, so it has no `ETag` and takes no `If-Match`. Send it back as `If-Match` on the real import and the import is applied only if the project has not moved since: otherwise it is refused `412 version_mismatch` before any write, so you never apply a diff you did not see. Without the header an import applies to the project as it is.
 
 A document that breaks a rule is refused `422 invalid_document`, whole, with `errors[{pointer, code, detail, params}]`: a JSON Pointer into the document and the code an ordinary write would use (`invalid_flag`, `invalid_configuration`, `type_immutable`, `unknown_field`, `required`, …). Every fault found is reported, so one run fixes the file.
 
@@ -305,6 +305,7 @@ Every environment whose ruleset changed is bumped once, at the end of the import
 | What | Limit or answer |
 |---|---|
 | Import body | 32 MiB, else `413 request_too_large`. |
+| Entities | At most as many as a direct write allows: 5,000 flags and 1,000 segments, counting what the project holds that the document does not name (a merge) and judged before anything is written, else `422 invalid_document` with `too_many` at the section. |
 | Media type | `application/json` or `application/yaml`, else `415 unsupported_media_type`. |
 | Malformed JSON or YAML | `400 invalid_request`. |
 | A document breaking a rule | `422 invalid_document`, every fault with its pointer. |
@@ -318,7 +319,7 @@ Every environment whose ruleset changed is bumped once, at the end of the import
 
 - **Export** downloads the project document as JSON or YAML. The dialog that deletes a project offers the same download, beside the audit log's, because the audit log does not hold the configuration.
 - **Import**, for owners, takes a `.json`, `.yaml` or `.yml` file and a mode, merge or replace. **Check what it would change** is the dry run: it lists what the import would create, update and delete, kind by kind, with the warnings, says how many entities a replace deletes, and names the protected environments it writes without a change request. **Apply** sends the dry run's `ETag` as `If-Match`, so when the project changed in between nothing is imported and the page offers to check again. A document the project already matches has nothing to apply.
-- **Import from Firebase**, for owners, walks through a [Remote Config template](#importing-from-firebase-remote-config): upload the template, tick the parameters to import, each shown with the flag key, type and tags it gets, read how each condition translates and which are skipped, choose the environment and the unit type percent rollouts use, then preview the flags, rules and attributes and apply, under the same `If-Match`.
+- **Import from Firebase**, for owners, walks through a [Remote Config template](#importing-from-firebase-remote-config): choose the template file, tick the parameters to import, each shown with the flag key, type and tags it gets, read how each condition translates and which are skipped, choose the environment and the unit type percent rollouts use, then run a dry run of the flags, rules and attributes and apply, under the same `If-Match`.
 - **Create from a document** is on the instance's **Projects** page, for instance admins: a document, a key and a name, a check of what it would create, then the project.
 
 ## The CLI
@@ -373,7 +374,7 @@ Re-importing the same template changes nothing, so you can import again after ed
 
 A condition expression is expanded to disjunctive normal form: one rule per conjunction, at most 50 alternatives. A configuration holds at most 50 rules; further ones are dropped with `rule_limit`.
 
-A new flag is on in the target environment and off in the others. An existing flag (of the same type, else `type_immutable`) is switched on in the target environment, keeps its name, owner, other environments, prerequisites and overrides, gains missing variations, and has its description replaced only by a non-empty one. Rules equal to existing ones keep their ids and salts. An archived flag is configured and stays archived (`archived_flag`).
+A new flag is on in the target environment and off in the others. An existing flag (of the same type, else `type_immutable`) is switched on in the target environment, keeps its name, owner, other environments, prerequisites and overrides, gains missing variations, and has its description replaced only by a non-empty one. Rules equal to existing ones keep their ids and salts. A template cannot express a rule that serves an experiment, so the rules of the flag in the target environment that do are kept, after the translated rules, and count towards the limit of 50. An archived flag is configured and stays archived (`archived_flag`), unless the template brings a value it lacks: that would change what an archived flag serves, and is refused as `422 invalid_document` with `archived` at the parameter's pointer.
 
 ### Condition terms
 
@@ -405,7 +406,7 @@ Conditions Flagnetic cannot reproduce are **skipped**, with a warning naming the
 
 `rollout_reshuffled` is a warning on every percent condition: Firebase and Flagnetic hash units differently, so the units that were in a percentage are not the same units in the rollout. A parameter's pointer is `/parameters/<key>`, or `/parameterGroups/<group>/parameters/<key>` for a grouped parameter; its default value is `<parameter>/defaultValue` and a conditional value `<parameter>/conditionalValues/<condition>`. The condition's expression is `/conditions/<index>/expression`. A document import's own warnings are `owner_replaced {email}` and `protection_kept`.
 
-A template fault is `422 invalid_document` with every fault reported, each with its pointer into the template: `invalid_json`, `required`, `duplicate_condition`, `unknown_condition`, `duplicate_parameter`, `invalid_value_type`, `invalid_value`, `type_immutable`.
+A template fault is `422 invalid_document` with every fault reported, each with its pointer into the template: `invalid_json`, `required`, `duplicate_condition`, `unknown_condition`, `duplicate_parameter`, `invalid_value_type`, `invalid_value`, `type_immutable`, `archived`.
 
 ## The demo project
 

@@ -57,10 +57,10 @@ type ImportResult struct {
 	DryRun   bool
 	Changes  transfer.Changes
 	Warnings []transfer.Warning
-	// Latest is the newest audit entry of the project before the import, the
-	// zero identifier when it has none or there was no project yet: the state
-	// a later import can name as the one it is based on.
-	Latest governance.EntryID
+	// State is the tag of the project's history before the import, "" when it
+	// has none or there was no project yet: the state a later import can name
+	// as the one it is based on.
+	State string
 }
 
 // Handle creates the project, whole or not at all: the document is checked

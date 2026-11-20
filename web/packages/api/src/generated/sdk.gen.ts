@@ -1519,8 +1519,7 @@ export const getProjectMe = <ThrowOnError extends boolean = false>(
  * requests, audit entries, events, the standard attributes and the
  * discovered attributes are never in it.
  *
- * The `ETag` is the identifier of the project's latest audit entry,
- * quoted: a later change to the project, whatever it touches, moves it.
+ * The `ETag` is an opaque tag of the project's history, quoted: a later change to the project, whatever it touches, moves it.
  * Reading the project is all it takes, so nothing is audited.
  *
  */
@@ -1621,8 +1620,8 @@ export const exportProject = <ThrowOnError extends boolean = false>(
  *
  * With `dry_run` the whole import runs, every check the database makes
  * included, and is rolled back: same answer, nothing written. Every
- * answer to a dry run carries an `ETag`, the identifier of the project's
- * latest audit entry, which an import can send as `If-Match` to be
+ * answer to a dry run carries an `ETag`, an opaque tag of the project's
+ * history, which an import can send as `If-Match` to be
  * refused when the project has moved since.
  *
  * Every entity that differs is written through the context that owns it

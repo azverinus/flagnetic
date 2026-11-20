@@ -76,15 +76,6 @@ type ImportIntoProjectCommand struct {
 var errVersionMismatch = apperrors.PreconditionFailed("version_mismatch",
 	"the project changed since the state this import was based on; run the dry run again")
 
-// entityTag is the tag a project's state is known by: its newest audit entry,
-// which any change to the project moves on; "" for a project with none.
-func entityTag(latest governance.EntryID) string {
-	if latest.IsZero() {
-		return ""
-	}
-	return latest.String()
-}
-
 // Handle merges the document into the project, whole or not at all, in one
 // unit of work that holds the project's row from before the project is read:
 // what the document names is created or updated, written through the context
@@ -108,11 +99,11 @@ func (h *ImportIntoProject) Handle(ctx context.Context, cmd ImportIntoProjectCom
 		if !found {
 			return errProjectNotFound
 		}
-		latest, err := h.d.History.LatestProjectEntry(ctx, project.ID)
+		state, err := h.d.History.ProjectState(ctx, project.ID)
 		if err != nil {
 			return err
 		}
-		if cmd.IfMatch != nil && !cmd.IfMatch.Matches(entityTag(latest)) {
+		if cmd.IfMatch != nil && !cmd.IfMatch.Matches(state) {
 			return errVersionMismatch
 		}
 		snapshot, err := h.read(ctx, project)
@@ -134,7 +125,7 @@ func (h *ImportIntoProject) Handle(ctx context.Context, cmd ImportIntoProjectCom
 			},
 		}
 		res, err = imp.apply(ctx)
-		res.Latest = latest
+		res.State = state
 		if err != nil {
 			return err
 		}
@@ -482,6 +473,8 @@ func (r *mergeRun) writeUnitTypes(ctx context.Context) error {
 		if err == nil {
 			r.changes.UnitTypes.Created = append(r.changes.UnitTypes.Created, u.Key)
 			r.wrote = true
+			// Every ruleset declares the unit types, so a new one changes them all.
+			r.allMoved = true
 		}
 	}
 	for _, c := range r.plan.UnitTypes.Updated {
@@ -519,6 +512,8 @@ func (r *mergeRun) writeAttributes(ctx context.Context) error {
 		if err == nil {
 			r.changes.Attributes.Created = append(r.changes.Attributes.Created, a.Key)
 			r.wrote = true
+			// Every ruleset declares the attributes, so a new one changes them all.
+			r.allMoved = true
 		}
 	}
 	for _, c := range r.plan.Attributes.Updated {

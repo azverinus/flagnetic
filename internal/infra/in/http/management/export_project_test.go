@@ -288,25 +288,18 @@ func TestExportNamesTheFileAndTheStateOfTheProject(t *testing.T) {
 		t.Errorf("Content-Disposition of the JSON export = %q", json)
 	}
 
-	// The ETag is the project's newest audit entry, quoted, and any change
-	// to the project moves it.
-	latest := func() string {
-		entries := do(f.admin.ListProjectAuditEntriesWithResponse(t.Context(), k, &management.ListProjectAuditEntriesParams{}))
-		if entries.JSON200 == nil || len(entries.JSON200.Items) == 0 {
-			t.Fatalf("audit = %d %s", entries.StatusCode(), entries.Body)
-		}
-		return entries.JSON200.Items[0].Id.String()
-	}
+	// The ETag is the state of the project's history, quoted and opaque, and
+	// any change to the project moves it.
 	etag := res.HTTPResponse.Header.Get("ETag")
-	if etag != `"`+latest()+`"` {
-		t.Errorf("ETag = %s, want the project's newest audit entry %s", etag, latest())
+	if len(etag) < 3 || etag[0] != '"' || etag[len(etag)-1] != '"' {
+		t.Errorf("ETag = %s, want a quoted tag", etag)
 	}
 	if again := export(t, f.admin, k, "json").HTTPResponse.Header.Get("ETag"); again != etag {
 		t.Errorf("ETag of an unchanged project moved: %s then %s", etag, again)
 	}
 	createFlag(t, f.admin, k, management.FlagCreate{Key: "one_more", Type: "boolean", Name: "One more"})
-	if moved := export(t, f.admin, k, "json").HTTPResponse.Header.Get("ETag"); moved == etag || moved != `"`+latest()+`"` {
-		t.Errorf("ETag after a change = %s, was %s, want the newest entry %s", moved, etag, latest())
+	if moved := export(t, f.admin, k, "json").HTTPResponse.Header.Get("ETag"); moved == etag {
+		t.Errorf("ETag after a change = %s, want it moved", moved)
 	}
 }
 

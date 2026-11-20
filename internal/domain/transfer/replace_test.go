@@ -30,7 +30,7 @@ func replacing(t *testing.T) transfer.Document {
 func TestReplacingAProjectWithItsOwnDocumentDeletesNothing(t *testing.T) {
 	cur := replacing(t)
 	del := transfer.PlanDeletions(cur, clone(t, cur))
-	if !del.Empty() || del.Refusal() != nil || len(del.Held) != 0 {
+	if len(del.Flags)+len(del.Experiments)+len(del.Segments)+len(del.Attributes)+len(del.UnitTypes)+len(del.Environments) != 0 || del.Refusal() != nil || len(del.Held) != 0 {
 		t.Errorf("deletions = %+v, want none", del)
 	}
 }
@@ -48,9 +48,6 @@ func TestReplacingDeletesWhatTheDocumentLacksButTheStandardAttributes(t *testing
 		!slices.Equal(del.Attributes, []string{"plan"}) || !slices.Equal(del.Segments, []string{"beta"}) ||
 		!slices.Equal(del.Experiments, []string{"a_draft"}) {
 		t.Errorf("deletions = %+v", del)
-	}
-	if del.Empty() {
-		t.Error("Empty = true")
 	}
 }
 

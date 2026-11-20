@@ -2,7 +2,9 @@ package transfer_test
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -418,4 +420,63 @@ func TestARolloutSaltARuleKeepsIsNotReusedByAnotherFlag(t *testing.T) {
 	if got := mergeFaultsOf(t, d); !slices.Equal(got, want) {
 		t.Errorf("faults = %v, want %v", got, want)
 	}
+}
+
+// The limits of a project's flags and segments, which a direct write refuses
+// going over.
+const (
+	maxFlags    = 5_000
+	maxSegments = 1_000
+)
+
+func TestADocumentThatLeavesMoreOfAnEntityThanAProjectHoldsIsRefusedBeforeAnythingIsWritten(t *testing.T) {
+	current := existing()
+	many := clone(t, current)
+	for i := range maxFlags {
+		many.Flags = append(many.Flags, transfer.Flag{Key: "flag_" + strconv.Itoa(i), Type: "boolean", Name: "Flag"})
+	}
+	for i := range maxSegments {
+		many.Segments = append(many.Segments, transfer.Segment{Key: "segment_" + strconv.Itoa(i), Name: "Segment"})
+	}
+
+	var e *apperrors.Error
+	for name, check := range map[string]error{
+		"merge":   transfer.CheckMerge(many, current),
+		"create":  transfer.CheckCreate(many),
+		"replace": transfer.CheckReplace(many, current),
+	} {
+		if !errors.As(check, &e) {
+			t.Fatalf("%s: error = %v, want invalid_document", name, check)
+		}
+		var got []string
+		for _, v := range e.Violations {
+			if v.Code == "too_many" {
+				got = append(got, v.Pointer)
+			}
+		}
+		if !slices.Equal(got, []string{"/segments", "/flags"}) && !slices.Equal(got, []string{"/flags", "/segments"}) {
+			t.Errorf("%s: too_many at %v, want /flags and /segments", name, got)
+		}
+	}
+
+	// A merge counts what the project holds: a document of the project's own
+	// flags adds nothing.
+	if err := transfer.CheckMerge(clone(t, current), current); err != nil {
+		t.Errorf("merging the project's own document = %v", err)
+	}
+	full := clone(t, current)
+	for i := range maxFlags - len(current.Flags) {
+		full.Flags = append(full.Flags, transfer.Flag{Key: "flag_" + strconv.Itoa(i), Type: "boolean", Name: "Flag"})
+	}
+	if err := transfer.CheckMerge(full, current); err != nil && slices.ContainsFunc(violationsOf(err), func(v apperrors.Violation) bool { return v.Code == "too_many" }) {
+		t.Errorf("a merge that reaches the limit exactly = %v, want none too_many", err)
+	}
+}
+
+func violationsOf(err error) []apperrors.Violation {
+	var e *apperrors.Error
+	if errors.As(err, &e) {
+		return e.Violations
+	}
+	return nil
 }
