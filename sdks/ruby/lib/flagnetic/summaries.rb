@@ -35,7 +35,7 @@ module Flagnetic
       @record = record
       @ruleset_version = ruleset_version
       @mutex = Mutex.new
-      @wall_start = Time.now
+      @wall_start = wall_now
       @window_due_since = now
       @current = Hash.new(0)
       @kept = nil
@@ -95,7 +95,7 @@ module Flagnetic
       @mutex.synchronize do
         @current = Hash.new(0)
         @kept = nil
-        @wall_start = Time.now
+        @wall_start = wall_now
         @window_due_since = now
       end
       @backoff.reset
@@ -110,7 +110,7 @@ module Flagnetic
     # report kept unless it began over an hour ago, and returns nil when
     # nothing was evaluated.
     def take_window
-      wall_end = Time.now
+      wall_end = wall_now
       win, kept = @mutex.synchronize do
         window = { start: @wall_start, end: wall_end, counts: @current }
         held = @kept
@@ -226,7 +226,7 @@ module Flagnetic
         end_t = en if end_t.nil? || en > end_t
         e["counts"].each { |r| counts[[r["flag"], r["variation"], r["reason"].to_sym]] += r["count"] }
       end
-      { start: start_t || Time.now, end: end_t || Time.now, counts: counts }
+      { start: start_t || wall_now, end: end_t || wall_now, counts: counts }
     end
 
     # schedule_retry honours Retry-After, capped at the ordinary backoff

@@ -103,7 +103,7 @@ module Flagnetic
 
     # add_alias enqueues an alias event linking two unit IDs.
     def add_alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
-      t = Time.now
+      t = wall_now
       enqueue({ "type" => "alias", "event_id" => UUID.v7(time: t), "from_unit_type" => from_unit_type.to_s,
                 "from_unit_id" => from_unit_id.to_s, "to_unit_type" => to_unit_type.to_s,
                 "to_unit_id" => to_unit_id.to_s, "occurred_at" => EventBatch.format_time(t) })
@@ -173,7 +173,7 @@ module Flagnetic
         skipped(key, "repeat")
         return
       end
-      t = Time.now
+      t = wall_now
       coerced = begin
         Eval::Context.__send__(:coerce, context)
       rescue StandardError

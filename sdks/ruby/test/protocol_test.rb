@@ -75,7 +75,7 @@ class ProtocolTest < Minitest::Test
   end
 
   def build(factor, options, stored: nil, offline: nil, window_top: false)
-    timing = Flagnetic::Client.const_get(:DEFAULT_TIMING).to_h.compact.transform_values do |v|
+    timing = Flagnetic::Client.const_get(:DEFAULT_TIMING).to_h.except(:now, :wall_now).compact.transform_values do |v|
       v.is_a?(Array) ? v.map { |x| x / factor } : v / factor
     end
     timing[:random] = TopRandom.new if window_top

@@ -196,16 +196,10 @@ class ExposuresTest < Minitest::Test
   end
 
   def test_an_exposure_with_an_invalid_unit_id_is_scrubbed_and_sent
-    @server.publish(document(1))
+    @server.publish(FIXTURE["ruleset"])
     c = client(flush_interval: 3600, stream: false)
     c.ready(timeout: 2)
-    exposures = c.instance_variable_get(:@exposures)
-    record = Flagnetic.const_get(:Exposures)::ExposureRecord.new(
-      experiment: Struct.new(:key, :unit_type, :unit_id, :variation, :override)
-                        .new("checkout_v2", "anonymous", "u-\xFF", "control", false),
-      reason: :experiment, ruleset_version: 1
-    )
-    exposures.__send__(:emit, { units: { "anonymous" => "x" } }, "auto_on", record)
+    c.string("auto_on", default: "", context: { units: { "anonymous" => "u-\xFF" } })
     c.flush(timeout: 2)
     assert_equal "u-\uFFFD", @server.events_requests.first.events.first["unit_id"]
   end

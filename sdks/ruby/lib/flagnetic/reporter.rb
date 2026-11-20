@@ -21,7 +21,9 @@ module Flagnetic
 
     private
 
-    def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    def now = @timing.now.call
+
+    def wall_now = @timing.wall_now.call
 
     # wait_for_send_lock waits for @send_mutex, up to deadline, so a flush
     # bounded by its own budget never blocks on another flush already in

@@ -70,7 +70,7 @@ module Flagnetic
 
     private
 
-    def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    def now = @timing.now.call
 
     # supervise runs the loop and starts it again, after a backoff, when it
     # ends by an exception: step already absorbs failures of one turn, so

@@ -133,17 +133,16 @@ class SummariesTest < Minitest::Test
   def test_a_window_older_than_an_hour_is_dropped_rather_than_merged
     @server.on_events { |_| [500, {}, ""] }
     @server.publish(document(1, { "on" => true }))
-    c = client(summary_interval: 3600, stream: false)
+    skew = 0
+    c = client(summary_interval: 3600, stream: false, timing: { wall_now: -> { Time.now + skew } })
     c.ready(timeout: 2)
     4.times { c.bool("on", default: false) }
     c.flush(timeout: 0.3)
 
     @server.on_events { |_| nil }
-    later = Time.now + 3700
-    Time.stub(:now, later) do
-      c.bool("on", default: false)
-      c.flush(timeout: 2)
-    end
+    skew = 3700
+    c.bool("on", default: false)
+    c.flush(timeout: 2)
     assert_equal({ %w[on v fallthrough] => 1 }, rows(summaries(@server.events_requests.last).first))
     dropped = logged(:queue_dropped).map(&:last)
     assert_equal(["window_older_than_one_hour"], dropped.map { |f| f[:cause] })

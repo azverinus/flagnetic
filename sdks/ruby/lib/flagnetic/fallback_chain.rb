@@ -24,7 +24,7 @@ module Flagnetic
         raise OfflineError, "offline ruleset: #{cause}"
       end
 
-      swap(ruleset, received_at: Time.now, stage: :fresh, source: "offline")
+      swap(ruleset, received_at: @timing.wall_now.call, stage: :fresh, source: "offline")
     rescue OfflineError
       raise
     rescue StandardError => e
@@ -177,7 +177,7 @@ module Flagnetic
       held = held_version
       return fetch_failed("version #{ruleset.version} is below the held #{held}") if held && ruleset.version < held
 
-      changed = swap(ruleset, received_at: Time.now, stage: :fresh, source: "fetch")
+      changed = swap(ruleset, received_at: @timing.wall_now.call, stage: :fresh, source: "fetch")
       succeeded
       persist(json)
       fire_change(changed)
@@ -201,7 +201,7 @@ module Flagnetic
     # failed moves fresh to last_good and marks the held ruleset stale;
     # last_good and built_in stay.
     def failed
-      @mutex.synchronize { @stale_since ||= Time.now }
+      @mutex.synchronize { @stale_since ||= @timing.wall_now.call }
       move_to(:last_good) if @stage == :fresh
     end
 

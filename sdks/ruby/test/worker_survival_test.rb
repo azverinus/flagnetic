@@ -11,67 +11,76 @@ class WorkerSurvivalTest < Minitest::Test
 
   Fatal = Class.new(Exception) # rubocop:disable Lint/InheritException
 
+  # A change listener runs on the worker's thread, so one that raises
+  # something that is not a StandardError is how the public API shows the
+  # worker a failure that its own loop must survive.
+  def raising_once(error)
+    raised = false
+    lambda do |_keys|
+      next if raised
+
+      raised = true
+      raise error
+    end
+  end
+
   def test_an_exception_outside_standard_error_does_not_end_the_worker
     @server.publish(document(1, { "on" => true }))
     c = client(stream: false, timing: { poll_down: 0.1 })
-    raised = false
-    c.define_singleton_method(:handle_fetch) do |response|
-      unless raised
-        raised = true
-        raise Fatal, "boom"
-      end
-      super(response)
-    end
-
-    assert(eventually { !logged(:worker_failed).empty? })
     assert_equal :fresh, c.ready(timeout: 5)
-    assert_match(/Fatal: boom/, logged(:worker_failed).first[1][:cause])
+    c.on_change(&raising_once(Fatal.new("boom")))
+
     @server.publish(document(2, { "on" => false }))
-    assert eventually(5) { c.bool("on", default: true) == false }
+    assert(eventually { !logged(:worker_failed).empty? })
+    assert_match(/Fatal: boom/, logged(:worker_failed).first[1][:cause])
+    @server.publish(document(3, { "on" => true }))
+    assert eventually(5) { c.detail("on", default: false).ruleset_version == 3 }
   end
 
   def test_a_dead_worker_is_logged_and_restarted
     @server.publish(document(1, { "on" => true }))
     c = client(stream: false, timing: { poll_down: 0.1 })
     assert_equal :fresh, c.ready(timeout: 5)
-    worker = c.instance_variable_get(:@worker)
-    broken = true
-    worker.define_singleton_method(:step) do
-      raise Fatal, "dead" if broken
-
-      super()
-    end
-    worker.wake
-    assert eventually(5) { !logged(:worker_died).empty? }
-    broken = false
+    # SystemExit is the one failure the loop's step lets through to its supervisor.
+    c.on_change(&raising_once(SystemExit.new))
     @server.publish(document(2, { "on" => false }))
-    assert eventually(10) { c.bool("on", default: true) == false }
+    assert eventually(5) { !logged(:worker_died).empty? }
+    @server.publish(document(3, { "on" => true }))
+    assert eventually(10) { c.detail("on", default: false).ruleset_version == 3 }
   end
 
   def test_close_never_raises_what_the_worker_died_of
-    @server.publish(document(1, { "on" => true }))
-    c = client(stream: false)
+    server = @server
+    server.publish(document(1, { "on" => true }))
+    # A logger that fails on the supervisor's own report ends the thread with it.
+    dying = lambda do |level, event, fields|
+      record(level, event, fields)
+      raise Fatal, "late" if event == :worker_died
+    end
+    c = Flagnetic::Client.new(KEY, base_url: server.base_url, logger: dying, stream: false,
+                                   timing: FAST.merge(poll_down: 0.1))
+    @clients << c
     assert_equal :fresh, c.ready(timeout: 5)
-    worker = c.instance_variable_get(:@worker)
-    worker.instance_variable_get(:@thread).kill
-    worker.instance_variable_get(:@thread).join
-    thread = Thread.new { raise Fatal, "late" }
-    thread.report_on_exception = false
-    worker.instance_variable_set(:@thread, thread)
+    c.on_change(&raising_once(SystemExit.new))
+    server.publish(document(2, { "on" => false }))
+    assert eventually(5) { !logged(:worker_died).empty? }
     sleep 0.05
     assert_nil c.close(timeout: 1)
   end
 
   def test_close_lets_an_exception_raised_into_the_caller_through
     @server.publish(document(1, { "on" => true }))
-    c = client(stream: false)
+    c = client(stream: false, timing: { poll_down: 0.1 })
     assert_equal :fresh, c.ready(timeout: 5)
-    worker = c.instance_variable_get(:@worker)
-    stuck = Thread.new { sleep }
-    worker.instance_variable_set(:@thread, stuck)
+    # The worker is held in a listener, so close waits on it.
+    entered = Queue.new
+    c.on_change do |_keys|
+      entered << true
+      sleep
+    end
+    @server.publish(document(2, { "on" => false }))
+    assert entered.pop(timeout: 5)
     assert_raises(Timeout::Error) { Timeout.timeout(0.2) { c.close(timeout: 5) } }
-  ensure
-    stuck&.kill
   end
 
   # Overflowing the stack depends on the platform's stack size, so the
