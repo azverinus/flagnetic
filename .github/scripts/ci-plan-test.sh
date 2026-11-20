@@ -29,8 +29,8 @@ plan_of() {
   plan_compute
 }
 
-tests_package() { grep -qx "$ROOT_MODULE/$1" <<<"$TEST_PKGS"; }
-runs_module() { grep -qx "$1" <<<"$MODULES"; }
+tests_package() { grep -Fqx "$ROOT_MODULE/$1" <<<"$TEST_PKGS"; }
+runs_module() { grep -Fqx "$1" <<<"$MODULES"; }
 
 expect_tests() { # <package...>: planned for the server's tests
   local p
@@ -94,6 +94,7 @@ expect_off E2E_TOUCHED
 # A pull request is tested on the oldest PostgreSQL, the one pr-check starts.
 CASE="postgres"
 [ "$POSTGRES_OLDEST" = "[$(postgres_oldest)]" ] || fail "the oldest PostgreSQL is $(postgres_oldest), the pull request plan has $POSTGRES_OLDEST"
+grep -Fq 'PR_CHECK_POSTGRES:-$(postgres_oldest)' .github/scripts/pr-check.sh || fail "pr-check.sh does not start the oldest PostgreSQL by default"
 
 if [ "$FAILURES" -gt 0 ]; then
   echo "ci-plan-test: $FAILURES failed" >&2

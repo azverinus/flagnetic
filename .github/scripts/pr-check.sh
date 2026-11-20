@@ -239,6 +239,9 @@ UNCOMMITTED="$(git status --porcelain | wc -l | tr -d ' ')"
 # shellcheck source=.github/scripts/ci-plan.sh
 . "$ROOT/.github/scripts/ci-plan.sh"
 PG_VERSION="${PR_CHECK_POSTGRES:-$(postgres_oldest)}"
+# Without jq the version reads empty, and the tests would ask for an image
+# that does not exist rather than the one CI uses.
+[ -n "$PG_VERSION" ] && [ "$PG_VERSION" != null ] || { echo "pr-check: cannot read the oldest PostgreSQL from ci-plan.sh (is jq installed?)" >&2; exit 2; }
 plan_changed "$BASE"
 if [ -z "$CHANGED" ]; then
   say "pr-check: no change since the merge base with $BASE_REF ($(git rev-parse --short "$BASE")); nothing to check"
@@ -250,7 +253,8 @@ SPECS="$(printf '%s\n' "$CHANGED" | grep -E '^web/e2e/.*\.spec\.ts$' | while rea
 
 print_plan() {
   say "pr-check plan (base $(git rev-parse --short "$BASE") = merge base with $BASE_REF; $(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ') files changed, $UNCOMMITTED uncommitted)"
-  say "  PostgreSQL for the tests: $PG_VERSION (--full)"
+  if [ -n "${DATABASE_URL:-}" ]; then say "  PostgreSQL for the tests: DATABASE_URL (--full)"
+  else say "  PostgreSQL for the tests: $PG_VERSION (--full)"; fi
   say "  Go changed: $ANY_GO   server: $SERVER   wide (go.mod/go.sum/go.work of the root): $WIDE"
   say "  changed packages: $(printf '%s' "$CHANGED_PKGS" | tr '\n' ' ')"
   if [ "$RUN_TESTS" = 1 ]; then
@@ -260,7 +264,7 @@ print_plan() {
     say "  server tests:     $(printf '%s\n' "$TEST_PKGS" | sed '/^$/d' | wc -l | tr -d ' ') packages, left to CI (--full runs them here)"
   fi
   for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && say "  module checked:   ${MOD_REL[$i]}"; done
-  say "  migrations: $RUN_MIGRATIONS  helm: $RUN_HELM  docs: $RUN_DOCS  load (CI only; task load): $RUN_LOAD  upgrade (CI only): $RUN_UPGRADE  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
+  say "  migrations: $RUN_MIGRATIONS  helm: $RUN_HELM  docs: $RUN_DOCS  load (CI only; task load): $RUN_LOAD  upgrade (CI only): $RUN_UPGRADE  console: $RUN_CONSOLE  sdk-js: $RUN_SDK_JS  python: $RUN_PYTHON  ruby: $RUN_RUBY  dart: $RUN_DART  flutter: $RUN_FLUTTER  workflows: $RUN_WORKFLOWS  e2e lint: $E2E_TOUCHED  playwright specs: $(printf '%s' "$SPECS" | tr '\n' ' ')"
 }
 print_plan
 [ "$PLAN_ONLY" = 1 ] && exit 0
