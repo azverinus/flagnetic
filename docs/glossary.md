@@ -195,7 +195,7 @@ Serving a variation to a percentage of units, deterministic per unit. Growing th
 _Avoid_: gradual release, canary, ramp, percentage rule
 
 **Override**:
-A pinned variation for a specific unit ID in an environment, set through the platform, with an optional note saying why and the member who last wrote it. Overrides are marked in every event they influence and excluded from analysis.
+A variation fixed for a specific unit ID in an environment, set through the platform, with an optional note saying why and the member who last wrote it. Overrides are marked in every event they influence and excluded from analysis.
 _Avoid_: force, pin, whitelist, individual targeting
 
 **Local override**:
