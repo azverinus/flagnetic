@@ -43,8 +43,8 @@ func (l *AuditLog) Append(ctx context.Context, e governance.Entry) error {
 	_, err = pgxtx.Querier(ctx, l.pool).Exec(ctx, `
 		INSERT INTO audit_entries (id, occurred_at, project_id, environment_id,
 		    actor_kind, actor_id, actor_name, actor_member_id,
-		    action, entity_kind, entity_id, entity_key, before, after, kill_switch, request_id, change_request_id, seq)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid, $9, $10, $11, $12, $13, $14, $15, NULLIF($16, ''), $17, nextval('audit_entry_seq'))`,
+		    action, entity_kind, entity_id, entity_key, before, after, kill_switch, request_id, change_request_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid, $9, $10, $11, $12, $13, $14, $15, NULLIF($16, ''), $17)`,
 		e.ID.Bytes(), e.OccurredAt, optional(e.Project), optional(e.Environment),
 		string(e.Actor.Kind), e.Actor.ID, e.Actor.Name, e.Actor.MemberID,
 		e.Action, e.Entity.Kind, e.Entity.ID, e.Entity.Key, before, after, e.KillSwitch, e.RequestID, optional(e.ChangeRequest))
