@@ -13,7 +13,7 @@ module Flagnetic
   #
   # Threads: the ruleset is a frozen object swapped under a mutex and read
   # without locking, so getters never wait. One background thread runs the
-  # change stream, polling and retries.
+  # ruleset stream, polling and retries.
   #
   # Fork: the first call in a forked child (Puma cluster mode, Unicorn)
   # sees the new process ID and starts the child's own background thread;
@@ -58,7 +58,7 @@ module Flagnetic
     #   another key, or under none, is discarded with store_failed.
     # - logger: a callable receiving (level, event, fields), or a Logger.
     #   Default: warn and above to $stderr.
-    # - stream: false disables the change stream; polling then runs every
+    # - stream: false disables the ruleset stream; polling then runs every
     #   30 s.
     # - poll_interval: seconds between safety polls while the stream is
     #   connected (default 300, at least 30).
@@ -274,7 +274,7 @@ module Flagnetic
 
     # after_fork starts a forked child's background thread now rather than
     # on the child's first call, so a worker that has not served a request
-    # yet already follows the change stream. It does nothing in the process
+    # yet already follows the ruleset stream. It does nothing in the process
     # that built the client and never raises. Nothing calls it by itself:
     # a fork-per-job runner that never evaluates would open a stream per
     # child.

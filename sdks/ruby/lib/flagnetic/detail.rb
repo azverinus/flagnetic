@@ -2,10 +2,10 @@
 
 module Flagnetic
   # REASONS are the evaluation reasons a Detail carries. The evaluator
-  # produces the first eight; the SDK produces local_override and
-  # fallback. A getter never serves error: an evaluator error serves the
-  # built-in default with reason fallback.
-  REASONS = %i[rule rollout experiment override prerequisite_failed error off fallthrough local_override
+  # produces the first seven; the SDK produces local_override and
+  # fallback. An evaluator error serves the built-in default with reason
+  # fallback, so no Detail carries error.
+  REASONS = %i[rule rollout experiment override prerequisite_failed off fallthrough local_override
                fallback].freeze
 
   # STAGES are the steps of the fallback chain. built_in: no ruleset was
@@ -15,11 +15,11 @@ module Flagnetic
   # included. An offline client is always fresh once its document loads.
   STAGES = %i[built_in last_good fresh].freeze
 
-  # ERROR_CODES say why a Detail has reason fallback: the evaluator's four,
+  # ERROR_CODES say why a Detail has reason fallback: the evaluator's three,
   # then type_mismatch (the flag's type differs from the getter's),
   # no_ruleset (stage built_in) and general (an internal failure caught at
   # the API boundary).
-  ERROR_CODES = %i[flag_not_found server_only prerequisite_cycle inconsistent_ruleset type_mismatch no_ruleset
+  ERROR_CODES = %i[flag_not_found prerequisite_cycle inconsistent_ruleset type_mismatch no_ruleset
                    general].freeze
 
   # Detail is a served value and why it was served.

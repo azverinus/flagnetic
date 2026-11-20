@@ -190,8 +190,8 @@ class ClientTest < Minitest::Test
         end
       end
       Thread.pass until setter.status == "sleep"
-      c.instance_variable_set(:@loaded, Flagnetic.const_get(:FallbackChain)::Loaded.new(ruleset: protected_ruleset,
-                                                                                        received_at: Time.now, stage: :fresh))
+      loaded = Flagnetic.const_get(:FallbackChain)::Loaded
+      c.instance_variable_set(:@loaded, loaded.new(ruleset: protected_ruleset, received_at: Time.now, stage: :fresh))
     end
     Thread.pass while result.nil?
     assert_empty c.local_overrides.list

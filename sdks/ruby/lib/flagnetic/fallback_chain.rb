@@ -6,7 +6,7 @@ module Flagnetic
   # FallbackChain is the part of Client that holds the ruleset: it loads
   # the store and offline documents, applies each fetch outcome and moves
   # the stage. Every method is private; the background thread calls handle_fetch,
-  # held_version and key_revoked.
+  # held_version, stream_connected and key_revoked.
   module FallbackChain
     # Loaded is the held ruleset, when it was received and the stage it is
     # held at. The stage is part of it so that a getter, reading it once,

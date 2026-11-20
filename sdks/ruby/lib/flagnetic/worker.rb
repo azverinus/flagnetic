@@ -4,7 +4,7 @@ require "json"
 
 module Flagnetic
   # Worker is a client's background thread. It fetches the ruleset after
-  # every (re)connect of the change stream, on every event above the held
+  # every (re)connect of the ruleset stream, on every event above the held
   # version and on the poll interval, and retries with backoff; it flushes
   # the exposure and alias queue and the evaluation summary window on
   # their intervals. The stream

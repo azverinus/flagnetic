@@ -61,7 +61,7 @@ class ScenarioServer
 
   # respond answers a request as a scripted response of the scenario list:
   # a network error drops the connection, stream keeps it open as the
-  # change stream.
+  # ruleset stream.
   def respond(request, response, body)
     socket = request.socket
     return socket.close if response["network_error"]

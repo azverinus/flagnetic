@@ -33,11 +33,11 @@ Under Rails no initializer is needed: set `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BAS
 
 ## Propagation
 
-A change saved in Flagnetic, a kill switch included, reaches a client holding the change stream (the default) within **2 seconds at the 99th percentile**, whichever replica the change and the client each go through. With `stream: false`, or behind a proxy that blocks `text/event-stream`, it arrives at the next poll, within 30 seconds. Every pull request that changes this gem checks the 2 seconds against two real replicas.
+A change saved in Flagnetic, a kill switch included, reaches a client holding the ruleset stream (the default) within **2 seconds at the 99th percentile**, whichever replica the change and the client each go through. With `stream: false`, or behind a proxy that blocks `text/event-stream`, it arrives at the next poll, within 30 seconds. Every pull request that changes this gem checks the 2 seconds against two real replicas.
 
 ## Client
 
-`Flagnetic::Client` is the server-mode client. It downloads the ruleset with the server key, holds it in memory, follows every change through the change stream (polling while the stream is down) and evaluates locally, so a getter never waits on the network and never raises. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0 to 2 seconds.
+`Flagnetic::Client` is the server-mode client. It downloads the ruleset with the server key, holds it in memory, follows every change through the ruleset stream (polling while the stream is down) and evaluates locally, so a getter never waits on the network and never raises. A stream is stable once it has delivered a heartbeat: one the server closes before that (a draining replica, a proxy that ends the stream early) is a failure like any other and the reconnect backs off, while the close of a stable stream waits 0 to 2 seconds.
 
 ```ruby
 require "flagnetic"
@@ -59,7 +59,7 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 
 | Option | Meaning |
 |---|---|
-| `stream:` | `false` turns the change stream off; the ruleset is then polled every 30 s (default `true`). |
+| `stream:` | `false` turns the ruleset stream off; the ruleset is then polled every 30 s (default `true`). |
 | `poll_interval:` | Seconds between polls while the stream is up (default 300, at least 30). |
 | `request_timeout:` | Seconds per request (default 10). |
 | `store:` | Path of a file keeping the last good ruleset across restarts. It is read at construction and rewritten on every accepted ruleset. The file is headed by a digest of the SDK key: one written under another key (another environment's, say) or under none is discarded with `store_failed`. |
@@ -75,7 +75,7 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 
 `stage` is `:fresh` while the latest attempt succeeded (a `304` included), `:last_good` while the held ruleset is older than the latest attempt (it came from an earlier success or from the store) and `:built_in` before any ruleset was received. `status` adds `stale_since`. `on_change` and `on_stage` register blocks and return a callable that removes them.
 
-Every request, the change stream included, goes through `Net::HTTP`, so the proxy configured for the process (`http_proxy`, `https_proxy`, `no_proxy`) applies.
+Every request, the ruleset stream included, goes through `Net::HTTP`, so the proxy configured for the process (`http_proxy`, `https_proxy`, `no_proxy`) applies.
 
 After `fork` the child starts its own background thread on its first call, so a child that never evaluates opens no stream; `after_fork` starts it at once, so a worker that has not served a request yet already follows the stream.
 
