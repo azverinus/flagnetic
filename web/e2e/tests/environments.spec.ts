@@ -102,21 +102,18 @@ test.describe("environments", () => {
     await expect(environmentRow(page, "sandbox")).toBeVisible();
   });
 
-  test("refuses to delete a protected environment, in the member's words", async ({ page }) => {
+  test("offers no delete for a protected environment, and says to stop protecting it first", async ({
+    page,
+  }) => {
     const projectKey = await seedProject("environments-protected");
     await openEnvironments(page, projectKey);
 
-    await environmentRow(page, "production")
-      .getByRole("button", { name: "Delete production" })
-      .click();
-    const confirm = page.getByRole("dialog", { name: "Delete production" });
-    await confirm.getByLabel("Type production to confirm").fill("production");
-    await confirm.getByRole("button", { name: "Delete environment" }).click();
-
-    await expect(confirm.getByRole("alert")).toHaveText(
-      "A protected environment cannot be deleted. Stop protecting it on its page first.",
-    );
-    await page.keyboard.press("Escape");
+    const remove = environmentRow(page, "production").getByRole("button", {
+      name: "Delete production",
+    });
+    await expect(remove).toHaveAttribute("aria-disabled", "true");
+    await remove.click({ force: true });
+    await expect(page.getByRole("dialog", { name: "Delete production" })).toHaveCount(0);
     await expect(environmentRow(page, "production")).toBeVisible();
   });
 });
