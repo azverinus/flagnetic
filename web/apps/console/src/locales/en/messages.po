@@ -755,6 +755,10 @@ msgstr "A rule has at most {max} conditions."
 msgid "A rule has at most {maxConditionsText} conditions."
 msgstr "A rule has at most {maxConditionsText} conditions."
 
+#: src/lib/problem-messages.ts
+msgid "A rule that serves an experiment would change. Change it from the experiment instead."
+msgstr "A rule that serves an experiment would change. Change it from the experiment instead."
+
 #: src/components/tester-panel.tsx
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
 msgstr "A rule's rollout served: the unit's bucket is below its percentage."
@@ -6624,6 +6628,10 @@ msgstr "Remove SMTP server"
 msgid "Remove tag {tag}"
 msgstr "Remove tag {tag}"
 
+#: src/lib/problem-messages.ts
+msgid "Remove the control character. Text holds visible characters, tabs and line breaks only."
+msgstr "Remove the control character. Text holds visible characters, tabs and line breaks only."
+
 #: src/components/ui/toolbar.tsx
 msgid "Remove the filter {label}"
 msgstr "Remove the filter {label}"
@@ -7573,9 +7581,17 @@ msgstr "Some exposures were refused and are not counted above. An SDK sends expo
 msgid "Some fields need correcting."
 msgstr "Some fields need correcting."
 
+#: src/lib/problem-messages.ts
+msgid "Some text holds a control character. Remove it: text holds visible characters, tabs and line breaks only."
+msgstr "Some text holds a control character. Remove it: text holds visible characters, tabs and line breaks only."
+
 #: src/components/flag-on-off.tsx
 msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
 msgstr "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
+
+#: src/lib/problem-messages.ts
+msgid "Someone else changed this at the same moment. Try again."
+msgstr "Someone else changed this at the same moment. Try again."
 
 #: src/lib/problem-messages.ts
 msgid "Someone else changed this since you opened it. Reload to see their changes, then make yours again."
@@ -8878,6 +8894,10 @@ msgstr "The share of units included in the experiment; the others get what the f
 #: src/lib/problem-messages.ts
 msgid "The sink is not ready to be enabled: {failure}."
 msgstr "The sink is not ready to be enabled: {failure}."
+
+#: src/lib/problem-messages.ts
+msgid "The sink was changed or removed meanwhile. Reload it and try again."
+msgstr "The sink was changed or removed meanwhile. Reload it and try again."
 
 #: src/components/sink-secret-dialog.tsx
 msgid "The sink's signing secret"

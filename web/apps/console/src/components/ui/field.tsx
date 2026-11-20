@@ -1,3 +1,4 @@
+import type { I18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
 import { cloneElement, isValidElement, type ReactElement, type ReactNode, useId } from "react";
 
@@ -5,7 +6,7 @@ import { Details } from "@/components/ui/details";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/cn";
 import { ApiError } from "@/lib/errors";
-import { violationsByPointer } from "@/lib/problem-messages";
+import { violationAt, violationMessage } from "@/lib/problem-messages";
 
 type ControlProps = {
   id?: string;
@@ -35,6 +36,11 @@ export type FieldProps = {
   children: ReactElement<ControlProps>;
 };
 
+function violationText(i18n: I18n, refusal: ApiError, pointer: string): string | undefined {
+  const violation = violationAt(refusal, pointer);
+  return violation && violationMessage(i18n, violation);
+}
+
 /**
  * One form field: the label above, then the hint, the control and the
  * error, at one spacing. The control is wired to all three, so a screen
@@ -57,9 +63,7 @@ export function Field({
   const errorId = `${id}-error`;
   const message =
     error ??
-    (refusal instanceof ApiError && pointer
-      ? violationsByPointer(i18n, refusal).get(pointer)
-      : undefined);
+    (refusal instanceof ApiError && pointer ? violationText(i18n, refusal, pointer) : undefined);
   const describedBy = [hint ? hintId : null, message ? errorId : null].filter(Boolean).join(" ");
 
   return (

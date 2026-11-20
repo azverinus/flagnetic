@@ -38,6 +38,30 @@ describe("a refusal in the member's language", () => {
     );
   });
 
+  it("says too many requests for a repeated invitation, with the wait beside rate_limited", () => {
+    expect(problemMessage(i18n, refusal(429, { code: "too_many_requests", retry_after: 60 }))).toBe(
+      "Too many requests. Try again in 1 minute.",
+    );
+    expect(problemMessage(i18n, refusal(429, { code: "too_many_requests" }))).toBe(
+      "Too many requests. Try again later.",
+    );
+  });
+
+  it("explains a control character, a change that met another and the refusals of an experiment's rules and a sink", () => {
+    expect(problemMessage(i18n, refusal(422, { code: "invalid_character" }))).toBe(
+      "Some text holds a control character. Remove it: text holds visible characters, tabs and line breaks only.",
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "concurrent_change" }))).toBe(
+      "Someone else changed this at the same moment. Try again.",
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "experiment_rules_changed" }))).toBe(
+      "A rule that serves an experiment would change. Change it from the experiment instead.",
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "sink_changed" }))).toBe(
+      "The sink was changed or removed meanwhile. Reload it and try again.",
+    );
+  });
+
   it("explains the refusals of deleting or changing an environment or a declaration", () => {
     expect(problemMessage(i18n, refusal(409, { code: "last_environment" }))).toBe(
       "This is the project's last environment. A project always keeps one to serve from.",
@@ -269,5 +293,15 @@ describe("the refusal a form explains above its actions", () => {
     expect(formRefusal(elsewhere, fields)).toBe(elsewhere);
     expect(formRefusal(conflict, fields)).toBe(conflict);
     expect(formRefusal(null, fields)).toBeNull();
+  });
+
+  it("is none when the violation lies inside one of the form's fields", () => {
+    const deep = refusal(422, {
+      code: "invalid_character",
+      errors: [violation("/email/domain")],
+    });
+
+    expect(formRefusal(deep, fields)).toBeUndefined();
+    expect(formRefusal(deep, ["/emailx"])).toBe(deep);
   });
 });

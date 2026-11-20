@@ -755,6 +755,10 @@ msgstr "В правиле — не более {max} условий."
 msgid "A rule has at most {maxConditionsText} conditions."
 msgstr "В правиле — не более {maxConditionsText} условий."
 
+#: src/lib/problem-messages.ts
+msgid "A rule that serves an experiment would change. Change it from the experiment instead."
+msgstr "Изменилось бы правило, которое раздаёт эксперимент. Измените его из самого эксперимента."
+
 #: src/components/tester-panel.tsx
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
 msgstr "Сработал rollout правила: бакет юнита ниже процента rollout."
@@ -6624,6 +6628,10 @@ msgstr "Удалить SMTP-сервер"
 msgid "Remove tag {tag}"
 msgstr "Удалить тег {tag}"
 
+#: src/lib/problem-messages.ts
+msgid "Remove the control character. Text holds visible characters, tabs and line breaks only."
+msgstr "Уберите управляющий символ. В тексте допустимы видимые символы, табуляции и переводы строк."
+
 #: src/components/ui/toolbar.tsx
 msgid "Remove the filter {label}"
 msgstr "Убрать фильтр {label}"
@@ -7573,9 +7581,17 @@ msgstr "Часть показов отклонена и не учтена выш
 msgid "Some fields need correcting."
 msgstr "Исправьте некоторые поля."
 
+#: src/lib/problem-messages.ts
+msgid "Some text holds a control character. Remove it: text holds visible characters, tabs and line breaks only."
+msgstr "В тексте есть управляющий символ. Уберите его: допустимы видимые символы, табуляции и переводы строк."
+
 #: src/components/flag-on-off.tsx
 msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
 msgstr "Кто-то только что изменил эту конфигурацию. Она загружена заново: переключите ещё раз, если всё ещё нужно."
+
+#: src/lib/problem-messages.ts
+msgid "Someone else changed this at the same moment. Try again."
+msgstr "Кто-то изменил это одновременно с вами. Повторите попытку."
 
 #: src/lib/problem-messages.ts
 msgid "Someone else changed this since you opened it. Reload to see their changes, then make yours again."
@@ -8878,6 +8894,10 @@ msgstr "Доля юнитов, попадающих в эксперимент; �
 #: src/lib/problem-messages.ts
 msgid "The sink is not ready to be enabled: {failure}."
 msgstr "Приёмник не готов к включению: {failure}."
+
+#: src/lib/problem-messages.ts
+msgid "The sink was changed or removed meanwhile. Reload it and try again."
+msgstr "Приёмник тем временем изменили или удалили. Загрузите его заново и повторите."
 
 #: src/components/sink-secret-dialog.tsx
 msgid "The sink's signing secret"
