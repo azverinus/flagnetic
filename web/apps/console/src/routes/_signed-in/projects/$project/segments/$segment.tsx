@@ -19,6 +19,7 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/can";
 import { useNewerVersionNotice } from "@/lib/change-stream";
+import { useNewerArrival } from "@/lib/use-form-conflict";
 import { ConflictBanner } from "@/components/conflict-banner";
 import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { QueryError } from "@/components/query-error";
@@ -61,11 +62,13 @@ function SegmentDetail() {
   if (segment.isError && segment.error instanceof ApiError && segment.error.status === 404) {
     return <SegmentNotFound project={project} />;
   }
-  const failed = segment.isError
-    ? { error: segment.error, retry: () => void segment.refetch() }
-    : declarations.state === "failed"
-      ? declarations
-      : undefined;
+  // A refetch that failed keeps the data it held, and with it the editor.
+  const failed =
+    segment.isError && segment.data === undefined
+      ? { error: segment.error, retry: () => void segment.refetch() }
+      : declarations.state === "failed"
+        ? declarations
+        : undefined;
   if (failed) {
     return (
       <Page>
@@ -269,6 +272,15 @@ function SegmentPage({
       setRefusal({ at: new Map(), rest: [problemMessage(i18n, error)] });
     },
   });
+
+  // A newer version the query answered (a refetch after a notice or on
+  // focus) starts a clean form over from it; one with edits meets it at
+  // the notice, or at its save.
+  useNewerArrival(
+    segment,
+    { version, dirty, saving: save.isPending },
+    { clean: restart, dirty: () => undefined },
+  );
 
   // Someone else saved the segment while this form has unsaved edits: the
   // banner shows at once, not at the refusal of Save.

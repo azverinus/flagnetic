@@ -177,15 +177,17 @@ export function useNewerArrival<Entity extends { version: number }>(
   state: { version: number | undefined; dirty: boolean; saving?: boolean },
   on: { clean: (current: Entity) => void; dirty: (current: Entity) => void },
 ) {
-  const latest = useRef({ state, on });
+  const handlers = useRef(on);
   useEffect(() => {
-    latest.current = { state, on };
+    handlers.current = on;
   });
+  const { version, dirty, saving } = state;
+  // Runs again when the form becomes clean, so a newer version that met
+  // edits is picked up once they are saved or discarded.
   useEffect(() => {
-    const { state: held, on: handlers } = latest.current;
-    if (!current || held.version === undefined || held.saving) return;
-    if (current.version <= held.version) return;
-    if (held.dirty) handlers.dirty(current);
-    else handlers.clean(current);
-  }, [current]);
+    if (!current || version === undefined || saving) return;
+    if (current.version <= version) return;
+    if (dirty) handlers.current.dirty(current);
+    else handlers.current.clean(current);
+  }, [current, version, dirty, saving]);
 }

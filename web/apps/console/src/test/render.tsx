@@ -96,3 +96,40 @@ export async function renderWithRouter(
   const result = renderWithProviders(<RouterProvider router={router} />, queryClient);
   return { ...result, router };
 }
+
+/**
+ * Renders the console's own routes at a path, for a test of a page whose
+ * component reads its route: the member is signed in already, so every
+ * other read is the fake server's to answer.
+ */
+export async function renderRoute(
+  path: string,
+  queryClient: QueryClient = signedInClient(),
+): Promise<RenderResult & { router: AnyRouter; queryClient: QueryClient }> {
+  // The shell asks the browser about its colour scheme and width.
+  window.matchMedia ??= ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+    onchange: null,
+  })) as typeof window.matchMedia;
+  // A project's change stream is one that never says anything.
+  globalThis.EventSource ??= class {
+    readyState = 0;
+    addEventListener() {}
+    close() {}
+  } as unknown as typeof EventSource;
+  const { routeTree } = await import("@/routeTree.gen");
+  const router = createRouter({
+    routeTree,
+    context: { queryClient },
+    history: createMemoryHistory({ initialEntries: [path] }),
+  });
+  await router.load();
+  const result = renderWithProviders(<RouterProvider router={router} />, queryClient);
+  return { ...result, router };
+}

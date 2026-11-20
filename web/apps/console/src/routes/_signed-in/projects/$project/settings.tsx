@@ -24,7 +24,7 @@ import { changedFields, descriptionSchema, nameSchema } from "@/lib/forms";
 import { ifMatch } from "@/lib/http";
 import { projectQuery, projectsQuery } from "@/lib/queries";
 import { useNewerVersionNotice } from "@/lib/change-stream";
-import { useFormConflict } from "@/lib/use-form-conflict";
+import { useFormConflict, useNewerArrival } from "@/lib/use-form-conflict";
 import { projectSettingsArea } from "@/components/area-screens";
 import { ProjectSettingsPanel } from "@/components/settings-panels";
 
@@ -95,6 +95,14 @@ function SettingsForm() {
     { kind: "project", key },
     { dirty: isDirty, version: conflicts.version },
     conflicts.meetNewer,
+  );
+  // A newer version the query answered (a refetch after a notice or on
+  // focus) starts a clean form over from it; one with edits meets it at
+  // the notice, or at its save.
+  useNewerArrival(
+    project,
+    { version: conflicts.version, dirty: isDirty, saving: save.isPending },
+    { clean: restart, dirty: () => undefined },
   );
   const send = (at: number) =>
     form.handleSubmit((values) => {
