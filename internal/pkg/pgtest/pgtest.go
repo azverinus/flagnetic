@@ -158,8 +158,27 @@ func newSchemaLocked(ctx context.Context) (connString, schema string, err error)
 	if _, err = conn.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
 		return "", "", fmt.Errorf("create schema: %w", err)
 	}
+	ensureTrigramExtension(ctx, conn)
 	connString, err = withSearchPath(pkg.baseURL, schema)
 	return connString, schema, err
+}
+
+// trigramLock is the advisory lock that serialises creating the trigram
+// extension. Packages test against one database in parallel, and
+// CREATE EXTENSION IF NOT EXISTS is not safe against itself: two sessions
+// that both find it missing collide on the catalog row, which fails the
+// migration that was only asking for it. Creating it here, one session at a
+// time, leaves every migration to find it already there.
+const trigramLock = 7_460_315_001
+
+// ensureTrigramExtension creates pg_trgm in public, as the migrations would. A
+// failure is left for the migration to report: it names the cause better.
+func ensureTrigramExtension(ctx context.Context, conn *pgx.Conn) {
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", trigramLock); err != nil {
+		return
+	}
+	defer func() { _, _ = conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1)", trigramLock) }()
+	_, _ = conn.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public")
 }
 
 func dropSchema(schema string) {
