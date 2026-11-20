@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.4...sdks/dart/v0.1.5) (2026-11-20)
+
+
+### Bug Fixes
+
+* **sdks:** close the Dart and Flutter review findings ([#417](https://github.com/azverinus/flagnetic/issues/417)) ([0ef349e](https://github.com/azverinus/flagnetic/commit/0ef349ea9beab8bbd6a1fe54138382aafa3c15f9))
+* **sdks:** close the JavaScript review findings, add summaryInterval ([#413](https://github.com/azverinus/flagnetic/issues/413)) ([f018603](https://github.com/azverinus/flagnetic/commit/f018603be9a9876438b2490c7bc4efefd23fbe71))
+
 ## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.3...sdks/dart/v0.1.4) (2026-11-17)
 
 
