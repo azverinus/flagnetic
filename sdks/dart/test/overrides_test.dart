@@ -411,6 +411,57 @@ void main() {
       expect(byKey['new_flag']!.overridden, isTrue);
     });
 
+    test('a JSON value handed out is a copy: mutating it changes nothing '
+        'the client serves', () {
+      Map<String, Object?> jsonFlag(Map<String, Object?> value) => {
+        'type': 'json',
+        'value': value,
+        'variation': 'a',
+        'reason': 'targeting_match',
+      };
+      final bootstrap = valuesDoc(
+        flags: {
+          'cfg': jsonFlag({
+            'list': [1],
+          }),
+        },
+      );
+      final client = Flagnetic.client(
+        clientKey,
+        context: testContext,
+        options: ClientOptions(bootstrap: bootstrap, allowOverrides: true),
+      );
+      addTearDown(client.close);
+
+      // The bootstrap map stays the app's.
+      final held =
+          ((bootstrap['flags']! as Map<String, Object?>)['cfg']!
+                  as Map<String, Object?>)['value']!
+              as Map<String, Object?>;
+      (held['list']! as List<Object?>).add(2);
+      expect(client.getJson('cfg', null), {
+        'list': [1],
+      });
+
+      final listed = client.allFlags.single.value! as Map<String, Object?>;
+      (listed['list']! as List<Object?>).add(3);
+      expect(client.getJson('cfg', null), {
+        'list': [1],
+      });
+
+      client.overrides.set('cfg', {
+        'list': [4],
+      });
+      final overridden = client.allFlags.single.value! as Map<String, Object?>;
+      (overridden['list']! as List<Object?>).add(5);
+      final listedOverride =
+          client.overrides.list()['cfg']! as Map<String, Object?>;
+      (listedOverride['list']! as List<Object?>).add(6);
+      expect(client.getJson('cfg', null), {
+        'list': [4],
+      });
+    });
+
     test('empty at stage built_in', () {
       final client = Flagnetic.client('not-a-key', context: testContext);
       addTearDown(client.close);

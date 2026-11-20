@@ -86,10 +86,6 @@ final class ClientOptions {
     this.streamBackoffCap = const Duration(seconds: 30),
     this.streamCloseJitter = const Duration(seconds: 2),
     this.streamSilenceTimeout = const Duration(seconds: 45),
-    @Deprecated(
-      'Ignored: a stream is stable once it has delivered a heartbeat.',
-    )
-    this.streamStableAfter = const Duration(seconds: 60),
   });
 
   /// Where last good values persist; an [InMemoryStore] when null.
@@ -239,10 +235,4 @@ final class ClientOptions {
   /// How long a stream may stay silent before it is reconnected: the server
   /// sends a heartbeat every 15 s.
   final Duration streamSilenceTimeout;
-
-  /// Ignored. A stream is stable once it has delivered a heartbeat, which
-  /// is what restarts the reconnect backoff from [streamBackoff]; it no
-  /// longer depends on how long the connection stays up.
-  @Deprecated('Ignored: a stream is stable once it has delivered a heartbeat.')
-  final Duration streamStableAfter;
 }

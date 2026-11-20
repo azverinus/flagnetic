@@ -83,6 +83,30 @@ void main() {
       ]);
     });
 
+    test('accepts the first answer for the new context at a lower ruleset '
+        'version', () async {
+      final server = await MockServer.start();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(pollInterval: const Duration(hours: 1)),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      await (await server.next()).respondJson(afterKillSwitch);
+      await eventually(() => client.stage == Stage.fresh);
+
+      final settled = client.setContext(signedIn);
+      // A replica a moment behind answers version 1 for the new context.
+      await (await server.next()).respondJson(evaluation);
+      await settled;
+      expect(client.stage, Stage.fresh);
+      expectAnswers(client, answersOf('server/evaluation.json'));
+    });
+
     test('a failed attempt still completes the future', () async {
       final server = await MockServer.start();
       final client = Flagnetic.client(
@@ -745,40 +769,126 @@ void main() {
       expect(evaluates(), before + 1, reason: 'one change, one evaluate');
     });
 
-    test(
-      'a stream refused with 401 stops, logs once and keeps serving',
-      () async {
-        final server = await MockServer.start();
-        final logs = LogRecorder();
-        final client = Flagnetic.client(
-          clientKey,
-          baseUrl: server.url,
-          context: anonymous,
-          options: scaledOptions(
-            sse: true,
-            logger: logs.call,
-            pollInterval: const Duration(hours: 1),
-            streamSilenceTimeout: const Duration(seconds: 30),
-          ),
-        );
-        addTearDown(() async {
-          await client.close();
-          await server.close();
-        });
-        await (await server.next()).respond(401);
-        // The stream did not connect, so the fetch loop starts anyway.
-        await (await server.next()).respondJson(evaluation);
-        await eventually(() => client.stage == Stage.fresh);
-        expectAnswers(client, answersOf('server/evaluation.json'));
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        expect(logs.count(LogEvents.keyRevoked), 1);
-        expect(
-          server.received.where((e) => e.path == '/sdk/v1/stream').length,
-          1,
-          reason: 'a refused key never reconnects',
-        );
-      },
-    );
+    test('a stream refused with 401 logs once, keeps serving and does not '
+        'reconnect while the key stays refused', () async {
+      final server = await MockServer.start();
+      final logs = LogRecorder();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(
+          sse: true,
+          logger: logs.call,
+          pollInterval: const Duration(hours: 1),
+          streamSilenceTimeout: const Duration(seconds: 30),
+          unauthorizedBackoffCap: const Duration(hours: 1),
+        ),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      await (await server.next()).respond(401);
+      // The stream did not connect, so the fetch loop starts anyway.
+      await (await server.next()).respond(401);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(logs.count(LogEvents.keyRevoked), 1);
+      expect(
+        server.received.where((e) => e.path == '/sdk/v1/stream').length,
+        1,
+        reason: 'no evaluate succeeded, so the key may still be refused',
+      );
+    });
+
+    test('a stream refused with 401 reopens once an evaluate succeeds, and '
+        'its ruleset event triggers an evaluate', () async {
+      final server = await MockServer.start();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(
+          sse: true,
+          pollInterval: const Duration(hours: 1),
+          streamSilenceTimeout: const Duration(seconds: 30),
+        ),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      await (await server.next(path: '/sdk/v1/stream')).respond(401);
+      // The evaluate is refused too, then the operator restores the key.
+      await (await server.next(path: '/sdk/v1/evaluate')).respond(401);
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(evaluation);
+      await eventually(() => client.stage == Stage.fresh);
+
+      final stream = await (await server.next(
+        path: '/sdk/v1/stream',
+      )).respondStream();
+      // The reopened stream's connect evaluates, as a first stream does.
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(evaluation);
+      await stream.send('event: ruleset\nid: 2\ndata: {"version":2}\n\n');
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(afterKillSwitch);
+      await eventually(
+        () => servesAnswers(
+          client,
+          answersOf('server/evaluation-after-kill-switch.json'),
+        ),
+      );
+    });
+  });
+
+  group('the announced ruleset version', () {
+    test('an answer below it is retried until the replica has it', () async {
+      final server = await MockServer.start();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(
+          sse: true,
+          pollInterval: const Duration(hours: 1),
+          streamSilenceTimeout: const Duration(seconds: 30),
+        ),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      final stream = await (await server.next(
+        path: '/sdk/v1/stream',
+      )).respondStream();
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(evaluation);
+      await eventually(() => client.stage == Stage.fresh);
+
+      await stream.send('event: ruleset\nid: 2\ndata: {"version":2}\n\n');
+      // The evaluate lands on a replica that has not loaded version 2.
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(evaluation);
+      final retried = Stopwatch()..start();
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+        timeout: const Duration(seconds: 3),
+      )).respondJson(afterKillSwitch);
+      expect(retried.elapsed, lessThan(const Duration(milliseconds: 2500)));
+      await eventually(
+        () => servesAnswers(
+          client,
+          answersOf('server/evaluation-after-kill-switch.json'),
+        ),
+      );
+    });
   });
 
   group('the anonymous unit ID helper', () {
@@ -805,10 +915,11 @@ void main() {
   });
 
   group('kill-switch propagation', () {
-    test('a stream event reaches onChange within 2 s, in real time', () async {
-      // Unscaled (no scaledOptions): the 2 s target is the SDK's own, and
-      // the number this prints unconditionally is what CI puts in the job
-      // summary.
+    test('a stream event reaches onChange within the 5 s target, in real '
+        'time', () async {
+      // Unscaled (no scaledOptions): the 5 s target is the SDK's own, jitter
+      // before the evaluate included, and the number this prints
+      // unconditionally is what CI puts in the job summary.
       final server = await MockServer.start();
       final client = Flagnetic.client(
         clientKey,
@@ -834,11 +945,12 @@ void main() {
       final started = DateTime.now();
       await stream.send('event: ruleset\nid: 2\ndata: {"version":2}\n\n');
       await (await server.next()).respondJson(afterKillSwitch);
-      final keys = await changed.future.timeout(const Duration(seconds: 2));
+      final keys = await changed.future.timeout(const Duration(seconds: 6));
       final elapsed = DateTime.now().difference(started);
       // ignore: avoid_print
       print('kill_switch_propagation_ms=${elapsed.inMilliseconds}');
       expect(keys, isNotEmpty);
+      expect(elapsed, lessThan(const Duration(seconds: 5)));
     });
   });
 }

@@ -172,6 +172,24 @@ void main() {
       );
     });
 
+    test('a store answering after setContext logs no failure', () async {
+      final seeded = await storeHolding(evaluation, context);
+      final server = await startServer();
+      final logs = LogRecorder();
+      final client = clientOf(server, store: _AsyncStore(seeded), logs: logs);
+      // Signing in at start-up, before the store has answered.
+      unawaited(
+        client.setContext(
+          const FlagneticContext(
+            units: {'anonymous': 'd-8f1c', 'user': 'u-1001'},
+          ),
+        ),
+      );
+      await server.next();
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(logs.count(LogEvents.storeFailed), 0);
+    });
+
     test('a store answering with futures loads before the request', () async {
       final seeded = await storeHolding(evaluation, context);
       final server = await startServer();

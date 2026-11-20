@@ -868,6 +868,31 @@ void main() {
       await flushed;
     });
 
+    test(
+      'a summary takes app_version from the context before the option',
+      () async {
+        final run = await serving(
+          experimentValues(),
+          context: const FlagneticContext(
+            units: {'anonymous': 'd-8f1c'},
+            attributes: {'app_version': '2.0.0'},
+          ),
+        );
+        addTearDown(() async {
+          await run.client.close();
+          await run.server.close();
+        });
+        run.client.getBool('checkout', false);
+        final flushed = run.client.flush();
+        final exchange = await run.server.next();
+        final event = eventsOf(exchange).single;
+        expect(event['type'], 'evaluation_summary');
+        expect(event['app_version'], '2.0.0');
+        await acceptBatch(exchange);
+        await flushed;
+      },
+    );
+
     test('summaries ride in the same batch as exposures and aliases', () async {
       final run = await serving(experimentValues());
       addTearDown(() async {

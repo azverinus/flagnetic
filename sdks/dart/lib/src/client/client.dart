@@ -159,6 +159,16 @@ final class FlagneticClient {
   RulesetStream? _rulesetStream;
   int _failures = 0;
   bool _revokedLogged = false;
+  // The generation whose first network answer was accepted.
+  int _answeredGeneration = 0;
+  // The newest ruleset version a stream event announced and no accepted
+  // answer has reached yet.
+  int? _announced;
+  int _catchUps = 0;
+  Timer? _catchUp;
+  // The stream was answered 401 or 403 and stays closed until an evaluate
+  // succeeds.
+  bool _streamRefused = false;
   bool _schemaLogged = false;
   final Set<String> _mismatched = {};
   final Set<String> _ignoredLogged = {};
@@ -199,7 +209,9 @@ final class FlagneticClient {
       return;
     }
     final bootstrap = _options.bootstrap;
-    if (bootstrap != null && _accept(bootstrap, 'bootstrap')) {
+    // The document is copied: the app's map must not be what the getters serve
+    // and what the store keeps.
+    if (bootstrap != null && _accept(copyJson(bootstrap), 'bootstrap')) {
       _firstValues.complete();
     } else {
       _loadStored();
@@ -214,7 +226,7 @@ final class FlagneticClient {
       sdkKey: _sdkKey,
       settings: (
         platform: _platform,
-        appVersion: _options.appVersion,
+        appVersion: () => _predeclared('app_version', _options.appVersion),
         requestTimeout: _options.requestTimeout,
         flushInterval: _options.flushInterval,
         summaryInterval: _options.summaryInterval,
@@ -269,7 +281,9 @@ final class FlagneticClient {
       lastEventId: () => _values?.rulesetVersion.toString(),
       onRuleset: (version) {
         final held = _values?.rulesetVersion;
-        if (held == null || version > held) _waitThenEvaluate();
+        if (held != null && version <= held) return;
+        _announced = max(_announced ?? version, version);
+        _waitThenEvaluate();
       },
       onConnected: () {
         final resume = _resume;
@@ -291,10 +305,12 @@ final class FlagneticClient {
       },
       onRefused: (status) {
         _keyRefused(status);
+        _streamRefused = true;
         final resume = _resume;
         _resume = null;
-        // The stream is done for good; the fetch loop must still start, so
-        // that a key restored by an operator recovers without a restart.
+        // The stream stays closed until an evaluate succeeds; the fetch loop
+        // must still start, so that a key restored by an operator recovers
+        // without a restart.  [_attempt] then reopens the stream.
         if (resume == _Resume.refetch) {
           _trigger(_Trigger.foreground);
         } else if (!_fetchedOnce) {
@@ -353,7 +369,7 @@ final class FlagneticClient {
           FlagSummary(
             key: key,
             type: override.type,
-            value: override.value,
+            value: copyJson(override.value),
             reason: Reasons.localOverride,
             overridden: true,
           ),
@@ -366,7 +382,7 @@ final class FlagneticClient {
         FlagSummary(
           key: key,
           type: flag.type,
-          value: flag.hasValue ? flag.value : null,
+          value: flag.hasValue ? copyJson(flag.value) : null,
           reason: flag.reason,
         ),
       );
@@ -475,6 +491,8 @@ final class FlagneticClient {
       _timer = null;
       _rulesetWait?.cancel();
       _rulesetWait = null;
+      _catchUp?.cancel();
+      _catchUp = null;
       _resume = null;
       // The stream is radio too: it closes with everything else.
       unawaited(_rulesetStream?.suspend() ?? Future<void>.value());
@@ -711,6 +729,8 @@ final class FlagneticClient {
       _timer = null;
       _rulesetWait?.cancel();
       _rulesetWait = null;
+      _catchUp?.cancel();
+      _catchUp = null;
       await _rulesetStream?.close();
       if (!_firstValues.isCompleted) _firstValues.complete();
       for (final waiter in _waiters) {
@@ -1136,11 +1156,57 @@ final class FlagneticClient {
       }
       return _Outcome.success;
     }
-    if (!_accept(json, 'network')) return _Outcome.failure;
+    // The held values answer the previous context, whose ruleset version a
+    // replica a moment behind may not have reached: the first answer for a
+    // new context is accepted at any version.
+    if (!_accept(
+      json,
+      'network',
+      anyVersion: generation != _answeredGeneration,
+    )) {
+      return _Outcome.failure;
+    }
+    _answeredGeneration = generation;
     _revokedLogged = false;
     _persist(context.units, _values!, _receivedAt!);
     if (!_firstValues.isCompleted) _firstValues.complete();
+    _reopenStream();
+    _catchUpTo(_values!.rulesetVersion);
     return _Outcome.success;
+  }
+
+  /// Reopens a stream the key's refusal closed, once an evaluate shows the
+  /// key works again.
+  void _reopenStream() {
+    if (!_streamRefused) return;
+    _streamRefused = false;
+    if (_foreground) _rulesetStream?.start();
+  }
+
+  /// An evaluate balanced to a replica that has not loaded the announced
+  /// version answers an older one, which is accepted: the next attempt would
+  /// be the poll, minutes away. Retries after 1, 2 and 4 s while the answer
+  /// stays below the announcement, then lets the announcement go.
+  void _catchUpTo(int version) {
+    final announced = _announced;
+    if (announced == null || version >= announced) {
+      _announced = null;
+      _catchUps = 0;
+      _catchUp?.cancel();
+      _catchUp = null;
+      return;
+    }
+    if (_catchUps >= _catchUpDelays.length) {
+      _announced = null;
+      _catchUps = 0;
+      return;
+    }
+    final delay = _catchUpDelays[_catchUps++];
+    _catchUp?.cancel();
+    _catchUp = Timer(delay, () {
+      _catchUp = null;
+      _trigger(_Trigger.ruleset);
+    });
   }
 
   /// The SDK key was refused with 401 or 403; logged once until a request
@@ -1197,7 +1263,8 @@ final class FlagneticClient {
   // The store.
 
   void _loadStored() {
-    final key = _keys.lastGood(_context.units);
+    final units = _context.units;
+    final key = _keys.lastGood(units);
     final FutureOr<String?> entry;
     try {
       entry = _store.get(key);
@@ -1207,23 +1274,28 @@ final class FlagneticClient {
     }
     if (entry is Future<String?>) {
       _storeLoaded = entry.then(
-        (raw) => _applyStored(key, raw),
+        (raw) => _applyStored(key, units, raw),
         onError: (Object e) => _storeFailed('get', key, e),
       );
     } else {
-      _applyStored(key, entry);
+      _applyStored(key, units, entry);
     }
   }
 
-  void _applyStored(String key, String? raw) {
+  /// Serves the last good entry read for [units]. A store answering late
+  /// may do so after [setContext] replaced the context: the entry then
+  /// answers a unit set nothing asks for any more, which is no failure of the
+  /// store.
+  void _applyStored(String key, Map<String, String> units, String? raw) {
     if (raw == null || _values != null) return;
+    if (!sameUnits(units, _context.units)) return;
     try {
       final entry = jsonDecode(raw);
       if (entry case {
-        'units': final Map<String, Object?> units,
+        'units': final Map<String, Object?> stored,
         'received_at': final String receivedAt,
         'values': final Object? values,
-      } when sameUnits(units.cast<String, String>(), _context.units)) {
+      } when sameUnits(stored.cast<String, String>(), units)) {
         final doc = ValuesDocument.parse(values);
         _values = doc;
         _valuesAnswerContext = true;
@@ -1314,6 +1386,12 @@ final class FlagneticClient {
   void _log(LogLevel level, String event, Map<String, Object?> fields) =>
       emitLog(_options.logger, level, event, fields);
 }
+
+const _catchUpDelays = [
+  Duration(seconds: 1),
+  Duration(seconds: 2),
+  Duration(seconds: 4),
+];
 
 /// The test helpers of an offline client: no network at all, stage
 /// `fresh`, events recorded in memory.
