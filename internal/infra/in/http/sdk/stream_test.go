@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/infra/config"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
@@ -464,7 +465,10 @@ func TestAnOriginRemovedFromAKeyHasItsStreamClosedOnTheNextHeartbeat(t *testing.
 
 func TestAnOriginTheKeyStillListsKeepsItsStreamAcrossHeartbeats(t *testing.T) {
 	c := fakeClock()
-	srv := testkit.StartServer(t, testkit.WithClock(c))
+	// The wait below opens a stream every few milliseconds until the replica
+	// has learnt of the change, on a clock that does not move: the
+	// per-minute connect budget must not run out before it has.
+	srv := testkit.StartServer(t, testkit.WithClock(c), limits(func(l *config.RateLimits) { l.ClientStreamConnects = 1_000_000 }))
 	p := newProject(t, srv)
 	k, value := p.clientKeyWithOrigins(t, "https://app.example.com")
 	origin := func(_ context.Context, req *http.Request) error {

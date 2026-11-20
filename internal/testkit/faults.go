@@ -1,10 +1,13 @@
 package testkit
 
 import (
+	"bytes"
+	"context"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -95,4 +98,46 @@ func RaiseEventTransactionOffset(t testing.TB, pool *pgxpool.Pool, offset int64)
 func DropClusterRecord(t testing.TB, pool *pgxpool.Pool) {
 	t.Helper()
 	exec(t, pool, "dropping the cluster record", `DROP TABLE event_cluster CASCADE`)
+}
+
+// CopyTableAsALogicalRestore copies the rows of table from one cluster's
+// database to another's as a logical dump and its restore do: the rows as
+// they were, over those the migrations seeded, whatever the new cluster's
+// transaction counter reads. No API moves a database to another cluster.
+func CopyTableAsALogicalRestore(t testing.TB, from, to *pgxpool.Pool, table string) {
+	t.Helper()
+	name := pgx.Identifier{table}.Sanitize()
+	exec(t, to, "emptying "+table+" for the restore", "TRUNCATE "+name)
+	var dump bytes.Buffer
+	src, err := from.Acquire(t.Context())
+	if err != nil {
+		t.Fatalf("dumping %s: %v", table, err)
+	}
+	defer src.Release()
+	if _, err = src.Conn().PgConn().CopyTo(t.Context(), &dump, "COPY (SELECT * FROM "+name+") TO STDOUT"); err != nil {
+		t.Fatalf("dumping %s: %v", table, err)
+	}
+	dst, err := to.Acquire(t.Context())
+	if err != nil {
+		t.Fatalf("restoring %s: %v", table, err)
+	}
+	defer dst.Release()
+	if _, err = dst.Conn().PgConn().CopyFrom(t.Context(), &dump, "COPY "+name+" FROM STDIN"); err != nil {
+		t.Fatalf("restoring %s: %v", table, err)
+	}
+}
+
+// HoldEvaluationSummariesOpenForReading holds the evaluation summaries' parent
+// table as a reader that stays open does, until the test ends: a long report
+// query no API keeps running on demand.
+func HoldEvaluationSummariesOpenForReading(t testing.TB, pool *pgxpool.Pool) {
+	t.Helper()
+	reader, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatalf("opening the reader: %v", err)
+	}
+	t.Cleanup(func() { _ = reader.Rollback(context.Background()) })
+	if _, err = reader.Exec(t.Context(), `LOCK TABLE evaluation_summary_events IN ACCESS SHARE MODE`); err != nil {
+		t.Fatalf("holding the evaluation summaries: %v", err)
+	}
 }

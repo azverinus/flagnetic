@@ -459,17 +459,9 @@ func TestACopyOfARefusedEventIsRefusedNotADuplicate(t *testing.T) {
 func TestCreatingAPartitionGivesUpRatherThanStallInserts(t *testing.T) {
 	testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	reader, err := pool.Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = reader.Rollback(t.Context()) }()
-	// A reader that stays open holds the parent table for as long as it runs.
-	if _, err = reader.Exec(t.Context(), `LOCK TABLE evaluation_summary_events IN ACCESS SHARE MODE`); err != nil {
-		t.Fatal(err)
-	}
+	testkit.HoldEvaluationSummariesOpenForReading(t, pool)
 	start := time.Now()
-	err = pgevents.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
+	err := pgevents.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
 	if err == nil {
 		t.Fatal("a partition was attached while a reader held its parent")
 	}

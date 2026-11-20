@@ -1,14 +1,12 @@
 package postgres_test
 
 import (
-	"bytes"
 	"context"
 	"io/fs"
 	"testing"
 	"testing/fstest"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
 
@@ -31,33 +29,6 @@ func migrated(t *testing.T, url string) *pgxpool.Pool {
 		t.Fatal(err)
 	}
 	return pool
-}
-
-// copyTable copies a table's rows between clusters as a logical dump and its
-// restore do: the rows as they were, whatever the new cluster's counter reads.
-func copyTable(t *testing.T, from, to *pgxpool.Pool, table string) {
-	t.Helper()
-	// A restore brings the dump's rows over those the migrations seeded.
-	if _, err := to.Exec(t.Context(), "TRUNCATE "+pgx.Identifier{table}.Sanitize()); err != nil {
-		t.Fatal(err)
-	}
-	var dump bytes.Buffer
-	src, err := from.Acquire(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer src.Release()
-	if _, err = src.Conn().PgConn().CopyTo(t.Context(), &dump, "COPY (SELECT * FROM "+pgx.Identifier{table}.Sanitize()+") TO STDOUT"); err != nil {
-		t.Fatal(err)
-	}
-	dst, err := to.Acquire(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dst.Release()
-	if _, err = dst.Conn().PgConn().CopyFrom(t.Context(), &dump, "COPY "+pgx.Identifier{table}.Sanitize()+" FROM STDIN"); err != nil {
-		t.Fatal(err)
-	}
 }
 
 // A logical dump moves the rows and the cursors of the streams reading them
@@ -111,7 +82,7 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, table := range []string{"event_cluster", "rollup_cursors", "alias_events"} {
-		copyTable(t, old, fresh, table)
+		testkit.CopyTableAsALogicalRestore(t, old, fresh, table)
 	}
 
 	adopted, err := postgres.AdoptCluster(ctx, fresh)

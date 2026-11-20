@@ -22,9 +22,9 @@ var (
 	createdTable = regexp.MustCompile(`(?im)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)`)
 	droppedTable = regexp.MustCompile(`(?im)^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-z_][a-z0-9_]*)`)
 	// statement is how SQL that reads or writes rows starts.
-	statement = regexp.MustCompile(`(?is)^\s*(?:--[^\n]*\n\s*)*(?:select|insert|update|delete|with|truncate|copy)\b`)
+	statement = regexp.MustCompile(`(?is)^\s*(?:--[^\n]*\n\s*)*(?:select|insert|update|delete|with|truncate|copy|lock)\b`)
 	// tableReference is a name following the words that take a table.
-	tableReference = regexp.MustCompile(`(?i)\b(?:from|join|into|update|truncate(?:\s+table)?|copy)\s+(?:only\s+)?([a-z_][a-z0-9_]*)`)
+	tableReference = regexp.MustCompile(`(?i)\b(?:from|join|into|update|truncate(?:\s+table)?|copy|lock(?:\s+table)?)\s+(?:only\s+)?([a-z_][a-z0-9_]*)`)
 )
 
 // faultHelpers are the files of the test kit allowed to run a statement on
@@ -144,6 +144,7 @@ func TestTheTableGuardFindsEveryStatementOnATable(t *testing.T) {
 			"`insert into alias_events (a) values (1)`,\n" +
 			"`WITH x AS (SELECT 1) SELECT * FROM scim_tokens`,\n" +
 			"`SELECT count(*) FROM pg_stat_activity`,\n" +
+			"`LOCK TABLE alias_events IN ACCESS SHARE MODE`,\n" +
 			"\"reading rows from alias_events failed\",\n" +
 			"}\n")},
 		"testkit/server.go":  {Data: []byte("package testkit\nvar _ = `DELETE FROM scim_tokens`\n")},
@@ -153,7 +154,7 @@ func TestTheTableGuardFindsEveryStatementOnATable(t *testing.T) {
 		"testdata/x_test.go": {Data: []byte("package x\nvar _ = `DELETE FROM scim_tokens`\n")},
 	}
 	found := tableStatements(t, fsys, tables)
-	if len(found) != 5 {
-		t.Errorf("found %d statements, want the 4 of a_test.go and the one of testkit/server.go:\n%s", len(found), strings.Join(found, "\n"))
+	if len(found) != 6 {
+		t.Errorf("found %d statements, want the 5 of a_test.go and the one of testkit/server.go:\n%s", len(found), strings.Join(found, "\n"))
 	}
 }
