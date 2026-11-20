@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks that the ci-ok job of a workflow needs every other job in it. ci-ok
-# is the only check branch protection requires, so a job it does not need
-# could fail without blocking a merge.
+# is the one check of this workflow that branch protection requires (the pull
+# request title, the DCO sign-off and CodeQL report from their own
+# workflows), so a job it does not need could fail without blocking a merge.
 set -euo pipefail
 
 workflow="${1:-.github/workflows/ci.yml}"

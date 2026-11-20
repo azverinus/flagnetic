@@ -428,6 +428,13 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       - name: ci-ok needs every job
         run: .github/scripts/check-ci-ok.sh
+      # Warnings and errors only: the notes of lower severity differ between
+      # versions of shellcheck, and actionlint above checks the run: blocks
+      # of the workflows, not these files.
+      - name: Lint the scripts
+        run: shellcheck -x --severity=warning .github/scripts/*.sh
+      - name: The plan follows its rules
+        run: .github/scripts/ci-plan-test.sh
 
   docker:
     name: docker build
@@ -988,9 +995,11 @@ jobs:
           echo "::warning title=rolling upgrade::The rolling-upgrade test failed. It only reports until the server has released v1.0.0."
           echo "**Rolling upgrade failed; report-only until v1.0.0 is tagged.**" >> "$GITHUB_STEP_SUMMARY"
 
-  # The one check branch protection requires. A job above may be skipped (a
-  # module matrix with nothing to run, a job behind a condition), which is
-  # fine; a failed or cancelled one is not.
+  # The one check of this workflow that branch protection requires (the pull
+  # request title, the DCO sign-off and CodeQL report from their own
+  # workflows). A job above may be skipped (a module matrix with nothing to
+  # run, a job behind a condition), which is fine; a failed or cancelled one
+  # is not.
   ci-ok:
     name: ci-ok
     needs: [plan, lint, test, coverage, vuln, npm-audit, tidy, console, docs, e2e, sdk-e2e, load, upgrade, sdk-ruby, sdk-python, workflows, migrations, helm, docker, module, released, dart, flutter, sdk-js]

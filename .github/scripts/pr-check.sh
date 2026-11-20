@@ -13,11 +13,14 @@
 # origin/main, committed or not. The rules are those of CI: both read them
 # from ci-plan.sh.
 #
-#   always            DCO sign-off of the commits, and the workflows (actionlint)
-#                     when one changed
+#   always            DCO sign-off of the commits
+#   workflows or      actionlint and the ci-ok needs, shellcheck of the scripts
+#   scripts changed   and the self-test of the plan (ci-plan-test.sh); not run
+#                     without shellcheck installed
 #   Go changed        go.mod tidy of every module of go.work, generated code
 #                     current, govulncheck
 #   server changed    build and golangci-lint
+#   e2e changed       golangci-lint of the end-to-end harness
 #   a Go module       lint, tests with its coverage floors, when it or a module
 #                     it requires changed
 #   migrations changed  squawk on the migrations added or changed since the merge
@@ -41,9 +44,13 @@
 #                     a failure of CI, not before every push.
 #
 # Never replicated, left to CI: CodeQL, the docker build, the oldest Go release
-# of the module matrix, the other PostgreSQL versions (tests run on one), the
-# browsers of the SDK suites, the released-requirements check, the
-# end-to-end suites, and Playwright beyond the specs that changed.
+# of the module matrix, the newest PostgreSQL (the tests here run on the oldest
+# supported one, the version CI tests a pull request on), the browsers of the
+# SDK suites, the released-requirements check, the end-to-end suites of the
+# console and of the SDKs, Playwright beyond the specs that changed, the SDK
+# API load run, the rolling-upgrade test, `pnpm audit` of the lockfiles,
+# chart-testing (`ct lint` and the installs on kind), and the pull request
+# title check.
 #
 # The heavy steps (lint, tests, builds) run under a lock shared by every
 # checkout on the machine, so several sessions queue instead of heating it
@@ -56,8 +63,10 @@
 #   PR_CHECK_NICE       niceness of the heavy steps; default 10
 #   PR_CHECK_LOCK       the lock; default under ~/.local/state/flagnetic
 #   PR_CHECK_POSTGRES   PostgreSQL major version of the shared test database
-#                       container; default 17. DATABASE_URL, when set, is used
-#                       instead of the container.
+#                       container; default the oldest supported one, which CI
+#                       tests a pull request on (POSTGRES_OLDEST of
+#                       ci-plan.sh). DATABASE_URL, when set, is used instead
+#                       of the container.
 #   PR_CHECK_PG_PORT    its host port; default 54329
 #   PR_CHECK_TEST_FLAGS extra flags for the server's go test (-run, -skip), for
 #                       diagnosing one failure. A run with them is not the
@@ -76,7 +85,6 @@ P="${PR_CHECK_P:-4}"
 PARALLEL="${PR_CHECK_PARALLEL:-4}"
 NICE="${PR_CHECK_NICE:-10}"
 LOCK="${PR_CHECK_LOCK:-${XDG_STATE_HOME:-$HOME/.local/state}/flagnetic/pr-check.lock}"
-PG_VERSION="${PR_CHECK_POSTGRES:-17}"
 PG_PORT="${PR_CHECK_PG_PORT:-54329}"
 PG_CONTAINER="flagnetic-pr-check-postgres"
 TEST_FLAGS="${PR_CHECK_TEST_FLAGS:-}"
@@ -230,17 +238,19 @@ UNCOMMITTED="$(git status --porcelain | wc -l | tr -d ' ')"
 # What the change needs is decided by the script CI asks too.
 # shellcheck source=.github/scripts/ci-plan.sh
 . "$ROOT/.github/scripts/ci-plan.sh"
+PG_VERSION="${PR_CHECK_POSTGRES:-$(postgres_oldest)}"
 plan_changed "$BASE"
 if [ -z "$CHANGED" ]; then
   say "pr-check: no change since the merge base with $BASE_REF ($(git rev-parse --short "$BASE")); nothing to check"
   exit 0
 fi
-PLAN_MODE=pr
+PLAN_MODE="pr"
 plan_compute
 SPECS="$(printf '%s\n' "$CHANGED" | grep -E '^web/e2e/.*\.spec\.ts$' | while read -r s; do [ -f "$s" ] && echo "${s#web/e2e/}"; done)"
 
 print_plan() {
   say "pr-check plan (base $(git rev-parse --short "$BASE") = merge base with $BASE_REF; $(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ') files changed, $UNCOMMITTED uncommitted)"
+  say "  PostgreSQL for the tests: $PG_VERSION (--full)"
   say "  Go changed: $ANY_GO   server: $SERVER   wide (go.mod/go.sum/go.work of the root): $WIDE"
   say "  changed packages: $(printf '%s' "$CHANGED_PKGS" | tr '\n' ' ')"
   if [ "$RUN_TESTS" = 1 ]; then
@@ -262,6 +272,10 @@ tree_fingerprint() { # one line per modified or untracked file with its content 
     [ -f "$f" ] && printf '%s %s\n' "$(git hash-object "$f")" "$f"
   done
 }
+
+# Warnings and errors only: the notes of lower severity differ between
+# versions of shellcheck, so they would fail CI on a runner's version alone.
+shellcheck_scripts() { shellcheck -x --severity=warning .github/scripts/*.sh; }
 
 dco() { git log --format=%H "$BASE..HEAD" | grep -q . && .github/scripts/check-dco.sh "$BASE" HEAD || true; }
 
@@ -294,6 +308,11 @@ ensure_postgres() {
   if [ -n "${DATABASE_URL:-}" ]; then return 0; fi
   command -v docker >/dev/null 2>&1 || { echo "docker is not installed: set DATABASE_URL to a PostgreSQL or install Docker"; return 1; }
   docker info >/dev/null 2>&1 || { echo "the Docker daemon is not running: start it, or set DATABASE_URL to a PostgreSQL"; return 1; }
+  # A container left by a run with another version would answer for this one.
+  if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER" &&
+    [ "$(docker inspect -f '{{.Config.Image}}' "$PG_CONTAINER" 2>/dev/null)" != "postgres:$PG_VERSION-alpine" ]; then
+    docker rm -f "$PG_CONTAINER" >/dev/null || return 1
+  fi
   if ! docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
     # One database for every run on the machine, in memory and without
     # fsync: each test package works in a schema of its own, as it does in
@@ -330,7 +349,7 @@ server_tests() {
   args="-race -count=1 -timeout 20m -p $P -parallel $PARALLEL"
   if [ -n "$COVER_PKGS" ]; then args="$args -coverpkg=$COVER_PKGS -coverprofile=$WORK/coverage.out"; fi
   # shellcheck disable=SC2086
-  nice -n "$NICE" go test $args $TEST_FLAGS $(printf '%s ' $TEST_PKGS)
+  nice -n "$NICE" go test $args $TEST_FLAGS $TEST_PKGS
 }
 
 server_coverage() {
@@ -388,6 +407,10 @@ fi
 if [ "$RUN_WORKFLOWS" = 1 ]; then
   step "actionlint and ci-ok" digest_tail "fix the workflow; a new job of ci.yml goes into the needs of ci-ok" \
     bash -c "$ACTIONLINT && .github/scripts/check-ci-ok.sh"
+  if command -v shellcheck >/dev/null 2>&1; then
+    step "shellcheck (.github/scripts)" digest_tail "fix what shellcheck says; a disable comment names the rule and why" shellcheck_scripts
+  else not_run "shellcheck (.github/scripts)" "shellcheck is not installed"; fi
+  step "plan self-test" digest_tail "a rule of ci-plan.sh leaves out a check a path needs, or the test is out of date" .github/scripts/ci-plan-test.sh
 fi
 
 # --- heavy checks, one machine-wide queue
@@ -397,6 +420,7 @@ fi
 HEAVY=0
 [ -n "$TEST_PKGS" ] && HEAVY=1
 [ "$SERVER" = 1 ] && HEAVY=1
+[ "$E2E_TOUCHED" = 1 ] && HEAVY=1
 for i in "${!MOD_PATH[@]}"; do [ "${MOD_RUN[$i]}" = 1 ] && HEAVY=1; done
 [ "$RUN_CONSOLE$RUN_DOCS$RUN_SDK_JS$RUN_PYTHON$RUN_RUBY$RUN_DART$RUN_FLUTTER" != "0000000" ] && HEAVY=1
 WAITED=0
@@ -414,6 +438,10 @@ for i in "${!MOD_PATH[@]}"; do
     step "golangci-lint (${MOD_REL[$i]})" digest_lint "fix the findings" lint_module "${MOD_REL[$i]}"
   fi
 done
+# The end-to-end harness is no published module, but CI lints it.
+if [ "$E2E_TOUCHED" = 1 ]; then
+  step "golangci-lint (e2e)" digest_lint "fix the findings" lint_module e2e
+fi
 
 if [ -n "$TEST_PKGS" ]; then
   dns_answers_unknown_names

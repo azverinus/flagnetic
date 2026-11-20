@@ -118,6 +118,17 @@ updates:
       interval: weekly
     commit-message:
       prefix: build
+  # The Python SDK has no runtime dependency; its lockfile pins the
+  # development tools that run in CI and on developer machines.
+  - package-ecosystem: uv
+    directory: /sdks/python
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(sdk-python)"
+    groups:
+      sdk-python:
+        patterns: ["*"]
   - package-ecosystem: pub
     directory: /sdks/dart
     schedule:
