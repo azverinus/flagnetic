@@ -44,7 +44,7 @@ const (
 // limiter counts the requests of the SDK API against its limits, in memory
 // on each replica: fixed one-minute windows per endpoint and key (and
 // client IP for a client key), the malformed or unknown keys per client
-// IP, the streams each key holds open, and the streams all client keys hold
+// IP, the ruleset streams each key holds open, and the ruleset streams all client keys hold
 // open together. A client IP is counted as subnet.Of groups it: an IPv6
 // client by its whole /64, which it can rotate through at will.
 type limiter struct {
@@ -56,9 +56,9 @@ type limiter struct {
 	windows  map[string]*window
 	failures map[netip.Prefix]*window
 	streams  map[string]int
-	// clientStreams is the number of streams client keys hold open.
+	// clientStreams is the number of ruleset streams client keys hold open.
 	clientStreams int
-	// keyStreams is the number of streams each client key holds open.
+	// keyStreams is the number of ruleset streams each client key holds open.
 	keyStreams map[delivery.SDKKeyID]int
 	// windowsSwept and failuresSwept are when each map was last swept.
 	windowsSwept, failuresSwept time.Time
@@ -85,8 +85,8 @@ func newLimiter(limits config.RateLimits, c clock.Clock, reg prometheus.Register
 }
 
 // perMinute returns the per-minute limit of ep for a key of kind, 0 when
-// none applies: a server key's stream connects are bounded by its
-// concurrent streams alone, and a client key never reaches the ruleset.
+// none applies: a server key's ruleset stream connects are bounded by its
+// concurrent ruleset streams alone, and a client key never reaches the ruleset.
 func (l *limiter) perMinute(ep endpoint, kind delivery.SDKKeyKind) int {
 	switch {
 	case kind == delivery.SDKKeyClient && ep == endpointEvaluate:
@@ -105,7 +105,7 @@ func (l *limiter) perMinute(ep endpoint, kind delivery.SDKKeyKind) int {
 	return 0
 }
 
-// concurrent returns the limit of the streams a key of kind holds at once.
+// concurrent returns the limit of the ruleset streams a key of kind holds at once.
 func (l *limiter) concurrent(kind delivery.SDKKeyKind) int {
 	if kind == delivery.SDKKeyClient {
 		return l.limits.ClientConcurrentStreams
@@ -184,7 +184,7 @@ func (l *limiter) failed(ip netip.Addr) {
 }
 
 // take counts a request of key from ip to ep against its per-minute limit
-// and, for a stream, holds one of the key's stream slots until release is
+// and, for a ruleset stream, holds one of the key's ruleset stream slots until release is
 // called. It sets the headers telling the SDK its budget, or refuses the
 // request.
 func (l *limiter) take(w http.ResponseWriter, ep endpoint, key delivery.SDKKey, ip netip.Addr) (release func(), err error) {
@@ -211,17 +211,17 @@ func (l *limiter) take(w http.ResponseWriter, ep endpoint, key delivery.SDKKey, 
 	return l.hold(w, key, ip)
 }
 
-// clientKeyShare is the fraction of the replica's places for client streams
+// clientKeyShare is the fraction of the replica's places for client ruleset streams
 // one client key may hold, as 1/clientKeyShare: a client key is public, so
 // whoever holds one could otherwise fill the replica's places from many
 // addresses and leave the client SDKs of every other project polling.
 const clientKeyShare = 4
 
-// hold takes one of the stream slots of key from ip and, for a client key,
-// one of the replica's places for client streams, of which the key may hold
+// hold takes one of the ruleset stream slots of key from ip and, for a client key,
+// one of the replica's places for client ruleset streams, of which the key may hold
 // a quarter: a client key is public, so its holders together must not tie
 // up every connection the replica can hold, nor one key's holders every
-// place. A stream's answer tells the budget of its key's slots, which
+// place. A ruleset stream's answer tells the budget of its key's slots, which
 // is what bounds it while it is open.
 func (l *limiter) hold(w http.ResponseWriter, key delivery.SDKKey, ip netip.Addr) (func(), error) {
 	limit := l.concurrent(key.Kind)
@@ -235,7 +235,7 @@ func (l *limiter) hold(w http.ResponseWriter, key delivery.SDKKey, ip netip.Addr
 	sk := counterKey(endpointStream, key, ip)
 	l.mu.Lock()
 	held := l.streams[sk]
-	// No window ends a held stream: the SDK tries again shortly.
+	// No window ends a held ruleset stream: the SDK tries again shortly.
 	if limit > 0 && held >= limit {
 		l.mu.Unlock()
 		return nil, l.refuse(w, endpointStream, string(key.Kind), limit, time.Second)

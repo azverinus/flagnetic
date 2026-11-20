@@ -1,0 +1,1354 @@
+{
+  "name": "dates/grammar",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": false
+    },
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [
+      {
+        "key": "at",
+        "type": "date"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "case_00",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_01",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_02",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_03",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_04",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_05",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_06",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_07",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_08",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_09",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_10",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_11",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_12",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_13",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_14",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_15",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_16",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_17",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_18",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_19",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_20",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_21",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_22",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "case_23",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "at",
+                "op": "before",
+                "value": "2030-01-01T00:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "accepts a one-digit hour",
+      "flag": "case_00",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T1:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "accepts a comma before the fraction",
+      "flag": "case_01",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00,5Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "accepts an offset of +24:00",
+      "flag": "case_02",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00+24:00"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "accepts an offset of -23:59",
+      "flag": "case_03",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00-23:59"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "accepts an offset of +24:60",
+      "flag": "case_04",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00+24:60"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "accepts more than nine fraction digits, truncated",
+      "flag": "case_05",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00.1234567891234Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "accepts a fraction of one digit",
+      "flag": "case_06",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00.5Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "accepts a numeric offset in place of Z",
+      "flag": "case_07",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00+02:00"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1"
+      }
+    },
+    {
+      "name": "rejects a lower-case t",
+      "flag": "case_08",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19t01:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a lower-case z",
+      "flag": "case_09",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a space for T",
+      "flag": "case_10",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19 01:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects no offset",
+      "flag": "case_11",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects an offset without a colon",
+      "flag": "case_12",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00+0200"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects an offset of +25:00",
+      "flag": "case_13",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00+25:00"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects an offset of +00:61",
+      "flag": "case_14",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00+00:61"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects hour 24",
+      "flag": "case_15",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T24:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects second 60",
+      "flag": "case_16",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:60Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a date alone",
+      "flag": "case_17",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a day past the month's end",
+      "flag": "case_18",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-02-30T01:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects February 29 in a common year",
+      "flag": "case_19",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2025-02-29T01:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a fraction with no digits",
+      "flag": "case_20",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00.Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a two-digit year",
+      "flag": "case_21",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "26-09-19T01:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a trailing space",
+      "flag": "case_22",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-19T01:00:00Z "
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    },
+    {
+      "name": "rejects a non-ASCII digit",
+      "flag": "case_23",
+      "context": {
+        "units": {},
+        "attributes": {
+          "at": "2026-09-١9T01:00:00Z"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "automatic_exposure": false,
+        "override_influenced": false,
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough"
+      }
+    }
+  ]
+}

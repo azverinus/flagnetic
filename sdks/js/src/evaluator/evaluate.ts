@@ -109,10 +109,10 @@ export interface ExperimentDetail {
 }
 
 /** What an unsupported construct is. */
-export type ConstructKind = "operator" | "condition_kind" | "serve_kind";
+export type ConstructKind = "operator" | "condition_kind" | "serve_kind" | "attribute_type";
 
 /**
- * An operator, condition kind or serve kind of a ruleset that this
+ * An operator, condition kind, serve kind or attribute type of a ruleset that this
  * evaluator does not know, typically sent by a server newer than the SDK.
  */
 export interface Construct {
@@ -205,7 +205,7 @@ interface CompiledFlag {
   readonly variations: ReadonlyMap<string, { readonly value?: JsonValue }>;
   readonly rules: readonly (readonly CompiledCondition[])[];
   // By rule index, whether the rule's serve breaks the invariants every
-  // experiment serve holds (see validExperiment), so evaluation reaching one
+  // rollout or experiment serve holds (see validRollout and validExperiment), so evaluation reaching one
   // answers inconsistent_ruleset without checking them again.
   readonly invalidServes: readonly boolean[];
 }
@@ -231,6 +231,7 @@ const OPERATORS: ReadonlySet<string> = new Set([
 ]);
 
 const CONDITION_KINDS: ReadonlySet<string> = new Set(["attribute", "in_segment", "not_in_segment", "prerequisite"]);
+const ATTRIBUTE_TYPES: ReadonlySet<string> = new Set(["string", "number", "boolean", "semver", "date", "list"]);
 const SERVE_KINDS: ReadonlySet<string> = new Set(["variation", "rollout", "experiment"]);
 
 // unsupported names a construct of a kind this evaluator does not know. A
@@ -260,6 +261,7 @@ function buildIndex(doc: RulesetDocument): Index {
         if (!OPERATORS.has(c.op)) return { kind: "inconsistent", ...withConstruct(unsupported("operator", c.op)) };
         const type = types.get(c.attribute);
         if (type === undefined) return inconsistent;
+        if (!ATTRIBUTE_TYPES.has(type)) return { kind: "inconsistent", ...withConstruct(unsupported("attribute_type", type)) };
         try {
           return { kind: "attribute", attribute: c.attribute, unit: units.has(c.attribute), match: compileOperator(type, c.op, c.value) };
         } catch {
@@ -311,10 +313,21 @@ function buildIndex(doc: RulesetDocument): Index {
     });
     if (found.length > 0) unsupportedByFlag.set(f.key, found);
     const variations = new Map(f.variations.map((v) => [v.key, v]));
-    const invalidServes = f.rules.map((r) => r.serve.kind === "experiment" && !validExperiment(r.serve, variations));
+    const invalidServes = f.rules.map(
+      (r) =>
+        (r.serve.kind === "rollout" && !validRollout(r.serve)) ||
+        (r.serve.kind === "experiment" && !validExperiment(r.serve, variations)),
+    );
     flags.set(f.key, { doc: f, variations, rules, invalidServes });
   }
   return { flags, segments, unsupported: unsupportedByFlag };
+}
+
+// validRollout reports whether a rollout serve holds what bucketing a unit
+// relies on: a unit type and a salt, and a percentage within 0 to 10000. The
+// variation is checked when it is served.
+function validRollout(s: ServeDocument): boolean {
+  return s.unit_type !== "" && s.salt !== "" && s.percentage >= 0 && s.percentage <= BUCKETS;
 }
 
 // validExperiment reports whether an experiment serve holds what assigning a
@@ -400,7 +413,12 @@ class Evaluation {
       if (this.unit(o.unit_type) !== o.unit_id) continue;
       const r = serve(f, o.variation, { reason: "override", override_influenced: true });
       if (r.reason === "error") return r;
+      // The shadow runs while f is still on the prerequisite path, so what it
+      // memoizes through a cycle must not outlive it.
+      const saved = new Map(this.memo);
       const shadow = this.body(f);
+      this.memo.clear();
+      for (const [k, v] of saved) this.memo.set(k, v);
       if (shadow.reason === "experiment" && shadow.experiment) {
         return withExperiment(r, { ...shadow.experiment, variation: r.variation ?? "", override: true });
       }

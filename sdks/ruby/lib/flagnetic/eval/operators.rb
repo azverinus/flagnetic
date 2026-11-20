@@ -62,6 +62,11 @@ module Flagnetic
 
       module_function
 
+      # known_type? reports whether this evaluator knows the attribute type.
+      def known_type?(type)
+        EXTRACT.key?(type)
+      end
+
       # check returns why this evaluator cannot apply op with value to an
       # attribute of type, or nil when it can: op must be defined for type
       # and value must have the JSON type op needs. It does not reject what

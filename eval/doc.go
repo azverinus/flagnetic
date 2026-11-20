@@ -22,7 +22,9 @@
 //		Attributes: map[string]any{"plan": "pro", "app_version": "1.18.0"},
 //	}, "new_checkout")
 //
-// A decoded Ruleset is immutable and safe for concurrent use.
+// A decoded Ruleset is immutable and safe for concurrent use, provided
+// callers treat what it hands out as read-only: Result.Value and the flag
+// returned by Ruleset.Flag are the ruleset's own data.
 //
 // # Algorithm
 //
@@ -53,14 +55,16 @@
 //     list order, reason experiment; otherwise evaluation continues.
 //  6. No rule matched: the fallthrough variation, reason fallthrough.
 //  7. A variation, segment, flag or attribute referenced but missing from
-//     the document, a condition that cannot be evaluated, or an experiment
-//     serve breaking its invariants (an experiment key, a unit type and
-//     both salts present; a traffic allocation within 0 to 10000; at least
-//     two weights, none negative, naming distinct variations of the flag
-//     and summing to exactly 10000) is error inconsistent_ruleset, only
-//     when evaluation reaches it, as a matched rule for a serve.
+//     the document, a condition that cannot be evaluated, a rollout serve
+//     breaking its invariants (a unit type and a salt present; a percentage
+//     within 0 to 10000) or an experiment serve breaking its invariants (an
+//     experiment key, a unit type and both salts present; a traffic
+//     allocation within 0 to 10000; at least two weights, none negative,
+//     naming distinct variations of the flag and summing to exactly 10000)
+//     is error inconsistent_ruleset, only when evaluation reaches it, as a
+//     matched rule for a serve.
 //
-// An operator, condition kind or serve kind this evaluator does not know,
+// An operator, condition kind, serve kind or attribute type this evaluator does not know,
 // typically sent by a server newer than it, is an unsupported rule: Decode
 // reports it per flag through Ruleset.UnsupportedRules, so an SDK can say
 // once that it must be upgraded, and evaluating it is step 7.

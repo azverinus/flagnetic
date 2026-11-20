@@ -23,11 +23,11 @@ class Context:
     attributes: Mapping[str, Any] = field(default_factory=dict)
 
 
-ConstructKind = Literal["operator", "condition_kind", "serve_kind"]
+ConstructKind = Literal["operator", "condition_kind", "serve_kind", "attribute_type"]
 
 
 class Construct(NamedTuple):
-    """An operator, condition kind or serve kind of a ruleset that this evaluator does not know."""
+    """An operator, condition kind, serve kind or attribute type this evaluator does not know."""
 
     kind: ConstructKind
     name: str

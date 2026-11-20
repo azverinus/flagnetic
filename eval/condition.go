@@ -3,6 +3,7 @@ package eval
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -68,6 +69,10 @@ func (c compiler) compile(cond Condition) compiledCondition {
 		match, err := compileOperator(typ, cond.Op, cond.Value)
 		if err != nil {
 			cc.err = fmt.Errorf("%w: attribute %q: %w", errInconsistent, cond.Attribute, err)
+			var ut *unknownTypeError
+			if errors.As(err, &ut) {
+				cc.unsupported = unsupported(ConstructAttributeType, string(ut.typ))
+			}
 			return cc
 		}
 		cc.attribute, cc.unit, cc.match = cond.Attribute, c.units[cond.Attribute], match
@@ -81,6 +86,12 @@ func (c compiler) compile(cond Condition) compiledCondition {
 	}
 	return cc
 }
+
+// unknownTypeError is an attribute type this evaluator does not know,
+// typically sent by a server newer than the evaluator.
+type unknownTypeError struct{ typ AttributeType }
+
+func (e *unknownTypeError) Error() string { return fmt.Sprintf("unknown attribute type %q", e.typ) }
 
 // unsupported is the construct of a kind with a name this evaluator does
 // not know, or nil for a missing name: no server sends that, so it is a
@@ -130,7 +141,7 @@ func compileOperator(typ AttributeType, op string, value any) (func(any) bool, e
 	case TypeList:
 		extract = func(v any) (any, bool) { return toStrings(v) }
 	default:
-		return nil, fmt.Errorf("unknown attribute type %q", typ)
+		return nil, &unknownTypeError{typ}
 	}
 
 	switch op {

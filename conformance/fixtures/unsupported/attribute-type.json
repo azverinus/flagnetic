@@ -1,0 +1,280 @@
+{
+  "name": "unsupported/attribute-type",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": false
+    },
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      },
+      {
+        "key": "ip",
+        "type": "ip"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "unknown_type",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "ip",
+                "op": "eq",
+                "value": "10.0.0.1"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_type_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "ip",
+                "op": "exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "known_type",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "ios"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_type_off",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "ip",
+                "op": "eq",
+                "value": "10.0.0.1"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "unsupported": {
+    "unknown_type": [
+      {
+        "kind": "attribute_type",
+        "name": "ip"
+      }
+    ],
+    "unknown_type_exists": [
+      {
+        "kind": "attribute_type",
+        "name": "ip"
+      }
+    ],
+    "unknown_type_off": [
+      {
+        "kind": "attribute_type",
+        "name": "ip"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a condition on an attribute of an unknown type is an inconsistent ruleset",
+      "flag": "unknown_type",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "ios",
+          "ip": "10.0.0.1"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "so is exists, which no type check would reject",
+      "flag": "unknown_type_exists",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "ios",
+          "ip": "10.0.0.1"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a flag that is off serves as usual",
+      "flag": "unknown_type_off",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "ios",
+          "ip": "10.0.0.1"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "off",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a flag without the construct is unaffected",
+      "flag": "known_type",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "ios",
+          "ip": "10.0.0.1"
+        }
+      },
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

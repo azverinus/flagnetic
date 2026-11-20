@@ -300,6 +300,69 @@
       ],
       "endpoint": "GET /sdk/v1/ruleset",
       "held": "server/ruleset.json",
+      "name": "ruleset-scope-not-server",
+      "outcome": "keep_held",
+      "response": {
+        "body": "degradation/ruleset-scope-not-server.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"2\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "scope is client, not server: only a server SDK holding a server key reads a ruleset"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
       "name": "ruleset-unknown-fields",
       "outcome": "accept",
       "response": {
@@ -490,10 +553,10 @@
       ],
       "endpoint": "GET /sdk/v1/ruleset",
       "held": "server/ruleset.json",
-      "name": "ruleset-unknown-rule-kind",
+      "name": "ruleset-unknown-serve-kind",
       "outcome": "accept",
       "response": {
-        "body": "degradation/ruleset-unknown-rule-kind.json",
+        "body": "degradation/ruleset-unknown-serve-kind.json",
         "headers": {
           "Cache-Control": "private, no-cache",
           "Content-Type": "application/json",

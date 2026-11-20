@@ -9,7 +9,7 @@ from itertools import accumulate
 from typing import Any
 
 from .model import Construct, ConstructKind
-from .operators import OPERATORS, Matcher, OperatorError, compile_operator
+from .operators import ATTRIBUTE_TYPES, OPERATORS, Matcher, OperatorError, compile_operator
 
 SCHEMA_VERSION = 1
 SCOPE_SERVER = "server"
@@ -452,6 +452,11 @@ def _compile_condition(
             cond.broken = True
             cond.error = f"attribute {attribute!r} is not declared"
             return cond
+        if attribute_type not in ATTRIBUTE_TYPES:
+            cond.broken = True
+            cond.error = f"attribute {attribute!r}: unknown attribute type {attribute_type!r}"
+            cond.unsupported = _unsupported("attribute_type", attribute_type)
+            return cond
         try:
             cond.match = compile_operator(attribute_type, op, raw.get("value"))
         except OperatorError as err:
@@ -469,6 +474,15 @@ def _compile_condition(
         cond.broken = True
         cond.unsupported = _unsupported("condition_kind", cond.kind)
     return cond
+
+
+def _valid_rollout(serve: Serve) -> bool:
+    """Whether a rollout serve holds what bucketing a unit relies on.
+
+    A unit type and a salt, and a percentage within 0 to 10000. The variation
+    is checked when it is served.
+    """
+    return bool(serve.unit_type) and bool(serve.salt) and 0 <= serve.percentage <= BUCKETS
 
 
 def _valid_experiment(serve: Serve, variations: Mapping[str, Any]) -> bool:
@@ -580,7 +594,9 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
                     for member in segment.conditions:
                         _add_reason(reasons, member)
             serve = Serve(_object(r.get("serve"), f"{rule_where}.serve"), rule_where)
-            invalid = serve.kind == SERVE_EXPERIMENT and not _valid_experiment(serve, f.variations)
+            invalid = (serve.kind == SERVE_ROLLOUT and not _valid_rollout(serve)) or (
+                serve.kind == SERVE_EXPERIMENT and not _valid_experiment(serve, f.variations)
+            )
             if serve.kind not in _SERVE_KINDS:
                 _add(found, _unsupported("serve_kind", serve.kind))
             rules.append(Rule(_string(r, "id", where), tuple(conditions), serve, invalid))

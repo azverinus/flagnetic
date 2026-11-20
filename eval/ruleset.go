@@ -45,7 +45,9 @@ func (rs *Ruleset) Protected() bool {
 }
 
 // Flag returns the flag with key, as the document has it, and whether the
-// document has it. SDKs check a flag's type against the one requested.
+// document has it. SDKs check a flag's type against the one requested. The
+// flag is the ruleset's own data, shared by every evaluation: a caller must
+// not modify it or anything it holds.
 func (rs *Ruleset) Flag(key string) (*Flag, bool) {
 	f, ok := rs.index.flags[key]
 	if !ok {
@@ -62,10 +64,13 @@ const (
 	ConstructOperator      ConstructKind = "operator"
 	ConstructConditionKind ConstructKind = "condition_kind"
 	ConstructServeKind     ConstructKind = "serve_kind"
+	// ConstructAttributeType is an attribute type a condition uses that
+	// this evaluator does not know.
+	ConstructAttributeType ConstructKind = "attribute_type"
 )
 
-// Construct is one operator, condition kind or serve kind of a ruleset
-// that this evaluator does not know.
+// Construct is one operator, condition kind, serve kind or attribute type
+// of a ruleset that this evaluator does not know.
 type Construct struct {
 	Kind ConstructKind `json:"kind"`
 	Name string        `json:"name"`
@@ -206,7 +211,7 @@ type Weight struct {
 // Decode reads a ruleset document. It fails only when the document is not
 // a ruleset this evaluator can read: malformed JSON, an unsupported
 // schema_version or a scope other than server. Dangling references, invalid
-// conditions and invalid experiment serves do not fail decoding; Decode
+// conditions and invalid rollout or experiment serves do not fail decoding; Decode
 // finds an invalid experiment serve once, and evaluating a flag that
 // reaches any of them returns reason error with inconsistent_ruleset, so
 // one defective flag never takes the others down.
@@ -242,10 +247,10 @@ type compiledFlag struct {
 	*Flag
 	variations map[string]json.RawMessage
 	rules      [][]compiledCondition
-	// invalidServes marks, by rule index, the experiment serves that break
-	// the invariants every experiment serve holds (see validExperiment), so
-	// evaluation reaching one answers inconsistent_ruleset without checking
-	// them again.
+	// invalidServes marks, by rule index, the rollout and experiment serves
+	// that break the invariants every such serve holds (see validRollout and
+	// validExperiment), so evaluation reaching one answers
+	// inconsistent_ruleset without checking them again.
 	invalidServes []bool
 }
 
@@ -329,7 +334,8 @@ func buildIndex(rs *Ruleset) *index {
 				}
 			}
 			cf.rules[j] = conds
-			cf.invalidServes[j] = r.Serve.Kind == ServeExperiment && !validExperiment(r.Serve, cf.variations)
+			cf.invalidServes[j] = (r.Serve.Kind == ServeRollout && !validRollout(r.Serve)) ||
+				(r.Serve.Kind == ServeExperiment && !validExperiment(r.Serve, cf.variations))
 			if !serveKinds[r.Serve.Kind] {
 				found = addConstruct(found, unsupported(ConstructServeKind, r.Serve.Kind))
 			}
@@ -340,6 +346,13 @@ func buildIndex(rs *Ruleset) *index {
 		idx.flags[f.Key] = cf
 	}
 	return idx
+}
+
+// validRollout reports whether a rollout serve holds what bucketing a unit
+// relies on: a unit type and a salt, and a percentage within 0 to 10000.
+// The variation is checked when it is served.
+func validRollout(s Serve) bool {
+	return s.UnitType != "" && s.Salt != "" && s.Percentage >= 0 && s.Percentage <= Buckets
 }
 
 // validExperiment reports whether an experiment serve holds what assigning

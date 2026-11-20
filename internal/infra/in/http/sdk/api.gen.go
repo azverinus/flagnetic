@@ -249,7 +249,10 @@ type FlagEvaluation struct {
 	// AutomaticExposure Whether the SDK records an exposure after every evaluation carrying `experiment`.
 	AutomaticExposure bool `json:"automatic_exposure"`
 
-	// ErrorCode For `error`: `flag_not_found`, `prerequisite_cycle` or `inconsistent_ruleset`.
+	// ErrorCode For `error`: `prerequisite_cycle` or `inconsistent_ruleset`.
+	// `flag_not_found` is the code of an SDK's local evaluator for a flag
+	// the ruleset does not hold; `/evaluate` never answers it, as it
+	// leaves unknown flags out.
 	ErrorCode *string `json:"error_code,omitempty"`
 
 	// Experiment The running experiment the value comes from, which an exposure carries.
@@ -302,8 +305,12 @@ type Problem struct {
 }
 
 // Ruleset The complete evaluable configuration of one environment at one
-// moment. An SDK ignores members it does not know, at any level. Every
-// list is ordered by key.
+// moment. An SDK ignores members it does not know, at any level.
+// `unit_types`, `attributes`, `segments` and `flags` are ordered by key.
+// Every other list keeps the order it has, which carries meaning: a
+// flag's `prerequisites`, `overrides` and `rules`, a rule's `conditions`
+// and an experiment's `weights` are evaluated or laid out in that order,
+// so an SDK never sorts them.
 type Ruleset struct {
 	Attributes  []RulesetAttribute  `json:"attributes"`
 	Environment *RulesetEnvironment `json:"environment,omitempty"`

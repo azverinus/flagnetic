@@ -61,6 +61,7 @@ How they compare:
 
 - An attribute the context lacks, `null`, or a value of the wrong type makes every operator false except `not_exists`, which is then true. Nothing is converted: `"5"` is not a number, and a semantic version or date that does not parse in a context is a value of the wrong type.
 - Strings compare byte by byte, case sensitively.
+- A date given as text is read as Go's RFC 3339 parser reads it in every SDK, which is looser than the RFC in a few forms: a one-digit hour, a comma before the fraction, a UTC offset up to `+24:60` and more than nine fraction digits (truncated) are accepted, while a lower-case `t` or `z` is not.
 - A rule's conditions are checked in order and stop at the first that does not hold.
 
 ## What a write refuses

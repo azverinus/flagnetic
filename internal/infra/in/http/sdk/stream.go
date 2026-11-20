@@ -17,22 +17,22 @@ import (
 )
 
 const (
-	// streamRetry is the reconnection delay a stream tells its client
-	// first, in milliseconds: short enough that an SDK whose stream ended
+	// streamRetry is the reconnection delay a ruleset stream tells its client
+	// first, in milliseconds: short enough that an SDK whose ruleset stream ended
 	// hears the next version within seconds.
 	streamRetry = 3000
 	// heartbeatInterval spaces the heartbeats, by which an SDK tells a quiet
-	// stream from a dead one: an SDK hearing nothing for three of them
+	// ruleset stream from a dead one: an SDK hearing nothing for three of them
 	// reconnects.
 	heartbeatInterval = 15 * time.Second
-	// streamLifetime and streamJitter bound how long one stream stays open,
+	// streamLifetime and streamJitter bound how long one ruleset stream stays open,
 	// so connections spread over the replicas as they come and go, and do
 	// not all reconnect at the same moment.
 	streamLifetime = 60 * time.Minute
 	streamJitter   = 5 * time.Minute
 )
 
-// errReplicaDraining answers a new stream on a replica that is shutting
+// errReplicaDraining answers a new ruleset stream on a replica that is shutting
 // down. Opening one only to close it at once would send an SDK that takes
 // such a close for a routine one into a reconnect loop on this replica for
 // as long as the load balancer still routes to it; a refusal is a failure
@@ -42,10 +42,10 @@ var errReplicaDraining = apperrors.Unavailable("unavailable",
 
 // StreamRuleset holds the ruleset stream of the key's environment: each
 // version this replica loads above the last one sent, a heartbeat every
-// heartbeatInterval re-checking the key and the origin the stream was opened
+// heartbeatInterval re-checking the key and the origin the ruleset stream was opened
 // from and catching up a version a failed reload left unsent, until the
-// stream's lifetime ends, the replica drains or the client goes away. A
-// replica that is already draining refuses the stream instead.
+// ruleset stream's lifetime ends, the replica drains or the client goes away. A
+// replica that is already draining refuses the ruleset stream instead.
 func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params StreamRulesetParams) {
 	select {
 	case <-a.edge.Draining():
@@ -66,7 +66,7 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 	a.h.Inventory.Note(p.key, delivery.ParseUserAgent(r.UserAgent()), "", current)
 
 	// Armed before the first frame, so a client that has read it knows
-	// the stream's time runs.
+	// the ruleset stream's time runs.
 	heartbeat := clock.After(a.clock, heartbeatInterval)
 	closing := clock.After(a.clock, streamLifetime+rand.N(streamJitter+1)) //nolint:gosec // spreads reconnections; nothing to guess
 
@@ -109,9 +109,9 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 				return
 			}
 			// The origin is judged against the key as it is now, so an
-			// origin removed from its list ends the stream here rather
+			// origin removed from its list ends the ruleset stream here rather
 			// than when its lifetime does. A key that cannot be checked
-			// for now keeps its stream, origin included.
+			// for now keeps its ruleset stream, origin included.
 			if err == nil {
 				if _, originErr := key.AdmitOrigin(origin, sentOrigin); originErr != nil {
 					return
@@ -130,7 +130,7 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 }
 
 // refusesKey reports whether err refuses the key itself: revoked, expired
-// or gone. A key that cannot be checked for now keeps its stream.
+// or gone. A key that cannot be checked for now keeps its ruleset stream.
 func refusesKey(err error) bool {
 	e, ok := apperrors.From(err)
 	return ok && e.Kind == apperrors.KindUnauthenticated
@@ -149,8 +149,8 @@ func lastEventID(header *string) int64 {
 	return v
 }
 
-// eventWriter writes a stream's frames, keeping the first failure, after
-// which the client is gone and the stream ends.
+// eventWriter writes a ruleset stream's frames, keeping the first failure, after
+// which the client is gone and the ruleset stream ends.
 type eventWriter struct {
 	w   io.Writer
 	rc  *http.ResponseController

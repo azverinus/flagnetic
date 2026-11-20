@@ -2,6 +2,7 @@ package eval
 
 import (
 	"encoding/json"
+	"maps"
 )
 
 // Context is what a flag is evaluated for: unit IDs by unit type, and
@@ -55,7 +56,8 @@ type Result struct {
 	// Type is the flag's type. It is empty only when there is no flag to
 	// read it from: an error with ErrorFlagNotFound.
 	Type string `json:"type"`
-	// Value is the served variation's value; absent for errors.
+	// Value is the served variation's value; absent for errors. It is the
+	// ruleset's own bytes, shared with every other result: do not modify it.
 	Value json.RawMessage `json:"value,omitempty"`
 	// Variation is the served variation's key; absent for errors.
 	Variation string `json:"variation,omitempty"`
@@ -157,6 +159,20 @@ func (rs *Ruleset) newEvaluation(ctx Context) *evaluation {
 	}
 }
 
+// scratch returns an evaluation over copies of the memo and the prerequisite
+// path. The shadow of an override runs while its flag is still on the path,
+// so a flag reached through it that closes a cycle would otherwise stay
+// memoized as prerequisite_cycle for the rest of the call, though the
+// result that is served never evaluates it that way.
+func (e *evaluation) scratch() *evaluation {
+	return &evaluation{
+		idx:      e.idx,
+		ctx:      e.ctx,
+		visiting: maps.Clone(e.visiting),
+		memo:     maps.Clone(e.memo),
+	}
+}
+
 func errorResult(code ErrorCode, influenced bool) Result {
 	return Result{Reason: ReasonError, ErrorCode: code, OverrideInfluenced: influenced}
 }
@@ -204,7 +220,7 @@ func (e *evaluation) compute(f *compiledFlag) Result {
 		if r.Reason == ReasonError {
 			return r
 		}
-		if shadow := e.body(f); shadow.Reason == ReasonExperiment {
+		if shadow := e.scratch().body(f); shadow.Reason == ReasonExperiment {
 			x := *shadow.Experiment
 			x.Variation = r.Variation
 			x.Override = true
