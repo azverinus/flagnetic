@@ -350,13 +350,25 @@ export function isFullSemver(value: string): boolean {
 
 /**
  * Whether a pattern is one RE2, the engine every evaluator matches with,
- * runs: it must compile, and RE2 has no look-around and no back-references,
- * which a browser's engine would accept.
+ * runs. RE2 has no look-around and no back-references, which a browser's
+ * engine would accept; it has flag groups (`(?i)`, `(?s:x)`) and `(?P<name>x)`
+ * captures, which a browser's engine refuses. Those are rewritten to
+ * their plain groups before the compile check, so the pattern is judged by
+ * its shape and the server's `invalid_value` answers for the rest.
  */
 export function isRe2Pattern(pattern: string): boolean {
   if (/\(\?<?[=!]|\\[1-9]/.test(pattern)) return false;
+  const plain = pattern.replace(
+    /\\[\s\S]|\(\?P<[A-Za-z_][A-Za-z0-9_]*>|\(\?[imsU]*(?:-[imsU]+)?\)|\(\?[imsU]*(?:-[imsU]+)?:/g,
+    (token) => {
+      if (token.startsWith("\\")) return token;
+      if (token.startsWith("(?P<")) return "(";
+      if (token.endsWith(")")) return "";
+      return "(?:";
+    },
+  );
   try {
-    new RegExp(pattern);
+    new RegExp(plain);
     return true;
   } catch {
     return false;
