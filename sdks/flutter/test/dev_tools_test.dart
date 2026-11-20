@@ -210,4 +210,63 @@ void main() {
       );
     });
   });
+
+  testWidgets('a non-finite number override is refused and persists nothing', (
+    tester,
+  ) async {
+    final store = InMemoryStore();
+    final logs = LogRecorder();
+    final client = offlineClient(
+      {'max_items': 10},
+      allowOverrides: true,
+      logger: logs.call,
+    );
+    addTearDown(client.close);
+    final devTools = FlagneticDevTools(
+      client: client,
+      store: store,
+      logger: logs.call,
+    );
+    addTearDown(devTools.dispose);
+
+    expect(
+      () => devTools.set('max_items', double.infinity),
+      throwsArgumentError,
+    );
+    expect(() => devTools.set('max_items', double.nan), throwsArgumentError);
+    expect(devTools.list(), isEmpty);
+    // The next change is not poisoned: it is persisted and logs no failure.
+    devTools.set('max_items', 25);
+    expect(store.entries[clientKeys.overrides], '{"max_items":25}');
+    expect(logs.count(LogEvents.listenerFailed), 0);
+  });
+
+  testWidgets('a stored override that no longer fits does not stop the '
+      'others', (tester) async {
+    final store = InMemoryStore({
+      // `checkout` is a boolean flag now; the number was saved before.
+      clientKeys.overrides: '{"banner":"Half price","checkout":7,"max":3}',
+    });
+    final logs = LogRecorder();
+    final client = offlineClient({
+      'checkout': false,
+      'banner': 'Try free',
+    }, allowOverrides: true);
+    addTearDown(client.close);
+    final devTools = FlagneticDevTools(
+      client: client,
+      store: store,
+      logger: logs.call,
+    );
+    addTearDown(devTools.dispose);
+
+    expect(client.getString('banner', ''), 'Half price');
+    expect(client.getNumber('max', 0), 3);
+    expect(client.getBool('checkout', false), isFalse);
+    expect(devTools.list(), {'banner': 'Half price', 'max': 3});
+    expect(devTools.hasOverrides.value, isTrue);
+    final failed = logs.fieldsOf(LogEvents.storeFailed);
+    expect(failed, hasLength(1));
+    expect(failed.single['key'], '${clientKeys.overrides}:checkout');
+  });
 }

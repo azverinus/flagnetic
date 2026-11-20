@@ -1,6 +1,7 @@
 import 'package:flagnetic/flagnetic.dart';
 import 'package:flutter/widgets.dart';
 
+import 'json_equals.dart';
 import 'listenable.dart';
 import 'scope.dart';
 
@@ -60,7 +61,7 @@ class _FlagBuilderState<T> extends State<FlagBuilder<T>> {
   void didUpdateWidget(FlagBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.flagKey != widget.flagKey ||
-        oldWidget.defaultValue != widget.defaultValue ||
+        !jsonEquals(oldWidget.defaultValue, widget.defaultValue) ||
         oldWidget.client != widget.client) {
       _follow();
     }
@@ -72,7 +73,7 @@ class _FlagBuilderState<T> extends State<FlagBuilder<T>> {
     if (held != null &&
         held.client == client &&
         held.flagKey == widget.flagKey &&
-        held.defaultValue == widget.defaultValue) {
+        jsonEquals(held.defaultValue, widget.defaultValue)) {
       return;
     }
     held?.dispose();

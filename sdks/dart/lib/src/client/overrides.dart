@@ -95,7 +95,7 @@ final class LocalOverrides {
   /// The local overrides by flag key.
   Map<String, Object?> list() => {
     for (final MapEntry(:key, :value) in _host.overrides.entries)
-      key: value.value,
+      key: copyJson(value.value),
   };
 }
 

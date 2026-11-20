@@ -19,11 +19,13 @@ String flagTypeOf(Object? value) => switch (value) {
   _ => 'json',
 };
 
-/// True when [value] can be served by a flag of [type].
+/// True when [value] can be served by a flag of [type]. A number is finite:
+/// JSON has no `NaN` or `Infinity`, so no server serves one, and the store
+/// cannot encode one.
 bool fitsFlagType(String type, Object? value) => switch (type) {
   'boolean' => value is bool,
   'string' => value is String,
-  'number' => value is num,
+  'number' => value is num && value.isFinite,
   _ => true,
 };
 

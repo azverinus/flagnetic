@@ -8,7 +8,7 @@ import 'transport/transport.dart';
 import 'types.dart';
 
 /// One event the ruleset stream dispatched.
-typedef SseEvent = ({String type, String data, String? id});
+typedef SseEvent = ({String type, String data});
 
 /// The longest line, and the most data one event may gather, that the parser
 /// holds. The platform writes lines of a few dozen bytes; a stream that
@@ -28,8 +28,7 @@ final class SseOverflow implements Exception {
 /// Reads the `text/event-stream` bytes of the ruleset stream by the WHATWG
 /// rules: CRLF, LF or CR ends a line even when split between reads, a blank
 /// line dispatches what was gathered, a line opening with a colon is a
-/// comment, `data` lines join with newlines and the last event ID carries
-/// over. The platform only ever writes `retry`, `ruleset` events and `: hb`
+/// comment and `data` lines join with newlines. The platform only ever writes `retry`, `ruleset` events and `: hb`
 /// heartbeats, but a proxy may reframe them.
 final class SseParser {
   final List<int> _buffer = [];
@@ -37,11 +36,6 @@ final class SseParser {
   bool _started = false;
   String _type = '';
   final StringBuffer _data = StringBuffer();
-  String? _id;
-
-  /// The last `id` the stream carried, sent as `Last-Event-ID` on a
-  /// reconnect; null until an event carried one.
-  String? get lastEventId => _id;
 
   /// Reads [bytes], calling [onEvent] for every event they complete and
   /// [onComment] for every comment line, the heartbeat among them.
@@ -113,8 +107,6 @@ final class SseParser {
       case 'data':
         _data.writeln(value);
         if (_data.length > maxSseLineBytes) _overflow();
-      case 'id':
-        if (!value.contains('\u0000')) _id = value;
     }
   }
 
@@ -128,7 +120,6 @@ final class SseParser {
       type: type.isEmpty ? 'message' : type,
       // One trailing newline was added by the last data line.
       data: data.substring(0, data.length - 1),
-      id: _id,
     ));
   }
 }
@@ -162,8 +153,8 @@ final class RulesetStream {
   /// the held ruleset version, or null when nothing is held. [onRuleset] is
   /// called with the version of every `ruleset` event, [onConnected] once
   /// per connection that answered 200, [onFailed] after every attempt that
-  /// did not, [onRefused] when the key was refused, which stops the stream
-  /// for good, and [onDropped] when a connection that answered 200 ended.
+  /// did not, and [onRefused] when the key was refused, which closes the
+  /// stream until [start] opens it again.
   RulesetStream({
     required Uri url,
     required String sdkKey,
@@ -180,7 +171,6 @@ final class RulesetStream {
       Map<String, Object?> fields,
     )
     log,
-    void Function()? onDropped,
     Random? random,
   }) : _url = url,
        _sdkKey = sdkKey,
@@ -191,7 +181,6 @@ final class RulesetStream {
        _onConnected = onConnected,
        _onFailed = onFailed,
        _onRefused = onRefused,
-       _onDropped = onDropped,
        _jitter = random ?? Random(),
        _log = log;
 
@@ -204,7 +193,6 @@ final class RulesetStream {
   final void Function() _onConnected;
   final void Function() _onFailed;
   final void Function(int status) _onRefused;
-  final void Function()? _onDropped;
   final void Function(LogLevel, String, Map<String, Object?>) _log;
   final Random _jitter;
 
@@ -232,7 +220,8 @@ final class RulesetStream {
   /// True when this call began a connect, which then ends in exactly one of
   /// `onConnected`, `onFailed` or `onRefused` unless [suspend] or [close]
   /// comes first; false when the stream is
-  /// closed or already connecting or connected.
+  /// closed or already connecting or connected. A stream the key's refusal
+  /// stopped connects again.
   bool start() {
     _suspended = false;
     if (_closed || _running) return false;
@@ -301,7 +290,9 @@ final class RulesetStream {
       // An error body may never end: cancelling releases the connection.
       unawaited(stream.body.listen(null).cancel().catchError((Object _) {}));
       if (stream.status == 401 || stream.status == 403) {
-        _closed = true;
+        // Not closed: the key may work again (an operator restored it, an
+        // allowed origin was added), and the client reopens the stream with
+        // [start] once an evaluate shows it does.
         _onRefused(stream.status);
         return;
       }
@@ -332,7 +323,6 @@ final class RulesetStream {
           _running = false;
           _drop();
           if (_gone) return;
-          _onDropped?.call();
           _retryAfterError({'cause': 'parse', 'detail': '$e'});
         } on Object catch (e) {
           _log(LogLevel.warn, LogEvents.sseDropped, {
@@ -345,14 +335,12 @@ final class RulesetStream {
         _running = false;
         _drop();
         if (_gone) return;
-        _onDropped?.call();
         _retryAfterError({'cause': 'network', 'detail': '$e'});
       },
       onDone: () {
         _running = false;
         _drop();
         if (_gone) return;
-        _onDropped?.call();
         if (_heard) {
           _retryAfterClose('closed');
         } else {
@@ -391,7 +379,6 @@ final class RulesetStream {
       if (_gone) return;
       _running = false;
       _drop();
-      _onDropped?.call();
       _retryAfterClose('silent');
     });
   }
