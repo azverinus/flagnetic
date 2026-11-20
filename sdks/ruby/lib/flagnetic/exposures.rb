@@ -309,8 +309,11 @@ module Flagnetic
       return true if events.empty?
 
       batches = EventBatch.pack(events, @transport.identity) { |_, err| report_unserialisable(err) }
+      settled = 0
       batches.each_with_index do |group, i|
+        settled = i
         result = attempt(group, deadline)
+        settled = i + 1
         case result.kind
         when :accepted
           @backoff.reset
@@ -325,6 +328,12 @@ module Flagnetic
         end
       end
       true
+    rescue StandardError
+      # What was taken and not answered goes back: the queue was emptied
+      # for this send, and a failure in reading an answer would otherwise
+      # drop every later batch with it.
+      put_back(batches[settled..].flatten(1)) if batches
+      raise
     end
 
     # schedule_retry backs off on its own schedule rather than honouring

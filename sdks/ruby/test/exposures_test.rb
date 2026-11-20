@@ -311,6 +311,21 @@ class ExposuresTest < Minitest::Test
     assert_equal ["out_of_window"], logged(:queue_dropped).first[1][:rejected]
   end
 
+  ["null", "true", '{"rejected":[1]}', '{"rejected":"x"}'].each do |body|
+    define_method(:"test_a_202_answer_#{body.hash.abs}_is_accepted_and_nothing_is_lost") do
+      @server.on_events { |_| [202, { "Content-Type" => "application/json" }, body] }
+      @server.publish(document(1))
+      c = client(stream: false)
+      c.ready(timeout: 2)
+      c.alias("anonymous", "d-1", "user", "u-1")
+      c.flush(timeout: 2)
+      c.alias("anonymous", "d-2", "user", "u-2")
+      c.flush(timeout: 2)
+      assert_equal [%w[d-1], %w[d-2]], @server.events_requests.map { |r| r.events.map { |e| e["from_unit_id"] } }
+      assert_empty logged(:worker_failed)
+    end
+  end
+
   def test_another_4xx_drops_the_batch
     @server.on_events { |_| [400, {}, ""] }
     @server.publish(document(1))
