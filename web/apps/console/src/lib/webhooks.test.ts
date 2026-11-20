@@ -161,4 +161,8 @@ describe("the check of a subscription's target", () => {
     expect(issue("https://user:secret@hooks.example.com/x")).toBe(message);
     expect(issue("https://hooks.example.com/x#x")).toBe(message);
   });
+
+  it("takes an empty fragment, which the server takes as none", () => {
+    expect(issue("https://hooks.example.com/x#")).toBeUndefined();
+  });
 });

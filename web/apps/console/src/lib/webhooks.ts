@@ -417,7 +417,8 @@ export function webhookUrlIssue(i18n: I18n, value: string): string | undefined {
   }
   const credentials =
     url.username !== "" || url.password !== "" || /^[^/]*\/\/[^/?#]*@/.test(value);
-  if (credentials || value.includes("#")) {
+  // An empty fragment (a bare "#") is no fragment to the server either.
+  if (credentials || url.hash !== "") {
     return i18n._(msg`Enter a URL without credentials or a fragment.`);
   }
   return undefined;

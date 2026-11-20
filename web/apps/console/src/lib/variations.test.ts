@@ -178,8 +178,9 @@ describe("the size of a variation's value", () => {
   });
 
   it("measures a JSON value compact, however it is laid out", () => {
-    const items = Array.from({ length: 16_000 }, () => 1).join(", ");
-    // 16,000 ones and 15,999 commas, 2 brackets: 32,001 bytes compact; with spaces 48,000.
+    const items = Array.from({ length: 30_000 }, () => 1).join(", ");
+    // 30,000 ones, 29,999 commas and 2 brackets: 60,001 bytes compact, under
+    // 64 KiB; laid out with a space after each comma it is 90,000, over it.
     expect(sizeIssues("json", `[${items}]`)).toEqual([]);
   });
 });
