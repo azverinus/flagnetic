@@ -33,11 +33,6 @@ type Deletions struct {
 // ExperimentStatus is an experiment with its status.
 type ExperimentStatus struct{ Key, Status string }
 
-// Empty reports whether nothing is to be deleted.
-func (d Deletions) Empty() bool {
-	return len(d.Experiments)+len(d.Flags)+len(d.Segments)+len(d.Attributes)+len(d.UnitTypes)+len(d.Environments) == 0
-}
-
 // Refusal returns the refusal of a replace that cannot be applied whatever
 // the project's state is, nil when there is none: 409 not_draft naming every
 // experiment that is not a draft, with a violation each; a flag the

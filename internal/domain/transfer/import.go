@@ -154,6 +154,7 @@ func CheckCreate(d Document) error {
 	var f faults
 	f.createSections(d)
 	f.uniqueKeys(d)
+	f.limits(d, Document{})
 	f.declarations(d)
 	f.configurations(d)
 	f.salts(d, nil)
@@ -207,6 +208,28 @@ func mapKeys[T any](in []T, key func(T) string) []string {
 		out[i] = key(e)
 	}
 	return out
+}
+
+// limits refuses a document that leaves the project holding more of an
+// entity than a direct write allows, judged up front: one import runs every
+// write in a single transaction holding the project's row, so a document of
+// hundreds of thousands of entities would keep every other write of the
+// project waiting. The project holds what current holds, plus what the
+// document names that current does not.
+func (f *faults) limits(d, current Document) {
+	check := func(section string, max int, held, named []string) {
+		total := len(slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(held), named...)))))
+		if total > max {
+			f.add(Pointer(section), "too_many", fmt.Sprintf("a project holds at most %d of these", max),
+				map[string]any{"max": max, "count": total})
+		}
+	}
+	check("environments", workspace.MaxEnvironments, mapKeys(current.Environments, func(e Environment) string { return e.Key }),
+		mapKeys(d.Environments, func(e Environment) string { return e.Key }))
+	check("segments", flags.MaxSegments, mapKeys(current.Segments, func(s Segment) string { return s.Key }),
+		mapKeys(d.Segments, func(s Segment) string { return s.Key }))
+	check("flags", flags.MaxFlags, mapKeys(current.Flags, func(fl Flag) string { return fl.Key }),
+		mapKeys(d.Flags, func(fl Flag) string { return fl.Key }))
 }
 
 // declarations refuses an attribute whose key a unit type has, and a unit

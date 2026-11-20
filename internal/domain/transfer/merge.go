@@ -305,6 +305,7 @@ func normalizedRuleID(s string) (string, bool) {
 func CheckMerge(d, current Document) error {
 	var f faults
 	f.uniqueKeys(d)
+	f.limits(d, current)
 	f.declarations(d)
 	f.mergedConfigurations(d, current)
 	f.types(d, current)
@@ -331,6 +332,7 @@ func CheckReplace(d, current Document) error {
 	var f faults
 	f.createSections(d)
 	f.uniqueKeys(d)
+	f.limits(d, Document{})
 	f.declarations(d)
 	f.configurations(d)
 	f.types(d, current)
