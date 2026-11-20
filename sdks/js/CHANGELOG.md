@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.6](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.5...sdks/js/v0.1.6) (2026-11-20)
+
+
+### Bug Fixes
+
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **sdks:** close the JavaScript review findings, add summaryInterval ([#413](https://github.com/azverinus/flagnetic/issues/413)) ([f018603](https://github.com/azverinus/flagnetic/commit/f018603be9a9876438b2490c7bc4efefd23fbe71))
+
+
+### Dependencies
+
+* **sdk-js:** Bump typescript-eslint from 8.72.2 to 8.73.0 ([#410](https://github.com/azverinus/flagnetic/issues/410)) ([c6863a6](https://github.com/azverinus/flagnetic/commit/c6863a6dddcfef069ebfa853f418bb5db2619c6f))
+
 ## [0.1.5](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.4...sdks/js/v0.1.5) (2026-11-17)
 
 
