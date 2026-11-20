@@ -6,6 +6,7 @@ import json
 import threading
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -231,7 +232,12 @@ def test_an_override_set_while_the_environment_turns_protected_is_not_kept() -> 
     open_env = SimpleNamespace(protected=False, environment_key="dev", flag=lambda _key: None)
     protected = SimpleNamespace(protected=True, environment_key="prod", flag=lambda _key: None)
     looks = iter([open_env, protected])
-    overrides = LocalOverrides(True, lambda: next(looks), lambda *_a, **_k: None, lambda _k: None)
+    overrides = LocalOverrides(
+        True,
+        lambda: cast(Any, next(looks)),
+        lambda *_a, **_k: None,
+        lambda _k: None,
+    )
     with pytest.raises(LocalOverrideRefused):
         overrides.set("checkout", True)
     assert overrides.list() == {}

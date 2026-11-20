@@ -71,7 +71,7 @@ class ProviderTest < Minitest::Test
     d = client.fetch_integer_details(flag_key: "auto_ratio", default_value: 7, evaluation_context: user)
     assert_equal [7, "TYPE_MISMATCH"], [d.value, d.error_code]
     assert_empty provider.client.recorder.exposures
-    assert_equal [["auto_ratio", "fallback"]], provider.client.recorder.summary.map { |r| [r.flag, r.reason.to_s] }
+    assert_equal([%w[auto_ratio fallback]], provider.client.recorder.summary.map { |r| [r.flag, r.reason.to_s] })
   end
 
   def test_integer_of_a_string_flag_is_a_type_mismatch
