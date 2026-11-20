@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/ruby-openfeature/v0.1.1...sdks/ruby-openfeature/v0.1.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **sdks:** close the Python and Ruby SDK review findings ([#414](https://github.com/azverinus/flagnetic/issues/414)) ([d02c998](https://github.com/azverinus/flagnetic/commit/d02c998264c98f3a0904f0187d779be749270237))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/ruby-openfeature/v0.1.0...sdks/ruby-openfeature/v0.1.1) (2026-11-17)
 
 
