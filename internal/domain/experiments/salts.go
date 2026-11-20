@@ -23,8 +23,8 @@ type Salts struct{ Inclusion, Variation string }
 // nothing and keeps the loop honest.
 const saltAttempts = 100
 
-// ErrSaltsExhausted is what NewSalts answers when every candidate was taken.
-var ErrSaltsExhausted = errors.New("experiments: every salt drawn was taken")
+// errSaltsExhausted is what NewSalts answers when every candidate was taken.
+var errSaltsExhausted = errors.New("experiments: every salt drawn was taken")
 
 // NewSalts draws salts from next until it has two that differ from each
 // other and from every one of taken: the salts the project's experiments and
@@ -48,7 +48,7 @@ func NewSalts(taken []string, next func() (string, error)) (Salts, error) {
 		picked = append(picked, candidate)
 	}
 	if len(picked) < 2 {
-		return Salts{}, ErrSaltsExhausted
+		return Salts{}, errSaltsExhausted
 	}
 	return Salts{Inclusion: picked[0], Variation: picked[1]}, nil
 }

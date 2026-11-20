@@ -724,7 +724,7 @@ func (f Flag) CanConfigure() error {
 
 // Propose returns what replacing c with in would leave, checked as Replace
 // checks it, once what neither c nor held may hold is left out of in, as
-// Proposable leaves it out. held are the rules of the proposal in revises,
+// proposable leaves it out. held are the rules of the proposal in revises,
 // nil for a new one: the server named its new rules and gave its new
 // rollouts salts when it was made, and they are the proposal's until it is
 // applied, so a rule keeps them while the proposal is edited. Otherwise
@@ -732,7 +732,7 @@ func (f Flag) CanConfigure() error {
 // again, and a rollout grown in an edit would move units out.
 func (c Configuration) Propose(f Flag, in ConfigurationInput, held []RuleInput, r Referents, m Mint) (Configuration, error) {
 	basis := c.holding(held)
-	out, _, err := c.write(basis, f, basis.Proposable(in), r, m, Write{})
+	out, _, err := c.write(basis, f, basis.proposable(in), r, m, Write{})
 	return out, err
 }
 
@@ -772,7 +772,7 @@ func (c Configuration) holding(held []RuleInput) Configuration {
 	return basis
 }
 
-// Proposable returns in with what only c may hold left out: a rule
+// proposable returns in with what only c may hold left out: a rule
 // identifier c has no rule with, and a salt that is not the salt of c's
 // rule the rule names. A proposal is written against the configuration of
 // its time and kept while others are written, and it may come from
@@ -781,7 +781,7 @@ func (c Configuration) holding(held []RuleInput) Configuration {
 // not c's is not c's to keep. The rule becomes a new one and the rollout
 // is given a salt of its own, instead of the proposal being refused for
 // naming what c never had.
-func (c Configuration) Proposable(in ConfigurationInput) ConfigurationInput {
+func (c Configuration) proposable(in ConfigurationInput) ConfigurationInput {
 	out := in
 	out.Rules = slices.Clone(in.Rules)
 	for i, ri := range out.Rules {

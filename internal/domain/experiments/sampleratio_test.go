@@ -117,7 +117,7 @@ func TestAlertAcknowledgedOnce(t *testing.T) {
 	raised := time.Date(2026, 10, 25, 10, 0, 0, 0, time.UTC)
 	a := experiments.RaiseAlert(id.Of[experiments.Alert]{}, experiments.ExperimentID{}, nil, experiments.AlertKindSampleRatio, raised,
 		experiments.AlertDetails{})
-	if !a.Active() || a.AcknowledgedAt != nil {
+	if a.ClearedAt != nil || a.AcknowledgedAt != nil {
 		t.Fatalf("raised alert = %+v, want active and unacknowledged", a)
 	}
 	first, changed := a.Acknowledge(raised.Add(time.Minute))
@@ -129,7 +129,23 @@ func TestAlertAcknowledgedOnce(t *testing.T) {
 		t.Errorf("a second acknowledgement = %+v, %v, want the first kept", again, changed)
 	}
 	cleared := first.Clear(raised.Add(2 * time.Hour))
-	if cleared.Active() || !cleared.ClearedAt.Equal(raised.Add(2*time.Hour)) {
+	if cleared.ClearedAt == nil || !cleared.ClearedAt.Equal(raised.Add(2*time.Hour)) {
 		t.Errorf("cleared = %+v, want inactive since then", cleared)
+	}
+}
+
+// A replica whose clock runs behind the one that raised an alert may
+// acknowledge or clear it earlier than it was raised; the alert is stamped at
+// its raising, which the stored check constraint requires.
+func TestAlertNeverEndsBeforeItWasRaised(t *testing.T) {
+	raised := time.Date(2026, 10, 25, 10, 0, 0, 0, time.UTC)
+	a := experiments.RaiseAlert(id.Of[experiments.Alert]{}, experiments.ExperimentID{}, nil, experiments.AlertKindSampleRatio, raised,
+		experiments.AlertDetails{})
+	acked, changed := a.Acknowledge(raised.Add(-time.Second))
+	if !changed || !acked.AcknowledgedAt.Equal(raised) {
+		t.Errorf("acknowledged a second early = %v, %v, want stamped at the raising %v", acked.AcknowledgedAt, changed, raised)
+	}
+	if cleared := a.Clear(raised.Add(-time.Second)); !cleared.ClearedAt.Equal(raised) {
+		t.Errorf("cleared a second early at %v, want the raising %v", cleared.ClearedAt, raised)
 	}
 }

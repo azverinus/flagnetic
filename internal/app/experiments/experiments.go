@@ -1,7 +1,8 @@
 // Package experiments holds the use cases of the experiments context. Every
-// write locks its project's row first, the lock the flags context's writes
-// take, so an experiment is judged against the flags and the salts of its
-// project as they are when it commits.
+// write that judges an experiment against its project's flags and salts locks
+// the project's row first, the lock the flags context's writes take, so it is
+// judged against them as they are when it commits. Acknowledging an alert is
+// the exception: it changes only the alert's own row, which it locks alone.
 package experiments
 
 import (
@@ -33,9 +34,9 @@ type AuditLog interface {
 	Record(ctx context.Context, e governance.Entry) error
 }
 
-// ProjectLocker locks a project's row for the unit of work. Every write of
-// the context takes this lock first and no other, in the lock order of the
-// flags context's writes.
+// ProjectLocker locks a project's row for the unit of work. A write that
+// takes it takes it before any other lock, in the lock order of the flags
+// context's writes; the alert rows the checks lock come after it.
 type ProjectLocker interface {
 	// LockProject locks the project's row, or answers ErrNotFound when
 	// there is none.
