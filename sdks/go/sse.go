@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-// maxFrameBytes bounds one line of the change stream, and the data one
+// maxFrameBytes bounds one line of the ruleset stream, and the data one
 // event accumulates over its lines. The only event the
 // stream carries is a version, so a longer line is a broken or hostile
 // server and ends the connection.
 const maxFrameBytes = 64 << 10
 
-// sseFrame is one block of the change stream: a dispatched event, or a
+// sseFrame is one block of the ruleset stream: a dispatched event, or a
 // comment such as the server's heartbeat.
 type sseFrame struct {
 	// Comment is true for a line starting with a colon. Such a frame
@@ -23,7 +23,10 @@ type sseFrame struct {
 	Comment bool
 	// Event is the event name, empty when the block named none.
 	Event string
-	// ID is the most recent id field, carried on every frame after it.
+	// ID is the most recent id field, carried on every frame after it. The
+	// client resumes from the version of the ruleset it holds, not from this,
+	// so only the tests of the reader read it; it stays so that the reader
+	// decodes the whole format.
 	ID string
 	// Data is the block's data lines joined by newlines.
 	Data string

@@ -9,60 +9,84 @@ import (
 	flagnetic "github.com/azverinus/flagnetic/sdks/go"
 )
 
-// A key_revoked log event fires PROVIDER_ERROR: it is the one case an
-// ordinary stage last_good does not distinguish from a revoked key.
-// White-box, because the wrapped client
-// never exposes why a fetch failed beyond the stage it left it in.
-func TestObserveFiresProviderErrorOnKeyRevoked(t *testing.T) {
-	p := &Provider{events: make(chan of.Event, 1)}
-	p.observe(0, flagnetic.EventKeyRevoked, map[string]any{"status": 401})
-
+// next returns the event type queued, or "" when none is.
+func next(p *Provider) of.EventType {
 	select {
 	case e := <-p.events:
-		if e.EventType != of.ProviderError {
-			t.Errorf("EventType = %q, want PROVIDER_ERROR", e.EventType)
-		}
-		if e.ProviderName != providerName {
-			t.Errorf("ProviderName = %q, want %q", e.ProviderName, providerName)
-		}
+		return e.EventType
 	default:
-		t.Fatal("no event emitted")
+		return ""
+	}
+}
+
+// A key_revoked log event fires PROVIDER_ERROR once Init has returned: it
+// is the one case an ordinary stage last_good does not distinguish from a
+// revoked key. White-box, because the wrapped client never exposes why a
+// fetch failed beyond the stage it left it in.
+func TestObserveFiresProviderErrorOnKeyRevoked(t *testing.T) {
+	p := &Provider{events: make(chan of.Event, 4), initialized: true}
+	p.observe(0, flagnetic.EventKeyRevoked, map[string]any{"status": 401})
+	if got := next(p); got != of.ProviderError {
+		t.Errorf("event = %q, want PROVIDER_ERROR", got)
 	}
 }
 
 // Every other log event is observed (so the provider's logger still logs)
 // but emits nothing.
 func TestObserveIgnoresOtherLogEvents(t *testing.T) {
-	p := &Provider{events: make(chan of.Event, 1)}
+	p := &Provider{events: make(chan of.Event, 4), initialized: true}
 	p.observe(0, flagnetic.EventFetchFailed, map[string]any{"cause": "network"})
-
-	select {
-	case e := <-p.events:
-		t.Errorf("unexpected event: %+v", e)
-	default:
+	if got := next(p); got != "" {
+		t.Errorf("unexpected event %q", got)
 	}
 }
 
-// Entering stage last_good fires STALE; a client that stays fresh, or one
-// that moves between two other stages, does not: ready is Init's job, not
-// onStage's.
-func TestOnStageFiresStaleOnlyEnteringLastGood(t *testing.T) {
-	p := &Provider{events: make(chan of.Event, 1)}
+// Before Init has returned the OpenFeature SDK sets the status itself:
+// stage moves and a revoked key send nothing, though the key is
+// remembered.
+func TestNothingIsSentBeforeInitReturns(t *testing.T) {
+	p := &Provider{events: make(chan of.Event, 4)}
+	p.observe(0, flagnetic.EventKeyRevoked, nil)
+	p.onStage(flagnetic.StageLastGood)
 	p.onStage(flagnetic.StageFresh)
-	select {
-	case e := <-p.events:
-		t.Fatalf("unexpected event on fresh: %+v", e)
-	default:
+	if got := next(p); got != "" {
+		t.Errorf("unexpected event %q before Init returned", got)
 	}
+	if p.revoked {
+		t.Error("a move to fresh before Init returned left the key marked refused")
+	}
+}
+
+// READY on every move to fresh, STALE on entering last_good; a refused key
+// keeps the status ERROR, so no STALE while it is refused, and the move to
+// fresh clears it.
+func TestStageMovesFollowTheStatusRules(t *testing.T) {
+	p := &Provider{events: make(chan of.Event, 8), initialized: true}
 
 	p.onStage(flagnetic.StageLastGood)
-	select {
-	case e := <-p.events:
-		if e.EventType != of.ProviderStale {
-			t.Errorf("EventType = %q, want PROVIDER_STALE", e.EventType)
-		}
-	default:
-		t.Fatal("no event emitted entering last_good")
+	if got := next(p); got != of.ProviderStale {
+		t.Errorf("entering last_good sent %q, want PROVIDER_STALE", got)
+	}
+	p.onStage(flagnetic.StageFresh)
+	if got := next(p); got != of.ProviderReady {
+		t.Errorf("entering fresh sent %q, want PROVIDER_READY", got)
+	}
+
+	p.observe(0, flagnetic.EventKeyRevoked, nil)
+	if got := next(p); got != of.ProviderError {
+		t.Fatalf("a refused key sent %q, want PROVIDER_ERROR", got)
+	}
+	p.onStage(flagnetic.StageLastGood)
+	if got := next(p); got != "" {
+		t.Errorf("last_good while the key is refused sent %q, want nothing", got)
+	}
+	p.onStage(flagnetic.StageFresh)
+	if got := next(p); got != of.ProviderReady {
+		t.Errorf("recovery sent %q, want PROVIDER_READY", got)
+	}
+	p.onStage(flagnetic.StageLastGood)
+	if got := next(p); got != of.ProviderStale {
+		t.Errorf("last_good after recovery sent %q, want PROVIDER_STALE", got)
 	}
 }
 
@@ -77,5 +101,42 @@ func TestEmitStopsAfterClose(t *testing.T) {
 	case e := <-p.events:
 		t.Fatalf("emit sent after close: %+v", e)
 	case <-time.After(10 * time.Millisecond):
+	}
+}
+
+// waitFor returns the first event type queued within a second, or "".
+func waitFor(p *Provider) of.EventType {
+	select {
+	case e := <-p.events:
+		return e.EventType
+	case <-time.After(time.Second):
+		return ""
+	}
+}
+
+// A key refused before Init returned is announced once Init has returned,
+// after the OpenFeature SDK's own READY, unless a status event has been
+// sent in between: that one is newer than the refusal.
+func TestAKeyRefusedBeforeInitIsAnnouncedAfterIt(t *testing.T) {
+	p := &Provider{events: make(chan of.Event, 4)}
+	p.observe(0, flagnetic.EventKeyRevoked, nil)
+	p.markInitialized()
+	if got := next(p); got != "" {
+		t.Errorf("sent %q at once, want the announcement after the delay", got)
+	}
+	if got := waitFor(p); got != of.ProviderError {
+		t.Errorf("announced %q, want PROVIDER_ERROR", got)
+	}
+
+	recovered := &Provider{events: make(chan of.Event, 4)}
+	recovered.observe(0, flagnetic.EventKeyRevoked, nil)
+	recovered.markInitialized()
+	recovered.onStage(flagnetic.StageFresh)
+	if got := next(recovered); got != of.ProviderReady {
+		t.Fatalf("recovery sent %q, want PROVIDER_READY", got)
+	}
+	time.Sleep(2 * announceDelay)
+	if got := next(recovered); got != "" {
+		t.Errorf("the stale announcement %q followed the newer READY", got)
 	}
 }

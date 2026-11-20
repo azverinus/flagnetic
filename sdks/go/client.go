@@ -57,12 +57,12 @@ type Client struct {
 	// happened, in Unix nanoseconds; 0 while unset.
 	staleSince atomic.Int64
 	// revoked marks the key refused, so key_revoked is logged once however
-	// many of the fetch loop and the change stream see it.
+	// many of the fetch loop and the ruleset stream see it.
 	revoked atomic.Bool
 
 	wait intervals
 
-	// Change stream. streamReady is closed once the first connection
+	// Ruleset stream. streamReady is closed once the first connection
 	// attempt has resolved, so the first fetch follows it; wake asks the
 	// fetch loop for a ruleset; target is the highest version an event has
 	// announced.
@@ -70,7 +70,10 @@ type Client struct {
 	streamReadyOnce sync.Once
 	streamConnected atomic.Bool
 	wake            chan struct{}
-	target          atomic.Int64
+	// streamDown tells the fetch loop that a connected stream dropped, so
+	// a poll wait chosen while it was up shortens to the down poll.
+	streamDown chan struct{}
+	target     atomic.Int64
 	// firstConnect and retryHint belong to the stream goroutine alone.
 	firstConnect bool
 	retryHint    time.Duration
@@ -180,7 +183,7 @@ func WithStore(path string) Option {
 }
 
 // WithPollInterval sets how often the ruleset is fetched with
-// If-None-Match while the change stream is connected; default 5 minutes,
+// If-None-Match while the ruleset stream is connected; default 5 minutes,
 // at least 30 seconds. While the stream is down or disabled the safety
 // poll runs every 30 seconds instead, so a kill switch is never further
 // away than that.
@@ -188,7 +191,7 @@ func WithPollInterval(d time.Duration) Option {
 	return func(o *options) { o.pollInterval = d }
 }
 
-// WithChangeStream turns the change stream on or off; it is on by
+// WithChangeStream turns the ruleset stream on or off; it is on by
 // default. The stream carries nothing but the new ruleset version, so a
 // kill switch reaches the client within two seconds; with it off the
 // safety poll every 30 seconds is the only notice, which is what a proxy
@@ -198,7 +201,7 @@ func WithChangeStream(enabled bool) Option {
 }
 
 // WithRequestTimeout bounds each request; default 10 seconds. For the
-// change stream it bounds the wait for the response to start, not the
+// ruleset stream it bounds the wait for the response to start, not the
 // stream itself, which stays open for as long as heartbeats arrive.
 func WithRequestTimeout(d time.Duration) Option {
 	return func(o *options) { o.requestTimeout = d }
@@ -297,7 +300,7 @@ func New(sdkKey, baseURL string, opts ...Option) (*Client, error) {
 		c.http = &http.Client{}
 		c.ownsHTTP = true
 	}
-	// The change stream stays open for an hour at a time, so no Timeout
+	// The ruleset stream stays open for an hour at a time, so no Timeout
 	// of the caller's client may cut it short.
 	streamHTTP := *c.http
 	streamHTTP.Timeout = 0
@@ -317,6 +320,7 @@ func New(sdkKey, baseURL string, opts ...Option) (*Client, error) {
 	}
 	c.streamReady = make(chan struct{})
 	c.wake = make(chan struct{}, 1)
+	c.streamDown = make(chan struct{}, 1)
 	c.firstConnect = true
 	c.startLoops(o, func(ctx context.Context, loops *sync.WaitGroup) {
 		if o.changeStream == nil || *o.changeStream {
@@ -380,11 +384,11 @@ func (c *Client) startLoops(o options, online func(context.Context, *sync.WaitGr
 // intervals are the SDK's default waits: what the two
 // background loops wait for, and the bounds their backoffs grow to.
 type intervals struct {
-	// requestTimeout bounds one ruleset request, and the change stream's
+	// requestTimeout bounds one ruleset request, and the ruleset stream's
 	// wait for its response headers. The open stream is long-lived and is
 	// bounded by heartbeat instead.
 	requestTimeout time.Duration
-	// poll is the safety poll while the change stream is connected,
+	// poll is the safety poll while the ruleset stream is connected,
 	// downPoll while it is down or disabled.
 	poll     time.Duration
 	downPoll time.Duration
@@ -396,7 +400,7 @@ type intervals struct {
 	unauthorizedCap time.Duration
 	streamRetryCap  time.Duration
 	closeJitterCap  time.Duration
-	// heartbeat is how long the change stream may stay silent.
+	// heartbeat is how long the ruleset stream may stay silent.
 	heartbeat time.Duration
 	// catchUp are the waits before re-fetching while a replica is behind
 	// the version an event announced.
@@ -854,9 +858,11 @@ func (c *Client) callListener(l func([]string), changed []string) {
 // evaluation counts and sends it as one evaluation summary, waiting for
 // the platform's answer or until ctx is done. Nothing queued and nothing
 // evaluated is nothing sent. An offline client records both in its
-// Recorder instead, at the call itself. Flush returns the error of the
-// last attempt, so a caller may ignore it: events that failed stay queued
-// and a window that failed merges into the next one.
+// Recorder instead, at the call itself. Flush attempts the queue of
+// exposures and aliases even while the backoff after a failure runs, and
+// returns the error of the last attempt, so a caller may ignore it: events
+// that failed stay queued and a window that failed merges into the next
+// one.
 func (c *Client) Flush(ctx context.Context) error {
 	if c == nil {
 		return nil
@@ -882,23 +888,44 @@ func (c *Client) flushAll(ctx context.Context) error {
 // evaluation counts, within five seconds or ctx, then stops fetching and
 // polling and returns once the background loops have ended, even during a
 // backoff or a request, or when ctx is done. Getters keep serving the held
-// ruleset. Close is idempotent.
+// ruleset. Close attempts the queue even during a backoff and, once
+// everything has stopped, returns the error of that attempt; what it
+// could not deliver is logged as queue_dropped with the cause
+// closing, and an exposure or alias recorded after Close is not queued
+// (logged once, with the cause closed). Close is idempotent.
 func (c *Client) Close(ctx context.Context) error {
 	if c == nil || c.cancel == nil {
 		return nil
 	}
 	flushCtx, stopFlush := context.WithTimeout(ctx, closeFlushTimeout)
-	_ = c.flushAll(flushCtx)
+	flushErr := c.flushAll(flushCtx)
 	stopFlush()
 	c.cancel()
 	c.markReady()
+	// Whatever the flush could not deliver is gone with the loops: say so
+	// once they have ended, so a send the cancel cut short has put its
+	// events back and a tick between the flush and the cancel has not
+	// delivered events the line would call dropped. When ctx ends first,
+	// the line follows the loops' end after Close has returned.
 	select {
 	case <-c.done:
 	case <-ctx.Done():
+		go func() {
+			<-c.done
+			c.stopQueues()
+		}()
 		return ctx.Err()
 	}
+	c.stopQueues()
 	if c.ownsHTTP {
 		c.http.CloseIdleConnections()
 	}
-	return nil
+	return flushErr
+}
+
+// stopQueues ends the exposure queue and the summary window at Close and
+// logs what they still hold as dropped.
+func (c *Client) stopQueues() {
+	c.exposures.stop()
+	c.summaries.stop()
 }

@@ -2,6 +2,9 @@ package openfeature_test
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -426,4 +429,135 @@ func TestConfigurationChangedEvent(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("no CONFIGURATION_CHANGED event within 2s")
 	}
+}
+
+// statusServer serves the ruleset until a test makes it answer another
+// status, and announces versions on the ruleset stream when a test says
+// so: an announcement is what makes the client fetch.
+type statusServer struct {
+	*httptest.Server
+	mu       sync.Mutex
+	status   int
+	announce chan int
+}
+
+func newStatusServer(t *testing.T) *statusServer {
+	t.Helper()
+	s := &statusServer{status: http.StatusOK, announce: make(chan int)}
+	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/sdk/v1/stream":
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprint(w, ": hb\n\n")
+			w.(http.Flusher).Flush()
+			for {
+				select {
+				case v := <-s.announce:
+					_, _ = fmt.Fprintf(w, "event: ruleset\nid: %d\ndata: {\"version\":%d}\n\n", v, v)
+					w.(http.Flusher).Flush()
+				case <-r.Context().Done():
+					return
+				}
+			}
+		case "/sdk/v1/ruleset":
+			s.mu.Lock()
+			status := s.status
+			s.mu.Unlock()
+			if status != http.StatusOK {
+				w.WriteHeader(status)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("ETag", `"3"`)
+			_, _ = w.Write([]byte(document))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
+// answer sets the status the ruleset endpoint answers with, and announces
+// a version above the one held so that the client fetches it at once.
+func (s *statusServer) answer(t *testing.T, status, announce int) {
+	t.Helper()
+	s.mu.Lock()
+	s.status = status
+	s.mu.Unlock()
+	select {
+	case s.announce <- announce:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the ruleset stream is not connected")
+	}
+}
+
+func onlineProvider(t *testing.T, s *statusServer) of.IClient {
+	t.Helper()
+	provider, err := fnof.New("sdk-server-key", s.URL, fnof.WithClientOptions(flagnetic.WithSummaries(false)))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	domain := t.Name()
+	if err := of.SetNamedProviderAndWait(domain, provider); err != nil {
+		t.Fatalf("SetNamedProviderAndWait: %v", err)
+	}
+	t.Cleanup(of.Shutdown)
+	return of.NewClient(domain)
+}
+
+// becomes waits for the OpenFeature status to reach want.
+func becomes(t *testing.T, client of.IClient, want of.State) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for client.State() != want {
+		if time.Now().After(deadline) {
+			t.Fatalf("State() = %q, want %q", client.State(), want)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// The failed fetch leaves the client at last_good and the retry, within a
+// second, brings it back to fresh: the status follows both.
+func TestTheStatusIsReadyAgainWhenTheClientRecovers(t *testing.T) {
+	s := newStatusServer(t)
+	client := onlineProvider(t, s)
+	becomes(t, client, of.ReadyState)
+
+	s.answer(t, http.StatusServiceUnavailable, 4)
+	becomes(t, client, of.StaleState)
+
+	s.answer(t, http.StatusOK, 5)
+	becomes(t, client, of.ReadyState)
+}
+
+func TestARefusedKeyKeepsTheStatusErrorUntilTheClientRecovers(t *testing.T) {
+	s := newStatusServer(t)
+	client := onlineProvider(t, s)
+	becomes(t, client, of.ReadyState)
+
+	s.answer(t, http.StatusUnauthorized, 4)
+	becomes(t, client, of.ErrorState)
+	// The client moves to last_good right after logging the refusal: that
+	// must not turn the status to stale.
+	time.Sleep(300 * time.Millisecond)
+	if got := client.State(); got != of.ErrorState {
+		t.Errorf("State() = %q after the stage move, want error to stay", got)
+	}
+
+	s.answer(t, http.StatusOK, 5)
+	becomes(t, client, of.ReadyState)
+}
+
+// A key refused before Init returns leaves the status ERROR, not the
+// READY the OpenFeature SDK sets when Init returns.
+func TestAKeyRefusedAtInitTurnsTheStatusToError(t *testing.T) {
+	s := newStatusServer(t)
+	s.mu.Lock()
+	s.status = http.StatusUnauthorized
+	s.mu.Unlock()
+	client := onlineProvider(t, s)
+	becomes(t, client, of.ErrorState)
 }

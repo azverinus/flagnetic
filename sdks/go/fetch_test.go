@@ -199,7 +199,7 @@ func ceiling() flagnetic.Option {
 	return flagnetic.WithJitter(func(c time.Duration) time.Duration { return c })
 }
 
-// newOnline builds an online client with the change stream and the
+// newOnline builds an online client with the ruleset stream and the
 // evaluation summary off, so that a test of the fetch loop scripts the
 // ruleset endpoint alone. The stream's own tests turn the stream back on
 // and the summary's turn reporting back on, by passing the option after.
@@ -368,7 +368,7 @@ func TestNotModifiedIsFresh(t *testing.T) {
 	clk.next(t).wake()
 	clk.next(t).wake()
 	if got := clk.next(t).d; got != 30*time.Second {
-		t.Errorf("after a 304 the loop sleeps %v, want the safety poll with the change stream off", got)
+		t.Errorf("after a 304 the loop sleeps %v, want the safety poll with the ruleset stream off", got)
 	}
 	if got := c.Stage(); got != flagnetic.StageFresh {
 		t.Errorf("stage = %q, want fresh", got)
@@ -935,11 +935,11 @@ func TestCorruptStoreStartsBuiltIn(t *testing.T) {
 	})
 }
 
-func TestSafetyPollWithoutTheChangeStream(t *testing.T) {
-	// With the change stream off the safety poll is the only notice a kill
+func TestSafetyPollWithoutTheRulesetStream(t *testing.T) {
+	// With the ruleset stream off the safety poll is the only notice a kill
 	// switch gets, so it runs every 30 seconds whatever the poll interval
 	// says; the interval itself is asserted with the stream connected, in
-	// TestPollIntervalFollowsTheChangeStream.
+	// TestPollIntervalFollowsTheRulesetStream.
 	for name, opts := range map[string][]flagnetic.Option{
 		"default":         nil,
 		"configured":      {flagnetic.WithPollInterval(time.Minute)},

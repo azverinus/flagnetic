@@ -87,8 +87,8 @@ func build(t testing.TB, read func() ([]byte, error), opts []flagnetic.Option) *
 	if err != nil {
 		t.Fatalf("flagnetictest: %v", err)
 	}
-	// The client reports its evaluation counts on an interval, so it holds
-	// a goroutine until it is closed.
+	// Close releases the client all the same, so a test leaves nothing
+	// behind it. An offline client starts no loop of its own.
 	t.Cleanup(func() { _ = c.Close(context.Background()) })
 	tc.Client = c
 	return tc

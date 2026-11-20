@@ -18,9 +18,9 @@
 // ruleset: it logs fetch_failed and retries with exponential backoff and
 // full jitter. A revoked key logs key_revoked and is retried more slowly.
 //
-// # The change stream
+// # The ruleset stream
 //
-// The client also opens the change stream, an SSE connection carrying
+// The client also opens the ruleset stream, an SSE connection carrying
 // nothing but new ruleset versions, before its first fetch, so that an
 // operator's kill switch reaches the service within two seconds. A version
 // above the held one causes a fetch with If-None-Match; a replica still

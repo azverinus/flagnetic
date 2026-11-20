@@ -86,6 +86,18 @@ func (o LocalOverrides) Set(key string, value any) error {
 		return fmt.Errorf("flagnetic: local override of %q: %w", key, err)
 	}
 	c.overridesMu.Lock()
+	// A swap installs its ruleset before it takes this lock to clear the
+	// overrides, so a ruleset that became protected since it was loaded
+	// above is seen here, and an override stored after that clear cannot
+	// outlive it.
+	if now := c.ruleset.Load(); now != loaded && now != nil && now.rs.Protected() {
+		c.overridesMu.Unlock()
+		c.log(slog.LevelWarn, EventOverrideRefused, map[string]any{
+			"flag":        key,
+			"environment": now.rs.Environment.Key,
+		})
+		return fmt.Errorf("local override of %q: %w", key, ErrLocalOverrideRefused)
+	}
 	next := maps.Clone(c.currentOverrides())
 	if next == nil {
 		next = map[string]localOverride{}

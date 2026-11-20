@@ -13,9 +13,9 @@ import (
 	"time"
 )
 
-// Defaults for the change stream.
+// Defaults for the ruleset stream.
 const (
-	// defaultDownPollInterval is the safety poll while the change stream
+	// defaultDownPollInterval is the safety poll while the ruleset stream
 	// is down or disabled; while it is connected the poll interval serves.
 	defaultDownPollInterval = 30 * time.Second
 	// heartbeatTimeout is how long the stream may stay silent. The server
@@ -47,7 +47,7 @@ const (
 	causeMalformed   = "malformed"
 )
 
-// streamOutcome is how one connection to the change stream ended.
+// streamOutcome is how one connection to the ruleset stream ended.
 type streamOutcome int
 
 const (
@@ -63,7 +63,7 @@ const (
 	streamStopped
 )
 
-// streamLoop keeps the change stream open, reconnecting until ctx is done.
+// streamLoop keeps the ruleset stream open, reconnecting until ctx is done.
 // A refused key stops it for good; the fetch loop keeps serving and keeps
 // retrying at the unauthorized cap.
 func (c *Client) streamLoop(ctx context.Context) {
@@ -101,7 +101,7 @@ func (c *Client) streamLoop(ctx context.Context) {
 	}
 }
 
-// streamOnce opens the change stream and reads it until it ends, reporting
+// streamOnce opens the ruleset stream and reads it until it ends, reporting
 // how it ended and whether it was stable, that is, delivered a heartbeat.
 func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable bool) {
 	rctx, cancel := context.WithCancel(ctx)
@@ -166,7 +166,15 @@ func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable 
 	}
 
 	c.streamConnected.Store(true)
-	defer c.streamConnected.Store(false)
+	defer func() {
+		c.streamConnected.Store(false)
+		// The fetch loop may be asleep on the long poll interval chosen
+		// while the stream was up: tell it the safety poll applies now.
+		select {
+		case c.streamDown <- struct{}{}:
+		default:
+		}
+	}()
 	c.log(slog.LevelInfo, EventSSEConnected, map[string]any{"last_event_id": lastEventID})
 	if !c.firstConnect {
 		// Versions may have been missed while the stream was down.
@@ -310,7 +318,7 @@ func (c *Client) heldVersion() int64 {
 }
 
 // keyRevoked logs key_revoked once, however many of the fetch loop and the
-// change stream see the refusal, until a fetch succeeds again.
+// ruleset stream see the refusal, until a fetch succeeds again.
 func (c *Client) keyRevoked(status int) {
 	if c.revoked.CompareAndSwap(false, true) {
 		c.log(slog.LevelError, EventKeyRevoked, map[string]any{"status": status})

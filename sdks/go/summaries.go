@@ -264,6 +264,26 @@ func (s *summaries) report(ctx context.Context) error {
 	return s.deliver(ctx, events)
 }
 
+// stop logs what Close leaves unsent: the rows of a window kept after a
+// failed delivery. It returns their count.
+func (s *summaries) stop() int {
+	if s == nil || s.offline() {
+		return 0
+	}
+	s.mu.Lock()
+	rows := 0
+	if s.kept != nil {
+		rows = len(s.kept.counts)
+	}
+	s.mu.Unlock()
+	if rows > 0 {
+		s.log(slog.LevelWarn, EventQueueDropped, map[string]any{
+			"kind": summaryEventType, "cause": "closing", "rows": rows,
+		})
+	}
+	return rows
+}
+
 // take closes the current window, merging in the one a failed report kept
 // unless its interval began over an hour ago, and returns nil when
 // nothing was evaluated. Dropping an aged window never drops this
