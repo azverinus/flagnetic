@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/eval/v0.1.0...eval/v0.1.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **http:** answer dropped bodies as gone, tidy edge and dead code ([#394](https://github.com/azverinus/flagnetic/issues/394)) ([bd41082](https://github.com/azverinus/flagnetic/commit/bd4108295c7f0c538d9c0afa59c5551606a154bf))
+
 ## 0.1.0 (2026-10-23)
 
 
