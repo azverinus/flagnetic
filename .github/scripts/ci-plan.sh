@@ -58,6 +58,9 @@ RE_DART='^(sdks/dart/|conformance/|api/sdk\.yaml$|docs/sdks/(behaviour-matrix|co
 RE_FLUTTER='^(sdks/dart/|sdks/flutter/|\.github/scripts/check-pub-package\.sh$|\.github/workflows/sdk-flutter\.yml$)'
 # What every published Go module is tested with besides its own sources.
 RE_MODULES='^(conformance/|api/sdk\.yaml$)'
+# What only the Go SDK's job reads besides its own sources: that job
+# regenerates the Go column of the behaviour matrix and fails on a diff.
+RE_MODULE_SDK_GO='^(docs/sdks/behaviour-matrix\.md$|\.github/scripts/behaviour-matrix\.sh$)'
 # The migration checks: the migrations the lint reads, the list that pins the
 # released ones, the lint's settings and the scripts and fixtures that run and
 # test them.
@@ -81,7 +84,10 @@ RE_UPGRADE='^(internal/infra/out/postgres/migrations/.*\.sql$|deploy/helm/|e2e/(
 # The docs site: the pages and the API documents it is built from, the site's
 # own sources, and the console workspace's lock and layout, which it shares.
 RE_DOCS='^(docs/|api/|website/|web/pnpm-(lock|workspace)\.yaml$)'
-RE_WORKFLOWS='^\.github/(workflows/|actionlint\.yaml$|scripts/check-ci-ok\.sh$)'
+# The workflows and every script under .github/scripts: the job lints the
+# workflows and runs shellcheck on the scripts, and the scripts that decide
+# or check what CI does are tested there.
+RE_WORKFLOWS='^\.github/(workflows/|actionlint\.yaml$|scripts/[^/]+\.sh$)'
 
 # Merging the server's release pull request publishes the image, so it is
 # the last point where everything is checked together.
@@ -92,6 +98,10 @@ SERVER_RELEASE_BRANCH='release-please--branches--main--components--server'
 POSTGRES_OLDEST='[16]'
 POSTGRES_ALL='[16,18]'
 
+# postgres_oldest: the major version a pull request is tested on, for the
+# run on a developer's machine that reproduces it.
+postgres_oldest() { jq -r '.[0]' <<<"$POSTGRES_OLDEST"; }
+
 # The server's test packages that take minutes each under the race detector.
 # They get test jobs of their own; the rest share one. The first is too long
 # for one job even alone, and about half of its tests are named TestA...,
@@ -101,14 +111,18 @@ SPLIT_PREFIX='^TestA'
 GROUPED_PACKAGES='internal/infra/in/http/sdk internal/infra/in/http/sso'
 
 # A guard test reads files outside its own package, so a change elsewhere can
-# break it. Two kinds, told apart by what they read:
+# break it. Three kinds, told apart by what they read:
 #   - a test that parses Go source (go/parser, go/ast, go/packages) checks
 #     every server package, so it runs whenever the server changed;
 #   - a test that opens a fixed file elsewhere in the tree ("../../api/x.yaml")
 #     can only be broken by a change under that top-level name, so it runs
-#     when something there changed.
+#     when something there changed;
+#   - a test that reads a page of the documentation through the test kit
+#     (testkit.Doc builds the path itself, so no path appears in the test)
+#     runs when anything under docs/ changed.
 GUARD_SOURCE_RE='go/parser|go/packages|go/ast|parser\.Parse|packages\.Load'
 GUARD_PATH_RE='"(\.\./)+[^"]+"'
+GUARD_DOC_RE='testkit\.Doc\('
 GENERATED_RE='\.gen\.go$'
 
 # ------------------------------------------------------------ the diff
@@ -158,10 +172,23 @@ package_dir() {
   printf '%s' "$d"
 }
 
+# has_product_go <directory>: it holds a Go file that is not a test.
+has_product_go() {
+  local f
+  for f in "$1"/*.go; do
+    [ -e "$f" ] || continue
+    case "$f" in *_test.go) ;; *) return 0 ;; esac
+  done
+  return 1
+}
+
 guard_packages() {
   local f top
   if [ "$SERVER" = 1 ]; then
     grep -rlE "$GUARD_SOURCE_RE" --include='*_test.go' internal cmd 2>/dev/null
+  fi
+  if changed '^docs/'; then
+    grep -rlE "$GUARD_DOC_RE" --include='*_test.go' internal cmd 2>/dev/null
   fi
   grep -rlE "$GUARD_PATH_RE" --include='*_test.go' internal cmd 2>/dev/null | while read -r f; do
     for top in $(grep -ohE "$GUARD_PATH_RE" "$f" | tr -d '"' | sed -E 's#^(\.\./)+##' | cut -d/ -f1 | sort -u); do
@@ -281,6 +308,7 @@ EOF
     [ "${MOD_REL[$i]}" = "e2e" ] && continue
     [ "${MOD_TOUCHED[$i]}" = 1 ] && MOD_RUN[$i]=1
     if [ "$FULL" = 1 ] || changed "$RE_MODULES" || changed "$RE_GO_ALL"; then MOD_RUN[$i]=1; fi
+    if [ "${MOD_REL[$i]}" = "sdks/go" ] && changed "$RE_MODULE_SDK_GO"; then MOD_RUN[$i]=1; fi
   done
   for _ in 1 2; do # a module that requires an affected module is affected
     for i in "${!MOD_PATH[@]}"; do
@@ -311,7 +339,7 @@ EOF
     if [ -n "$TEST_PKGS" ]; then
       # A changed package without tests of its own is covered by the tests of
       # the packages that depend on it.
-      COVER_PKGS="$(printf '%s\n' "$CHANGED_PKGS" | grep -E "^$ROOT_MODULE/internal/" | grep -vE "$GENERATED_RE" | sed "s#^$ROOT_MODULE#.#" | while read -r d; do ls "$d"/*.go 2>/dev/null | grep -qv '_test\.go$' && echo "$d"; done | tr '\n' ',' | sed 's/,$//')"
+      COVER_PKGS="$(printf '%s\n' "$CHANGED_PKGS" | grep -E "^$ROOT_MODULE/internal/" | grep -vE "$GENERATED_RE" | sed "s#^$ROOT_MODULE#.#" | while read -r d; do has_product_go "$d" && echo "$d"; done | tr '\n' ',' | sed 's/,$//')"
     fi
   fi
 
