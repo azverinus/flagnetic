@@ -80,10 +80,6 @@ var refusedByTheAPI = []string{
 	"prerequisites/cycle back",
 	"prerequisites/cycle self",
 	// Constructs no evaluator knows yet, and what names them.
-	"prerequisites/override-shadow-cycle b",
-	"rollout/invalid-missing-unit-type invalid",
-	"rollout/invalid-percentage-above-range invalid",
-	"rollout/invalid-percentage-below-range invalid",
 	"unsupported/rules segment future_segment",
 	"unsupported/rules segment segment_of_a_future_kind",
 	"unsupported/rules several_unknown_constructs",
