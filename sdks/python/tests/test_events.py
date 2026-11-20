@@ -304,3 +304,31 @@ def test_flush_from_a_listener_sends_at_once() -> None:
     finally:
         client.close(timeout=1)
         server.close()
+
+
+def test_close_logs_what_it_could_not_deliver_and_nothing_is_recorded_after(ingest: Any) -> None:
+    logs = Logs()
+    _, client = ingest(lambda _n: Response(503), send_summaries=False, logger=logs)
+    for i in range(3):
+        client.alias("anonymous", f"d-{i}", "user", "u-1001")
+    client.close()
+    (dropped,) = logs.named("queue_dropped")
+    assert (dropped["cause"], dropped["events"], dropped["status"]) == ("closing", 3, 503)
+    client.alias("anonymous", "d-9", "user", "u-1001")
+    client.exposure(CONTEXT, "checkout")
+    assert logs.count("queue_dropped") == 1
+    (skipped,) = [f for f in logs.named("exposure_skipped") if f["cause"] == "closed"]
+    assert skipped
+
+
+def test_a_full_queue_logs_its_drops_once_per_flush_interval(ingest: Any) -> None:
+    logs = Logs()
+    _, client = ingest(lambda _n: Response(503), send_summaries=False, logger=logs, flush_interval=3600)
+    for i in range(10_000 + 50):
+        client.alias("anonymous", f"d-{i}", "user", "u-1001")
+    # The first drop is logged at once; the other 49 wait for the next flush.
+    (first,) = logs.named("queue_dropped")
+    assert first["dropped"] == 1
+    client.flush(timeout=1)
+    counts = [f["dropped"] for f in logs.named("queue_dropped") if f["cause"] == "queue_full"]
+    assert counts == [1, 49]

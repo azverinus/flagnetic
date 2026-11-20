@@ -189,7 +189,7 @@ class TestDecode:
 
     def test_invalid_utf8_in_a_string_reads_as_the_replacement_character(self) -> None:
         document = b'{"schema_version": 1, "scope": "server", "flags": [{"key": "f\xff"}]}'
-        assert decode(document).keys == ("f�",)
+        assert tuple(decode(document).flags) == ("f�",)
 
     def test_the_widest_integer_is_read(self) -> None:
         assert decode({**self.DOCUMENT, "version": (1 << 63) - 1}).version == (1 << 63) - 1
@@ -211,7 +211,7 @@ class TestDecode:
                 "flags": [None, flag, {**flag, "key": "g", "rules": [{"id": "r", "serve": None}]}],
             }
         )
-        assert rs.keys == ("", "f", "g")
+        assert tuple(rs.flags) == ("", "f", "g")
         assert evaluate(rs, Context(), "f").variation == "a"
         assert evaluate(rs, Context(), "g").error_code == "inconsistent_ruleset"
         broken = {**flag, "rules": [{"id": "r", "conditions": [None], "serve": {"kind": "variation"}}]}

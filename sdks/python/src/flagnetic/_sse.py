@@ -84,14 +84,14 @@ class Frame:
 
     comment: bool = False
     event: str = ""
-    id: str = ""
     data: str = ""
 
 
 class EventStreamParser:
     """Decodes the event stream format from bytes as they arrive.
 
-    The fields ``event``, ``id``, ``data`` and ``retry``, comments, multi-line
+    The fields ``event``, ``data`` and ``retry`` (an ``id`` is ignored: the stream resumes from the
+    version the client holds), comments, multi-line
     data and lines ended by LF, CRLF or CR. Written by hand so that the package
     depends on the standard library alone.
     """
@@ -101,7 +101,6 @@ class EventStreamParser:
         self._event = ""
         self._data: list[str] = []
         self._data_size = 0
-        self._id = ""
         # The reconnection time the server last asked for, in seconds; None until it sends one.
         self.retry: float | None = None
 
@@ -129,7 +128,7 @@ class EventStreamParser:
             # A blank line dispatches, unless the block held no data: an id or
             # a retry on its own only updates the parser.
             if self._data:
-                frames.append(Frame(event=self._event, id=self._id, data="\n".join(self._data)))
+                frames.append(Frame(event=self._event, data="\n".join(self._data)))
             self._event = ""
             self._data = []
             self._data_size = 0
@@ -147,9 +146,6 @@ class EventStreamParser:
                 self._data_size += len(value) + 1
                 if self._data_size > MAX_LINE_BYTES:
                     raise StreamError("event stream event too long")
-            elif field == "id":
-                if "\0" not in value:
-                    self._id = value
             elif field == "retry" and value.isascii() and value.isdigit():
                 if len(value) > MAX_RETRY_DIGITS:
                     raise StreamError("event stream retry too long")

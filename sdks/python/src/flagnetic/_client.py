@@ -226,6 +226,7 @@ class Client:
         self._schema_logged = False
         self._ready = threading.Event()
         self._closed = False
+        self._closed_logged = False
         self._lock = threading.Lock()
         self._listeners: dict[int, Callable[[list[str]], None]] = {}
         self._stage_listeners: dict[int, Callable[[Stage], None]] = {}
@@ -686,6 +687,12 @@ class Client:
         if self._recorder is not None:
             self._recorder._record(event)
         elif self._queue is not None:
+            if self._closed:
+                # Nothing sends the queue any more: what is added now would sit in it unreported.
+                if not self._closed_logged:
+                    self._closed_logged = True
+                    self._log(logging.WARNING, _events.EXPOSURE_SKIPPED, cause="closed")
+                return
             self._queue.record(event._wire())
 
     def flush(self, timeout: float | None = DEFAULT_CLOSE_TIMEOUT) -> None:

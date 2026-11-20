@@ -154,7 +154,6 @@ class Ruleset:
         "environment_key",
         "flags",
         "invalid",
-        "keys",
         "protected",
         "segments",
         "unsupported",
@@ -166,7 +165,6 @@ class Ruleset:
     protected: bool
     flags: dict[str, Flag]
     segments: dict[str, Segment]
-    keys: tuple[str, ...]
     unsupported: dict[str, list[Construct]]
     invalid: dict[str, list[str]]
 
@@ -548,7 +546,6 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
     rs.flags = {}
     rs.unsupported = {}
     rs.invalid = {}
-    keys: list[str] = []
     for raw in _objects(top, "flags", "the document"):
         f = Flag()
         f.key = _string(raw, "key", "flags")
@@ -611,5 +608,3 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
         if reasons:
             rs.invalid[f.key] = reasons
         rs.flags[f.key] = f
-        keys.append(f.key)
-    rs.keys = tuple(keys)

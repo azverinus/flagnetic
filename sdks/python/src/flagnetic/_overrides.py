@@ -95,6 +95,27 @@ class LocalOverrides:
             self._log(logging.WARNING, _events.OVERRIDE_REFUSED, flag=key, cause="not_allowed")
             raise LocalOverridesNotAllowed
         ruleset = self._held()
+        self._refuse_if_protected(key, ruleset)
+        flag = ruleset.flag(key) if ruleset is not None else None
+        flag_type = flag.type if flag is not None else type_of(value)
+        if not fits(flag_type, value):
+            raise TypeError(f"flagnetic: a local override of {key!r} must be a {flag_type} value")
+        if flag_type == "json":
+            value = copy.deepcopy(value)
+        with self._lock:
+            # Looked at again under the lock that clearing takes: a swap to a protected ruleset
+            # between the first look and this store would clear before it, and the override would
+            # be served once the environment is unprotected.
+            held = self._held()
+            if held is None or not held.protected:
+                self._by_key = {**self._by_key, key: LocalOverride(flag_type, value)}
+                held = None
+        if held is not None:
+            self._refuse_if_protected(key, held)
+        self._log(logging.WARNING, _events.OVERRIDE_SET, flag=key)
+        self._changed([key])
+
+    def _refuse_if_protected(self, key: str, ruleset: Ruleset | None) -> None:
         if ruleset is not None and ruleset.protected:
             self._log(
                 logging.WARNING,
@@ -104,16 +125,6 @@ class LocalOverrides:
                 environment=ruleset.environment_key,
             )
             raise LocalOverrideRefused(key)
-        flag = ruleset.flag(key) if ruleset is not None else None
-        flag_type = flag.type if flag is not None else type_of(value)
-        if not fits(flag_type, value):
-            raise TypeError(f"flagnetic: a local override of {key!r} must be a {flag_type} value")
-        if flag_type == "json":
-            value = copy.deepcopy(value)
-        with self._lock:
-            self._by_key = {**self._by_key, key: LocalOverride(flag_type, value)}
-        self._log(logging.WARNING, _events.OVERRIDE_SET, flag=key)
-        self._changed([key])
 
     def remove(self, key: str) -> None:
         """Drops the local override of ``key``; change listeners hear it when there was one."""

@@ -928,3 +928,21 @@ def test_the_sdk_key_is_in_no_repr(clients: Any) -> None:
 def test_a_platform_that_cannot_be_in_a_header_is_refused_at_construction(platform: str) -> None:
     with pytest.raises(ValueError, match="platform"):
         flagnetic.Client(SDK_KEY, "http://127.0.0.1:1", platform=platform, stream=False)
+
+
+def test_a_stream_slow_to_send_headers_does_not_keep_the_first_fetch_waiting(clients: Any) -> None:
+    release = threading.Event()
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            release.wait(10)
+            return Response(500)
+        return Response(200, JSON, RULESET)
+
+    try:
+        client = clients(MockServer(handler), stream=True, request_timeout=30)
+        started = time.monotonic()
+        assert client.ready(5) is flagnetic.Stage.FRESH
+        assert time.monotonic() - started < 4
+    finally:
+        release.set()

@@ -56,14 +56,16 @@ LISTENER_FAILED = "listener_failed"
 #: retry_in (seconds), status for an HTTP status, and kind for the evaluation summary.
 EVENTS_FAILED = "events_failed"
 #: warning: events or summary rows were given up on. Fields: cause (queue_full, not_serialisable,
-#: client_error, refused_by_the_server, window_too_old) and what was dropped; fault, the kind of
-#: encoding error, for not_serialisable.
+#: client_error, refused_by_the_server, window_too_old, closing: what close could not deliver) and what
+#: was dropped; queue_full is logged at most once per flush interval, with the count since the last;
+#: fault, the kind of encoding error, for not_serialisable.
 QUEUE_DROPPED = "queue_dropped"
 #: warning: send_exposures is off, so no exposure or alias leaves this client; logged at construction.
 EXPOSURES_OFF = "exposures_off"
 #: debug: an exposure call found nothing to report. Fields: flag, cause (local_override,
 #: no_experiment for a flag no evaluation of which carried an experiment block, no_detail for a
-#: context the flag was not evaluated with).
+#: context the flag was not evaluated with). Once, at warning level and with cause closed, when an
+#: exposure or alias comes after close, which records nothing.
 EXPOSURE_SKIPPED = "exposure_skipped"
 #: warning: local overrides are enabled; logged at construction.
 LOCAL_OVERRIDES_ALLOWED = "local_overrides_allowed"

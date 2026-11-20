@@ -20,7 +20,6 @@ import ssl
 import threading
 import time
 import zlib
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
 from urllib.parse import urlsplit
@@ -39,6 +38,9 @@ DEFAULT_REQUEST_TIMEOUT = 10.0
 DEFAULT_POLL_INTERVAL = 300.0
 MIN_POLL_INTERVAL = 30.0
 DEFAULT_DOWN_POLL_INTERVAL = 30.0
+# How long the first fetch waits for the first attempt to open the stream: a stream endpoint slow to
+# answer must not keep the ruleset from being fetched.
+FIRST_STREAM_WAIT = 2.0
 RETRY_BASE = 1.0
 RETRY_CAP = 300.0
 UNAUTHORIZED_CAP = 900.0
@@ -89,6 +91,7 @@ class Waits:
     """
 
     request_timeout: float
+    first_stream: float
     poll: float
     down_poll: float
     retry_base: float
@@ -111,6 +114,7 @@ class Waits:
         poll = DEFAULT_POLL_INTERVAL if poll_interval is None else poll_interval
         return cls(
             request_timeout=request_timeout,
+            first_stream=min(request_timeout, FIRST_STREAM_WAIT / divisor),
             poll=max(poll / divisor, MIN_POLL_INTERVAL / divisor),
             down_poll=down_poll_interval / divisor,
             retry_base=RETRY_BASE / divisor,
@@ -236,7 +240,6 @@ class Delivery:
         reporter: Reporter | None = None,
         ingest: Ingest | None = None,
         ssl_context: ssl.SSLContext | None = None,
-        sleep_hook: Callable[[], None] | None = None,
     ) -> None:
         self._host = host
         self._reporter = reporter
@@ -469,6 +472,8 @@ class Delivery:
 
     def _connection(self, secure: bool, stream: bool) -> http.client.HTTPConnection:
         timeout = self._waits.request_timeout
+        if stream and not self._first_attempt_done:
+            timeout = self._waits.first_stream
         if secure:
             cls = _SecureStreamConnection if stream else http.client.HTTPSConnection
             return cls(self._netloc_host, self._port, timeout=timeout, context=self._ssl_context)
