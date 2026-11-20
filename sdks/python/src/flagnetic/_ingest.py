@@ -14,7 +14,6 @@ import http.client
 import json
 import os
 import socket
-import ssl
 import threading
 import time
 from collections.abc import Mapping, Sequence
@@ -109,7 +108,6 @@ class Ingest:
         version: str,
         schema_version: int,
         request_timeout: float,
-        ssl_context: ssl.SSLContext | None = None,
     ) -> None:
         parts = urlsplit(base_url)
         self._secure = parts.scheme == "https"
@@ -121,7 +119,6 @@ class Ingest:
         self._identity = {"name": SDK_NAME, "version": version, "platform": platform}
         self._schema_version = schema_version
         self._timeout = request_timeout
-        self._ssl_context = ssl_context
         self._lock = threading.Lock()
         self._conn: http.client.HTTPConnection | None = None
 
@@ -159,7 +156,7 @@ class Ingest:
         }
         if self._secure:
             conn: http.client.HTTPConnection = http.client.HTTPSConnection(
-                self._host, self._port, timeout=self._timeout, context=self._ssl_context
+                self._host, self._port, timeout=self._timeout
             )
         else:
             conn = http.client.HTTPConnection(self._host, self._port, timeout=self._timeout)

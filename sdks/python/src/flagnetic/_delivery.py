@@ -239,7 +239,6 @@ class Delivery:
         schema_version: int,
         reporter: Reporter | None = None,
         ingest: Ingest | None = None,
-        ssl_context: ssl.SSLContext | None = None,
     ) -> None:
         self._host = host
         self._reporter = reporter
@@ -257,7 +256,6 @@ class Delivery:
         self._stream_enabled = stream
         self._agent = agent
         self._schema_version = schema_version
-        self._ssl_context = ssl_context
         self._closing = threading.Event()
         self._wake_read, self._wake_write = socket.socketpair()
         self._wake_read.setblocking(False)
@@ -476,7 +474,7 @@ class Delivery:
             timeout = self._waits.first_stream
         if secure:
             cls = _SecureStreamConnection if stream else http.client.HTTPSConnection
-            return cls(self._netloc_host, self._port, timeout=timeout, context=self._ssl_context)
+            return cls(self._netloc_host, self._port, timeout=timeout)
         cls_plain = _StreamConnection if stream else http.client.HTTPConnection
         return cls_plain(self._netloc_host, self._port, timeout=timeout)
 
@@ -498,6 +496,11 @@ class Delivery:
             )
         else:
             self._fetch_failures = 0
+            if self._stream_stopped:
+                # The key that was refused on the stream answers the fetch: a restored key, or a
+                # refusal that was a proxy's, so the stream is tried again.
+                self._stream_stopped = False
+                self._next_stream = now
             if self._target != self._announced:
                 self._announced, self._catch_ups = self._target, 0
             if self._host.held_version() < self._announced and self._catch_ups < len(self._waits.catch_up):

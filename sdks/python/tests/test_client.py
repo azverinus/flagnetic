@@ -527,7 +527,7 @@ def test_without_a_logger_events_go_to_the_flagnetic_logger(caplog: pytest.LogCa
     assert loaded[0].levelno == logging.INFO
 
 
-def test_a_refused_stream_key_stays_down_and_is_reported_once(clients: Any) -> None:
+def test_a_refused_stream_key_stays_down_until_the_next_fetch_and_is_reported_once(clients: Any) -> None:
     logs = Logs()
     stream_requests: list[Request] = []
 
@@ -541,7 +541,9 @@ def test_a_refused_stream_key_stays_down_and_is_reported_once(clients: Any) -> N
             )
         return Response(200, JSON, RULESET)
 
-    client = clients(MockServer(handler), stream=True, logger=logs, _time_divisor=100)
+    client = clients(
+        MockServer(handler), stream=True, logger=logs, _time_divisor=100, _down_poll_interval=3600
+    )
     assert client.ready(5) is flagnetic.Stage.FRESH
     time.sleep(0.5)
     assert len(stream_requests) == 1
@@ -946,3 +948,19 @@ def test_a_stream_slow_to_send_headers_does_not_keep_the_first_fetch_waiting(cli
         assert time.monotonic() - started < 4
     finally:
         release.set()
+
+
+def test_a_stream_refused_once_reopens_after_a_fetch_succeeds(clients: Any) -> None:
+    streams: list[Request] = []
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            streams.append(request)
+            if len(streams) == 1:
+                return Response(403)
+            return Response(200, {"Content-Type": "text/event-stream"}, stream=True)
+        return Response(200, JSON, RULESET)
+
+    client = clients(MockServer(handler), stream=True, _time_divisor=100, _down_poll_interval=30)
+    assert client.ready(5) is flagnetic.Stage.FRESH
+    assert eventually(lambda: [] if len(streams) >= 2 else ["the stream stayed stopped"], 5) == []
