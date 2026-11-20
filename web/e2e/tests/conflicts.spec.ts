@@ -70,11 +70,14 @@ test.describe("two members saving the same thing", () => {
     await signIn(other.page, other.who);
     await other.page.goto(`/projects/${project}/segments/beta`);
 
+    // The form has unsaved edits before the colleague saves: a clean one
+    // follows the colleague's save on its own.
+    await page.getByLabel("Description").fill("Who tries a feature first.");
+
     await other.page.getByLabel("Name").fill("Early adopters");
     await unsavedBar(other.page).getByRole("button", { name: "Save" }).click();
     await expect(other.page.getByText("The segment is saved.")).toBeVisible();
 
-    await page.getByLabel("Description").fill("Who tries a feature first.");
     await unsavedBar(page).getByRole("button", { name: "Save" }).click();
     const banner = page.getByRole("alert").filter({ hasText: "after you opened this" });
     await expect(banner).toContainText("Tomas Berg saved a change on");

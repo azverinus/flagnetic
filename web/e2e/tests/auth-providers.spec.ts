@@ -139,8 +139,8 @@ test.describe("auth providers", () => {
     await page.getByLabel("Name", { exact: true }).fill("Dex (mine)");
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
-    await expect(page.getByRole("alert")).toContainText("Someone else changed this");
-    await page.getByRole("button", { name: "Load their version" }).click();
+    await expect(page.getByRole("alert")).toContainText("Someone saved a change");
+    await page.getByRole("button", { name: "Reload and lose my edits" }).click();
     await expect(heading(page, "Dex (theirs)")).toBeVisible();
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dex (theirs)");
 
