@@ -211,7 +211,7 @@ describe("the mask, reason by reason", () => {
   });
 
   test("does not tell through a prerequisite that an override decided it", () => {
-    expect(flags.getDetail(germanUser, "behind_pinned", false).reason).toBe("targeting_match");
+    expect(doc?.flags.behind_pinned?.reason).toBe("targeting_match");
     expect(doc?.flags.behind_pinned?.override_influenced).toBe(false);
   });
 
