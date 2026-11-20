@@ -91,12 +91,19 @@ func (c *Client) run(ctx context.Context) {
 		case <-c.wake:
 		default:
 		}
+		select {
+		case <-c.streamDown:
+		default:
+		}
 		outcome := c.fetch(ctx)
 		if outcome == fetchCanceled || ctx.Err() != nil {
 			return
 		}
 		c.markReady()
 		var wait time.Duration
+		// polling is true when the wait is the safety poll, the only one a
+		// dropped stream shortens: a backoff or a catch-up has its own reason.
+		polling := false
 		switch outcome {
 		case fetchFailed:
 			failures++
@@ -106,6 +113,7 @@ func (c *Client) run(ctx context.Context) {
 			wait = c.jitter(backoffCeiling(failures, c.wait.retryBase, c.wait.unauthorizedCap))
 		default:
 			failures = 0
+			polling = false
 			if target := c.target.Load(); target != announced {
 				announced, catchUps = target, 0
 			}
@@ -116,9 +124,10 @@ func (c *Client) run(ctx context.Context) {
 				catchUps++
 			} else {
 				wait = c.pollWait()
+				polling = true
 			}
 		}
-		if !c.waitNext(ctx, wait) {
+		if !c.waitNext(ctx, wait, polling) {
 			return
 		}
 	}
@@ -135,23 +144,40 @@ func (c *Client) pollWait() time.Duration {
 }
 
 // waitNext waits d, returning early when the change stream asks for a
-// fetch, and false when the client is closing.
-func (c *Client) waitNext(ctx context.Context, d time.Duration) bool {
-	wctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	watching := make(chan struct{})
-	go func() {
-		defer close(watching)
-		select {
-		case <-c.wake:
-			cancel()
-		case <-wctx.Done():
+// fetch, and false when the client is closing. When polling is set and the
+// stream drops during the wait, a wait longer than the down poll shortens
+// to it, counted from the drop.
+func (c *Client) waitNext(ctx context.Context, d time.Duration, polling bool) bool {
+	for {
+		wctx, cancel := context.WithCancel(ctx)
+		watching := make(chan struct{})
+		dropped := false
+		go func() {
+			defer close(watching)
+			var down <-chan struct{}
+			if polling && d > c.wait.downPoll {
+				down = c.streamDown
+			}
+			select {
+			case <-c.wake:
+				cancel()
+			case <-down:
+				dropped = true
+				cancel()
+			case <-wctx.Done():
+			}
+		}()
+		c.sleep(wctx, d)
+		cancel()
+		<-watching
+		if ctx.Err() != nil {
+			return false
 		}
-	}()
-	c.sleep(wctx, d)
-	cancel()
-	<-watching
-	return ctx.Err() == nil
+		if !dropped {
+			return true
+		}
+		d = c.wait.downPoll
+	}
 }
 
 // backoffCeiling is the exponential ceiling of the nth consecutive

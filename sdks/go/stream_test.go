@@ -567,7 +567,7 @@ func TestRefusedKeyClosesTheChangeStreamAndKeepsServing(t *testing.T) {
 	}
 }
 
-func TestPollIntervalFollowsTheChangeStream(t *testing.T) {
+func TestPollIntervalFollowsTheRulesetStream(t *testing.T) {
 	srv := newStreamServer(t, ruleset(7), status(http.StatusNotModified))
 	srv.streamStatuses = []int{http.StatusOK, http.StatusServiceUnavailable} // once dropped, the stream stays down
 	clk := newSleeper()
@@ -579,8 +579,9 @@ func TestPollIntervalFollowsTheChangeStream(t *testing.T) {
 	if connected.d != 2*time.Minute {
 		t.Errorf("with the stream connected the loop sleeps %v, want the poll interval", connected.d)
 	}
+	// The drop alone, with the 2-minute sleep left running, must bring the
+	// 30 s safety poll.
 	conn.close()
-	connected.wake()
 
 	// Both loops wait on the same clock now: the fetch loop's safety poll
 	// is the one asking for 30 s while the stream is down.

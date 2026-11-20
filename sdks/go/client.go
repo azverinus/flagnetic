@@ -70,7 +70,10 @@ type Client struct {
 	streamReadyOnce sync.Once
 	streamConnected atomic.Bool
 	wake            chan struct{}
-	target          atomic.Int64
+	// streamDown tells the fetch loop that a connected stream dropped, so
+	// a poll wait chosen while it was up shortens to the down poll.
+	streamDown chan struct{}
+	target     atomic.Int64
 	// firstConnect and retryHint belong to the stream goroutine alone.
 	firstConnect bool
 	retryHint    time.Duration
@@ -317,6 +320,7 @@ func New(sdkKey, baseURL string, opts ...Option) (*Client, error) {
 	}
 	c.streamReady = make(chan struct{})
 	c.wake = make(chan struct{}, 1)
+	c.streamDown = make(chan struct{}, 1)
 	c.firstConnect = true
 	c.startLoops(o, func(ctx context.Context, loops *sync.WaitGroup) {
 		if o.changeStream == nil || *o.changeStream {

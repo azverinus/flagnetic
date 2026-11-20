@@ -166,7 +166,15 @@ func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable 
 	}
 
 	c.streamConnected.Store(true)
-	defer c.streamConnected.Store(false)
+	defer func() {
+		c.streamConnected.Store(false)
+		// The fetch loop may be asleep on the long poll interval chosen
+		// while the stream was up: tell it the safety poll applies now.
+		select {
+		case c.streamDown <- struct{}{}:
+		default:
+		}
+	}()
 	c.log(slog.LevelInfo, EventSSEConnected, map[string]any{"last_event_id": lastEventID})
 	if !c.firstConnect {
 		// Versions may have been missed while the stream was down.
