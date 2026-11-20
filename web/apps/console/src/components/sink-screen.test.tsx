@@ -32,7 +32,10 @@ describe("a sink's screen", () => {
   });
 
   it("says the sink is missing when the server has none", async () => {
-    fakeServer(common);
+    fakeServer({
+      ...common,
+      [`GET ${base(clickhouseSink.id)}`]: problem(404, "not_found"),
+    });
     await renderWithRouter(() => <SinkScreen project="checkout" sink={clickhouseSink.id} />);
     expect(await screen.findByRole("heading", { name: "Sink not found" })).toBeVisible();
   });

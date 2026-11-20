@@ -38,8 +38,12 @@ export type OverridesSectionProps = {
   unitTypes: readonly UnitType[];
   /** A member's name by identifier, for who last wrote each override. */
   nameOf: (member: string) => string;
-  /** Why overrides cannot be written now, such as the flag being archived; none when they can. */
-  frozen?: string;
+  /**
+   * Why overrides cannot be written now, shown in place of adding one; true
+   * when they cannot and the page already says why, such as the flag being
+   * archived; none when they can.
+   */
+  frozen?: string | true;
 };
 
 /**
@@ -201,7 +205,9 @@ export function OverridesSection({
               : remove.error
           }
         />
-        {frozen ? null : can ? (
+        {frozen === true ? null : frozen ? (
+          <p className="text-sm text-muted-foreground">{frozen}</p>
+        ) : can ? (
           <AddOverride
             project={project}
             flag={flag}

@@ -124,6 +124,8 @@ function routes(extra: Record<string, never> = {}) {
   return {
     "GET /projects/mobile/environments": environments,
     "GET /projects/mobile/unit-types": unitTypes,
+    // Applying an import reads who the member is again; the test does not look at the answer.
+    "GET /me": problem(404, "not_found"),
     ...extra,
   };
 }

@@ -103,6 +103,17 @@ describe("the transitions a change request offers", () => {
     ]);
   });
 
+  it("never offers to apply a scheduled change request: the system applies it at its time", () => {
+    const approval = { member: { id: other, name: "Bo" }, at: "2026-10-25T11:00:00Z", comment: "" };
+    const scheduled = changeRequest({
+      state: "approved",
+      approval,
+      apply_at: "2026-11-30T09:00:00Z",
+    });
+
+    expect(offered(changeRequestOffers(scheduled, developer))).toEqual(["cancel", "copy"]);
+  });
+
   it("lets the author or the approver apply an approved one, and a holder of approve anyone's", () => {
     const approval = { member: { id: other, name: "Bo" }, at: "2026-10-25T11:00:00Z", comment: "" };
     const mine = changeRequest({ state: "approved", approval });

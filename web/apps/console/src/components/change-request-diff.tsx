@@ -193,7 +193,7 @@ function json(value: unknown): string {
 }
 
 /** A change request's patch, one sentence per operation. */
-export function PatchDiff({
+function PatchDiff({
   diff,
   subject = "configuration",
 }: {

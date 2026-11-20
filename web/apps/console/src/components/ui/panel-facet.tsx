@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 export type FacetOption = { value: string; label: string };
 
 /** Up to this many options a facet is a radio list; beyond it, a select. */
-export const facetRadioLimit = 5;
+const facetRadioLimit = 5;
 
 /** The select's value for a facet left unset: Radix keeps the empty string for itself. */
 const unset = "\u0000unset";

@@ -5,7 +5,6 @@ import { cn } from "@/lib/cn";
 
 export const Popover = PopoverPrimitive.Root;
 export const PopoverTrigger = PopoverPrimitive.Trigger;
-export const PopoverAnchor = PopoverPrimitive.Anchor;
 
 /**
  * Content next to its trigger, in the top layer: Escape and a click outside

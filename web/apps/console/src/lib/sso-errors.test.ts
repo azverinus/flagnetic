@@ -12,7 +12,7 @@ describe("the sentence for an error the sign-in page was sent with", () => {
     ["sso_failed", "Signing in through the identity provider failed"],
     ["idp_error", "The identity provider refused the sign-in"],
     ["member_not_found", "No member of this instance matches that account"],
-    ["member_deactivated", "Your account here is deactivated"],
+    ["member_deactivated", "You are deactivated here"],
     ["attempt_mismatch", "That sign-in was started in another browser"],
   ])("explains %s", (code, start) => {
     expect(ssoErrorMessage(i18n, code)).toMatch(new RegExp(`^${start}`));

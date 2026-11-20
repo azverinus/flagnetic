@@ -51,6 +51,31 @@ describe("a field", () => {
     expect(input).toHaveAccessibleDescription("Shown everywhere. At most 200 characters.");
   });
 
+  it("shows a violation deeper than the field on the nearest field it starts with", () => {
+    const refusal = new ApiError(422, {
+      code: "invalid_character",
+      errors: [
+        { pointer: "/variations/0/value/msg", code: "invalid_character", detail: "control" },
+      ],
+    });
+    renderWithProviders(
+      <>
+        <Field label="Value" refusal={refusal} pointer="/variations/0/value">
+          <Input />
+        </Field>
+        <Field label="Other" refusal={refusal} pointer="/variations/0/val">
+          <Input />
+        </Field>
+      </>,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Value" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("textbox", { name: "Value" })).toHaveAccessibleDescription(
+      "Remove the control character. Text holds visible characters, tabs and line breaks only.",
+    );
+    expect(screen.getByRole("textbox", { name: "Other" })).not.toHaveAttribute("aria-invalid");
+  });
+
   it("shows the form's own error before the server's", () => {
     renderWithProviders(
       <Field label="Name" error="Required.">

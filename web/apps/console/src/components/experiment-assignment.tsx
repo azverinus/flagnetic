@@ -128,7 +128,7 @@ export function ExperimentAssignmentLookup({
   );
 }
 
-export function AssignmentAnswer({ assignment }: { assignment: ExperimentAssignment }) {
+function AssignmentAnswer({ assignment }: { assignment: ExperimentAssignment }) {
   const { i18n } = useLingui();
   const unit = assignment.unit_id;
   const inclusion = formatNumber(i18n, assignment.inclusion_bucket);

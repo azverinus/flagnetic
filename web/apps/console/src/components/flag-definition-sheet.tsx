@@ -96,7 +96,7 @@ export function FlagDefinitionSheet({
 
 /** The fields whose refusals the form shows under them, by their pointers. */
 const fieldPointer =
-  /^\/(name|description|owner|tags(\/\d+)?|lifetime|expected_removal_at|variations\/\d+\/(key|value|name|description))$/;
+  /^\/(name|description|owner|tags(\/\d+)?|lifetime|expected_removal_at|variations\/\d+\/(key|value|name|description)(\/.*)?)$/;
 
 /** A conflict met on saving: the definition as it is now, and the entry that made it so. */
 type Conflict = { current: FlagDefinition; entry: AuditEntry | undefined };

@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 
+import { takeUndeclared } from "./src/test/fake-server";
 import { activateForTests } from "./src/test/render";
 
 // jsdom has no layout, so it lacks the element methods Radix Select calls
@@ -30,4 +31,10 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  const undeclared = takeUndeclared();
+  if (undeclared.length > 0) {
+    throw new Error(
+      `The test made requests to routes it did not declare in fakeServer: ${[...new Set(undeclared)].join(", ")}`,
+    );
+  }
 });

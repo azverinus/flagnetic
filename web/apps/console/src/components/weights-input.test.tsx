@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/errors";
 import { type WeightDraft, weightIssues } from "@/lib/experiments";
 import { activateForTests, renderWithProviders } from "@/test/render";
 
@@ -81,6 +82,26 @@ describe("the weights input", () => {
       screen.getByText("Enter a percentage from 0 to 100, at most two decimals."),
     ).toBeInTheDocument();
     expect(screen.getByText("Enter every weight to see the total.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Weight of variation 2 (%)" })).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  });
+
+  it("marks the row a refusal points into, however deep", () => {
+    renderWithProviders(
+      <WeightsInput
+        rows={half}
+        onChange={changes}
+        variations={variations}
+        refusal={
+          new ApiError(422, {
+            code: "validation_failed",
+            errors: [{ pointer: "/variations/1/weight/x", code: "required", detail: "" }],
+          })
+        }
+      />,
+    );
     expect(screen.getByRole("textbox", { name: "Weight of variation 2 (%)" })).toHaveAttribute(
       "aria-invalid",
       "true",

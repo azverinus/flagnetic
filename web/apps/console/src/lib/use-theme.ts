@@ -7,7 +7,7 @@ import { applyTheme, readTheme, type Theme, themeStorageKey, writeTheme } from "
  * control showing it follows, the toasts included, which render outside
  * the router.
  */
-export const themeEvent = "flagnetic:theme";
+const themeEvent = "flagnetic:theme";
 
 /** The theme picked on this page when the browser denied storing it. */
 let unstored: Theme | undefined;

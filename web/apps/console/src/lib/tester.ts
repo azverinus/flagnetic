@@ -147,7 +147,7 @@ export function contextLabel(context: EvaluationContext): string {
 }
 
 /** How many contexts the tester remembers in each project. */
-export const maxRecentContexts = 10;
+const maxRecentContexts = 10;
 
 const recentPrefix = "flagnetic.recent-contexts.";
 const recentKey = (project: string) => `${recentPrefix}${project}`;

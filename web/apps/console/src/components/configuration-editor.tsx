@@ -494,6 +494,11 @@ export function ConfigurationEditor({
             errors={errors}
             saltedRules={salted}
             onRegenerateSalt={readOnly === undefined ? setSalting : undefined}
+            regenerateBlocked={
+              proposes
+                ? t`A protected environment never takes a new salt: it would move units to other variations without a review.`
+                : undefined
+            }
             matchedRule={matched}
             disabled={readOnly !== undefined}
           />

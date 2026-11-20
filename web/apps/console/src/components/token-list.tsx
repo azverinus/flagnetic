@@ -31,7 +31,7 @@ import { useNowPassing } from "@/lib/use-now";
  * the kind of token, scopes, expiry, creation, last use and where each is
  * in its life at now.
  */
-export function useTokenColumns<Token extends ApiToken>(
+function useTokenColumns<Token extends ApiToken>(
   now: Date,
   /** Memoized by the caller, so the cells keep their identity between renders. */
   kindColumns?: readonly TableColumn<Token>[],

@@ -8,7 +8,7 @@ export const dayRanges = [7, 30, 90] as const;
 export type DayRange = (typeof dayRanges)[number];
 
 /** The range shown when the address names none; the server's own default. */
-export const defaultDayRange = 30 satisfies DayRange;
+const defaultDayRange = 30 satisfies DayRange;
 
 /** What a page of daily counts keeps in its address: the range, unless it is the default. */
 export type DaysSearch = { days?: Exclude<DayRange, typeof defaultDayRange> };

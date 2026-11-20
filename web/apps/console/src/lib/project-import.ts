@@ -174,7 +174,7 @@ export function deletionCount(result: ImportResult): number {
 export type ChangeKind =
   "environments" | "unit_types" | "attributes" | "segments" | "flags" | "experiments";
 
-export const changeKinds: ChangeKind[] = [
+const changeKinds: ChangeKind[] = [
   "environments",
   "unit_types",
   "attributes",

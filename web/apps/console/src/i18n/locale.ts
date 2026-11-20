@@ -9,7 +9,7 @@ export type Locale = (typeof locales)[number];
 export const localeStorageKey = "flagnetic.locale";
 
 /** The language the console is written in, used when nothing else applies. */
-export const sourceLocale: Locale = "en";
+const sourceLocale: Locale = "en";
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (locales as readonly string[]).includes(value);

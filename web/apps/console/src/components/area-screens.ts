@@ -117,7 +117,7 @@ export const activityScreens = [
  * The screens behind the sidebar's "Project settings" link, in the order
  * the link tries them: it opens the first one the caller may open.
  */
-export const projectSettingsScreens = [
+const projectSettingsScreens = [
   {
     to: "/projects/$project/settings",
     group: "project",

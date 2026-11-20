@@ -65,7 +65,7 @@ export function statusName(i18n: I18n, status: SdkKeyStatus): string {
  * Whether a key still works for an SDK: an expired or revoked key is
  * refused whatever is done to it.
  */
-export function isInUse(key: Pick<SdkKey, "status">): boolean {
+function isInUse(key: Pick<SdkKey, "status">): boolean {
   return key.status === "active" || key.status === "rotating";
 }
 
