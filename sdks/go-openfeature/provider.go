@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -45,6 +46,16 @@ type Provider struct {
 
 	closed atomic.Bool
 	events chan of.Event
+
+	// mu orders what the stage listener and the logger report, which run
+	// on the client's own goroutines. initialized is set once Init has
+	// returned: until then the OpenFeature SDK sets the status itself, so
+	// nothing is sent. revoked holds a refused key until the client is
+	// fresh again, and reported counts the status events sent.
+	mu          sync.Mutex
+	initialized bool
+	revoked     bool
+	reported    int
 
 	unsubChange func()
 	unsubStage  func()
@@ -198,6 +209,7 @@ func (p *Provider) Init(_ of.EvaluationContext) error {
 	ctx, cancel := context.WithTimeout(context.Background(), p.readyTimeout)
 	defer cancel()
 	p.client.Ready(ctx)
+	p.markInitialized()
 	return nil
 }
 
@@ -205,7 +217,38 @@ func (p *Provider) Init(_ of.EvaluationContext) error {
 // is done, and never fails, for the reason Init documents.
 func (p *Provider) InitWithContext(ctx context.Context, _ of.EvaluationContext) error {
 	p.client.Ready(ctx)
+	p.markInitialized()
 	return nil
+}
+
+// announceDelay is how long after Init returns the provider announces a
+// state other than ready. The OpenFeature SDK sets READY itself when Init
+// returns, on another goroutine than the one draining the provider's
+// events; an announcement sent at once could be overtaken by that READY.
+const announceDelay = 100 * time.Millisecond
+
+// markInitialized marks Init as returned and, when the client is not fresh,
+// announces the state it is really in once the SDK's own READY is in:
+// ERROR for a refused key, STALE at last_good. A status event sent in the
+// meantime already says it, so the announcement is then dropped.
+func (p *Provider) markInitialized() {
+	p.mu.Lock()
+	p.initialized = true
+	reported := p.reported
+	p.mu.Unlock()
+	go func() {
+		time.Sleep(announceDelay)
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if p.reported != reported {
+			return
+		}
+		if p.revoked {
+			p.errorLocked()
+		} else if p.client.Stage() == flagnetic.StageLastGood {
+			p.staleLocked()
+		}
+	}()
 }
 
 // Shutdown closes the wrapped client, flushing queued exposures, aliases
@@ -247,13 +290,37 @@ func (p *Provider) onChange(changed []string) {
 	})
 }
 
-// onStage fires STALE on entering stage last_good; other transitions are
-// silent, ready is Init's job.
+// onStage turns the client's moves between stages into status events:
+// READY on every move to fresh, so the status leaves STALE or ERROR when
+// the client recovers, and STALE on a move to last_good unless the key is
+// refused, where the ERROR already sent must not be hidden by STALE. Until
+// Init has returned the OpenFeature SDK sets the status itself, so a move
+// then is only remembered.
 func (p *Provider) onStage(stage flagnetic.Stage) {
-	if stage != flagnetic.StageLastGood {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if stage == flagnetic.StageFresh {
+		p.revoked = false
+	}
+	if !p.initialized {
 		return
 	}
-	p.emit(of.Event{
+	switch {
+	case stage == flagnetic.StageFresh:
+		p.report(of.Event{
+			ProviderName: providerName,
+			EventType:    of.ProviderReady,
+			ProviderEventDetails: of.ProviderEventDetails{
+				Message: "flagnetic: ruleset stage is fresh",
+			},
+		})
+	case stage == flagnetic.StageLastGood && !p.revoked:
+		p.staleLocked()
+	}
+}
+
+func (p *Provider) staleLocked() {
+	p.report(of.Event{
 		ProviderName: providerName,
 		EventType:    of.ProviderStale,
 		ProviderEventDetails: of.ProviderEventDetails{
@@ -262,16 +329,8 @@ func (p *Provider) onStage(stage flagnetic.Stage) {
 	})
 }
 
-// observe is the client's logger: it logs exactly as flagnetic's own
-// default would, and additionally fires PROVIDER_ERROR when the SDK key is
-// revoked, the one case last_good
-// alone does not distinguish from an ordinary fetch failure.
-func (p *Provider) observe(level slog.Level, event flagnetic.Event, fields map[string]any) {
-	defaultLog(level, event, fields)
-	if event != flagnetic.EventKeyRevoked {
-		return
-	}
-	p.emit(of.Event{
+func (p *Provider) errorLocked() {
+	p.report(of.Event{
 		ProviderName: providerName,
 		EventType:    of.ProviderError,
 		ProviderEventDetails: of.ProviderEventDetails{
@@ -279,6 +338,29 @@ func (p *Provider) observe(level slog.Level, event flagnetic.Event, fields map[s
 			ErrorCode: of.GeneralCode,
 		},
 	})
+}
+
+// report sends a status event and counts it. The caller holds mu.
+func (p *Provider) report(e of.Event) {
+	p.reported++
+	p.emit(e)
+}
+
+// observe is the client's logger: it logs exactly as flagnetic's own
+// default would, and additionally remembers a revoked SDK key and fires
+// PROVIDER_ERROR for it, the one case last_good alone does not
+// distinguish from an ordinary fetch failure.
+func (p *Provider) observe(level slog.Level, event flagnetic.Event, fields map[string]any) {
+	defaultLog(level, event, fields)
+	if event != flagnetic.EventKeyRevoked {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.revoked = true
+	if p.initialized {
+		p.errorLocked()
+	}
 }
 
 // emit queues e for the OpenFeature SDK's drain goroutine, dropping it

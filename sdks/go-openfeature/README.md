@@ -36,7 +36,7 @@ enabled, _ := client.BooleanValue(ctx, "new_checkout", false, of.NewEvaluationCo
 - Boolean, string, integer, float and object evaluations go through the SDK's `Detail`. Integers follow the SDK's `Int`: a number that is not whole or does not fit in an `int64` serves the default with `TYPE_MISMATCH`.
 - The targeting key is the unit ID of the unit type given with `WithUnitType` (`user` by default); further unit types travel in the evaluation context's `units` attribute, as `map[string]any{"units": map[string]any{"anonymous": "d-8f1c"}}`.
 - `Init` waits for the first ruleset up to the ready timeout and never fails: a provider at built-in defaults still serves them. `Shutdown` closes the client, flushing what is queued.
-- Events: ready from `Init`, `PROVIDER_CONFIGURATION_CHANGED` with the changed flag keys after every accepted ruleset, `PROVIDER_STALE` when the client falls back to its last good ruleset, and `PROVIDER_ERROR` when the SDK key is refused.
+- Events: ready from `Init`, `PROVIDER_CONFIGURATION_CHANGED` with the changed flag keys after every accepted ruleset, `PROVIDER_STALE` when the client falls back to its last good ruleset, `PROVIDER_READY` again every time it is back to a fresh one, and `PROVIDER_ERROR` when the SDK key is refused. While the key stays refused the status remains `ERROR`: no `PROVIDER_STALE` follows it.
 - `provider.Client()` returns the wrapped `*flagnetic.Client`.
 
 ## Reasons
