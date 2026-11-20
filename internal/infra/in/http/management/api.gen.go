@@ -1339,7 +1339,8 @@ type AttributeListItem struct {
 
 	// UsageCount How many flags (archived ones included, each counted once whatever
 	// its environments) and segments name it, in a rule's condition, a
-	// rollout, an override or a segment's condition. Deleting it is
+	// rollout, an override or a segment's condition, plus the draft and
+	// running experiments that assign the unit type. Deleting it is
 	// refused while this is above zero.
 	UsageCount DeclarationUsageCount `json:"usage_count"`
 
@@ -1978,7 +1979,8 @@ type CredentialMethod string
 
 // DeclarationUsageCount How many flags (archived ones included, each counted once whatever
 // its environments) and segments name it, in a rule's condition, a
-// rollout, an override or a segment's condition. Deleting it is
+// rollout, an override or a segment's condition, plus the draft and
+// running experiments that assign the unit type. Deleting it is
 // refused while this is above zero.
 type DeclarationUsageCount = int
 
@@ -5082,7 +5084,8 @@ type UnitTypeListItem struct {
 
 	// UsageCount How many flags (archived ones included, each counted once whatever
 	// its environments) and segments name it, in a rule's condition, a
-	// rollout, an override or a segment's condition. Deleting it is
+	// rollout, an override or a segment's condition, plus the draft and
+	// running experiments that assign the unit type. Deleting it is
 	// refused while this is above zero.
 	UsageCount DeclarationUsageCount `json:"usage_count"`
 

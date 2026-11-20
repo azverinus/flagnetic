@@ -63,8 +63,9 @@ func (s *Store) DeclarationReferences(ctx context.Context, project workspace.Pro
 }
 
 // DeclarationUsageCounts returns, by the key of each unit type or attribute
-// of project something names, how many flags and segments name it: a flag,
-// archived ones included, once whatever its environments and however many
+// of project something names, how many flags, segments and experiments name
+// it: an experiment once, while it is a draft or running, the same as the
+// delete guard holds a unit type; a flag, archived ones included, once whatever its environments and however many
 // rules, rollouts and overrides name it there, as DeclarationReferences
 // finds them; a segment once however many of its conditions do. One query
 // answers every declaration of the project.
@@ -87,6 +88,9 @@ func (s *Store) DeclarationUsageCounts(ctx context.Context, project workspace.Pr
 		    UNION
 		    SELECT s.id, cond->>'attribute' FROM segments s, jsonb_array_elements(s.conditions) cond
 		    WHERE s.project_id = $1
+		    UNION
+		    SELECT id, unit_type FROM experiments
+		    WHERE project_id = $1 AND status IN ('draft', 'running')
 		) named
 		GROUP BY named.key`, project)
 }

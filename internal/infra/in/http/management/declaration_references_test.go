@@ -279,3 +279,25 @@ func TestUsageCountsCostOneQueryPerList(t *testing.T) {
 		}
 	}
 }
+
+// A unit type that only a draft or running experiment assigns is held by the
+// delete guard, so the list shows it as used.
+func TestAUnitTypeAssignedOnlyByAnExperimentIsListedAsUsed(t *testing.T) {
+	f := startExperiments(t)
+	declareUnitType(t, f.admin, f.project.Key, "organization")
+	body := validExperiment("title_test")
+	body.UnitType = "organization"
+	createExperiment(t, f.admin, f.project.Key, body)
+
+	units := do(f.admin.ListUnitTypesWithResponse(t.Context(), f.project.Key))
+	if units.JSON200 == nil {
+		t.Fatalf("GET unit types = %d %s", units.StatusCode(), units.Body)
+	}
+	got := map[string]int{}
+	for _, u := range units.JSON200.Items {
+		got[u.Key] = u.UsageCount
+	}
+	if got["organization"] != 1 || got["user"] != 0 {
+		t.Errorf("unit type usage counts = %v, want organization 1 and user 0", got)
+	}
+}
