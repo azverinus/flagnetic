@@ -8,5 +8,5 @@
   "sdks/ruby": "0.1.3",
   "sdks/ruby-openfeature": "0.1.1",
   "sdks/dart": "0.1.4",
-  "sdks/flutter": "0.1.2"
+  "sdks/flutter": "0.1.3"
 }
