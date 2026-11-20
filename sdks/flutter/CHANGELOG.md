@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/flutter/v0.1.2...sdks/flutter/v0.1.3) (2026-11-20)
+
+
+### Bug Fixes
+
+* **sdks:** close the Dart and Flutter review findings ([#417](https://github.com/azverinus/flagnetic/issues/417)) ([0ef349e](https://github.com/azverinus/flagnetic/commit/0ef349ea9beab8bbd6a1fe54138382aafa3c15f9))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/flutter/v0.1.1...sdks/flutter/v0.1.2) (2026-11-17)
 
 
