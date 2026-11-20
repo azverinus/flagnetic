@@ -211,7 +211,8 @@ class ExposuresTest < Minitest::Test
     c.ready(timeout: 2)
     c.string("auto_on", default: "", context: { units: { "anonymous" => "u-\xFF" } })
     c.flush(timeout: 2)
-    assert_equal "u-\uFFFD", @server.events_requests.first.events.first["unit_id"]
+    exposures = @server.events_requests.flat_map(&:events).select { |e| e["type"] == "exposure" }
+    assert_equal(["u-\uFFFD"], exposures.map { |e| e["unit_id"] })
   end
 
   # The guard: an event that still does not encode (whatever the reason) is
