@@ -199,6 +199,12 @@ export interface ClientOptions {
   readonly requestTimeout?: number;
   /** Milliseconds between event flushes while the tab is visible: 5 000 by default. */
   readonly flushInterval?: number;
+  /**
+   * Milliseconds between evaluation summaries while the tab is visible: 60 000
+   * by default. The summary is also reported when the tab is hidden and when
+   * the client closes. Exposures and aliases keep the flush interval.
+   */
+  readonly summaryInterval?: number;
   /** Whether exposures are sent: true by default. Off logs a warning at construction. */
   readonly sendExposures?: boolean;
   /** Whether evaluation summaries are sent: true by default. */

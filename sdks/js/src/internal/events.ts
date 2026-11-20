@@ -14,9 +14,9 @@ export type QueuedEvent = Record<string, unknown> & { readonly type: string; rea
  * Limits of POST /sdk/v1/events. The body limit is on the
  * decompressed envelope, so a batch is packed against it before gzipping.
  */
-export const MAX_EVENTS_PER_BATCH = 500;
-export const MAX_SUMMARY_ROWS = 1_000;
-export const MAX_BATCH_BYTES = 1 << 20;
+const MAX_EVENTS_PER_BATCH = 500;
+const MAX_SUMMARY_ROWS = 1_000;
+const MAX_BATCH_BYTES = 1 << 20;
 
 /** The key a summary row is counted under: one flag, one variation, one reason. */
 export function countKey(flag: string, variation: string | null, reason: string): string {
@@ -322,27 +322,31 @@ export function utf8Length(s: string): number {
 }
 
 /**
- * Splits events into batches the endpoint accepts: at most 500 events and,
- * decompressed, under 1 MiB counting the envelope. An event too large on
- * its own still becomes a batch of one, which the platform answers 413 and
- * the caller drops.
+ * The events from `from` that make the next batch the endpoint accepts: at
+ * most 500 and, decompressed, under 1 MiB counting the envelope. An event too
+ * large on its own still becomes a batch of one, which the platform answers
+ * 413 and the caller drops.
  */
-export function packBatches(events: readonly QueuedEvent[], envelopeOverhead: number): QueuedEvent[][] {
+export function packBatch(events: readonly QueuedEvent[], envelopeOverhead: number, from = 0): QueuedEvent[] {
   const budget = MAX_BATCH_BYTES - envelopeOverhead;
-  const batches: QueuedEvent[][] = [];
-  let current: QueuedEvent[] = [];
   let size = 0;
-  for (const e of events) {
+  let end = from;
+  for (; end < events.length; end++) {
     // One comma per event after the first.
-    const cost = utf8Length(JSON.stringify(e)) + 1;
-    if (current.length > 0 && (current.length === MAX_EVENTS_PER_BATCH || size + cost > budget)) {
-      batches.push(current);
-      current = [];
-      size = 0;
-    }
-    current.push(e);
+    const cost = utf8Length(JSON.stringify(events[end])) + 1;
+    if (end > from && (end - from === MAX_EVENTS_PER_BATCH || size + cost > budget)) break;
     size += cost;
   }
-  if (current.length > 0) batches.push(current);
+  return events.slice(from, end);
+}
+
+/** Splits events into batches the endpoint accepts, as `packBatch` does one at a time. */
+export function packBatches(events: readonly QueuedEvent[], envelopeOverhead: number): QueuedEvent[][] {
+  const batches: QueuedEvent[][] = [];
+  for (let from = 0; from < events.length; ) {
+    const batch = packBatch(events, envelopeOverhead, from);
+    batches.push(batch);
+    from += batch.length;
+  }
   return batches;
 }

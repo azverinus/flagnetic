@@ -194,6 +194,7 @@ class Runner {
       stream: o.sse === true,
       pollInterval: o.poll_interval_ms as number,
       flushInterval: o.flush_interval_ms as number,
+      ...(typeof o.summary_interval_ms === "number" && { summaryInterval: o.summary_interval_ms }),
       sendSummaries: o.send_summaries === true,
       sendExposures: o.send_exposures !== false,
       allowOverrides: o.allow_overrides === true,

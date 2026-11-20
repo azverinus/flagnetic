@@ -49,6 +49,9 @@ const defaults = {
   minRefetchGap: 10_000,
   requestTimeout: 5_000,
   flushInterval: 5_000,
+  summaryInterval: 60_000,
+  /** The age past which an unsent summary window is dropped. */
+  maxWindowAge: 3_600_000,
   retryInitial: 2_000,
   retryMax: 300_000,
   unauthorizedMax: 900_000,
@@ -220,6 +223,7 @@ export class FlagneticClient {
       ...(options.pollInterval !== undefined && { pollInterval: Math.max(pollFloor, options.pollInterval) }),
       ...(options.requestTimeout !== undefined && { requestTimeout: options.requestTimeout }),
       ...(options.flushInterval !== undefined && { flushInterval: options.flushInterval }),
+      ...(options.summaryInterval !== undefined && { summaryInterval: options.summaryInterval }),
       ...internals.timing,
     };
     this.backoff = new Backoff(this.timing.retryInitial, this.random);
@@ -257,6 +261,8 @@ export class FlagneticClient {
         capacity: this.timing.capacity,
         batchSize: this.timing.batchSize,
         flushInterval: this.timing.flushInterval,
+        summaryInterval: this.timing.summaryInterval,
+        maxWindowAge: this.timing.maxWindowAge,
         requestTimeout: this.timing.requestTimeout,
         retryInitial: this.timing.retryInitial,
         retryMax: this.timing.retryMax,
