@@ -11,6 +11,7 @@ import (
 	"fmt"
 	mrand "math/rand/v2"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -75,6 +76,12 @@ func NewDeps(pool *pgxpool.Pool, c clock.Clock) Deps {
 	return Deps{Pool: pool, Clock: c, IDs: id.NewSource(c)}
 }
 
+// TargetResolver resolves the host name of a webhook or sink target to its
+// addresses.
+type TargetResolver interface {
+	LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error)
+}
+
 // Options are how a replica serves, as its configuration sets them.
 type Options struct {
 	// Keyring holds the instance's secret key, which session cookies are
@@ -110,6 +117,9 @@ type Options struct {
 	// WebhookTargets is what the operator allows a webhook subscription's
 	// target to be.
 	WebhookTargets governance.TargetPolicy
+	// Resolver resolves the names of webhook and sink targets; nil is the
+	// system's resolver.
+	Resolver TargetResolver
 	// WebhookTick is how often the replica fans the outbox out and sends the
 	// webhook deliveries that are due.
 	WebhookTick time.Duration
@@ -247,18 +257,22 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	})
 	// A subscription's secret is sealed under the instance's secret key, and
 	// its target's name resolved by the system's resolver.
+	var resolver TargetResolver = net.DefaultResolver
+	if o.Resolver != nil {
+		resolver = o.Resolver
+	}
 	webhookStore := pggovernance.NewWebhooks(d.Pool)
 	webhooks := appgovernance.WebhookDeps{
 		Tx: tx, Store: webhookStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
-		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
+		Sealer: o.Keyring, Resolver: resolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
 	}
 	// A sink's secret is sealed under the same key, its target resolved by the
 	// same resolver and judged by the webhook subscriptions' policy.
 	sinkStore := pgsinks.NewStore(d.Pool).WithFault(o.SinkFault)
-	sinkTargets := outsinks.NewTargets(o.WebhookTargets, net.DefaultResolver)
+	sinkTargets := outsinks.NewTargets(o.WebhookTargets, resolver)
 	sinks := appsinks.Deps{
 		Tx: tx, Store: sinkStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
-		Sealer: o.Keyring, Resolver: net.DefaultResolver, TargetPolicy: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
+		Sealer: o.Keyring, Resolver: resolver, TargetPolicy: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
 		Rows: sinkStore, Targets: sinkTargets, Opener: o.Keyring, Retention: o.EventsRetention, LagWarning: o.SinkLagWarning,
 		DeadLetters: sinkStore, Gaps: sinkStore,
 	}

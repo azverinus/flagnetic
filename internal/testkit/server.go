@@ -161,11 +161,12 @@ type serverOptions struct {
 	edge    []func(*flaghttp.Options)
 	routes  []route
 	// console is the default locale of the console served, "" for none.
-	console string
-	listen  pglisten.Options
-	targets governance.TargetPolicy
-	fault   *pgdelivery.RulesetLoadFault
-	limits  []func(*config.RateLimits)
+	console  string
+	listen   pglisten.Options
+	targets  governance.TargetPolicy
+	resolver compose.TargetResolver
+	fault    *pgdelivery.RulesetLoadFault
+	limits   []func(*config.RateLimits)
 	// aliasLinksLimit and firstExposuresLimit are the limits of what an
 	// environment keeps of each; 0 keeps the configuration's.
 	aliasLinksLimit, firstExposuresLimit int
@@ -285,6 +286,15 @@ func WithWebhookTargets(p governance.TargetPolicy) ServerOption {
 	return func(o *serverOptions) { o.targets = p }
 }
 
+// WithResolver serves resolving the names of webhook and sink targets with r
+// instead of the default, which answers the names reserved for documentation
+// and tests (.example, .invalid and .test) as not found at once and
+// leaves any other to the system's resolver. A test of how a target's name
+// resolves passes one answering the addresses it wants.
+func WithResolver(r compose.TargetResolver) ServerOption {
+	return func(o *serverOptions) { o.resolver = r }
+}
+
 // WithClock serves with c as the application clock instead of the wall clock.
 func WithClock(c clock.Clock) ServerOption {
 	return func(o *serverOptions) { o.clock = c }
@@ -375,6 +385,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		AliasLinksLimit:       cmp.Or(o.aliasLinksLimit, cfg.AliasLinksLimit),
 		FirstExposuresLimit:   cmp.Or(o.firstExposuresLimit, cfg.FirstExposuresLimit),
 		WebhookTargets:        o.targets,
+		Resolver:              cmp.Or[compose.TargetResolver](o.resolver, reservedNamesResolver{}),
 		WebhookTick:           cfg.WebhookTick,
 		SinkTick:              cfg.SinkTick,
 		SinkLagWarning:        cfg.SinkLagWarning,

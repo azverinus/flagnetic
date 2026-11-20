@@ -1,9 +1,11 @@
 package management_test
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strings"
 	"testing"
@@ -126,6 +128,31 @@ func TestAWebhookTargetTheInstanceWillNotCallIsRefused(t *testing.T) {
 	if list := do(admin.ListWebhooksWithResponse(t.Context(), p.Key)); list.JSON200 == nil || len(list.JSON200.Items) != 0 {
 		t.Errorf("refused creates left %s", list.Body)
 	}
+}
+
+// answering stands for a DNS that answers every name with addr, as a proxy's
+// fake-IP DNS does.
+type answering netip.Addr
+
+func (a answering) LookupNetIP(context.Context, string, string) ([]netip.Addr, error) {
+	return []netip.Addr{netip.Addr(a)}, nil
+}
+
+func TestAWebhookTargetIsJudgedByTheTestKitsResolverNotTheMachinesDNS(t *testing.T) {
+	// The test kit's default resolver finds the names reserved for tests
+	// nowhere, so the target is accepted whatever the machine's DNS answers.
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	createWebhook(t, admin, p.Key, siem())
+
+	// A resolver answering every name with a private address makes the
+	// same target one the instance will not call.
+	hostile := testkit.StartServer(t, testkit.WithResolver(answering(netip.MustParseAddr("198.18.0.7"))))
+	admin = testkit.Client(t, hostile, testkit.InstanceAdminToken(t))
+	p = createProject(t, admin, projectKey())
+	res := do(admin.CreateWebhookWithResponse(t.Context(), p.Key, siem()))
+	assertProblem(t, "a name resolving to a private address", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "private_network_target")
 }
 
 func TestALoopbackWebhookTargetIsAllowedWhenTheOperatorAllowsIt(t *testing.T) {
