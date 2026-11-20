@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/azverinus/flagnetic v0.0.0
 	github.com/azverinus/flagnetic/eval v0.1.0
-	github.com/azverinus/flagnetic/sdks/go v0.1.0
+	github.com/azverinus/flagnetic/sdks/go v0.1.1
 	github.com/azverinus/flagnetic/sdks/go-openfeature v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
