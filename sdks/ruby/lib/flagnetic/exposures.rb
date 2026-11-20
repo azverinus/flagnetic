@@ -233,12 +233,17 @@ module Flagnetic
     # stability.
     def fingerprint(context)
       c = Eval::Context.__send__(:coerce, context)
-      units = c.units.sort.flatten
-      attributes = c.attributes.sort.map { |k, v| [k, attribute_token(v)] }.flatten
-      (units + [""] + attributes).join(" ")
+      units = c.units.sort.flatten.map { |u| part(u.to_s) }
+      attributes = c.attributes.sort.map { |k, v| [part(k.to_s), part(attribute_token(v))] }.flatten
+      (units + [part("")] + attributes).join
     rescue StandardError
       context.object_id.to_s
     end
+
+    # part prefixes a piece with its length, so no choice of pieces can join
+    # the same way as another: a separator would let a unit ID holding it
+    # collide with two units.
+    def part(string) = "#{string.bytesize}:#{string}"
 
     def attribute_token(value)
       case value

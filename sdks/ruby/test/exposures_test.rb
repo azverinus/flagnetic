@@ -58,6 +58,16 @@ class ExposuresTest < Minitest::Test
     assert_equal "control", c.recorder.exposures.first.variation_key
   end
 
+  def test_exposure_sends_the_assignment_of_its_own_context_when_two_contexts_join_alike
+    c = offline
+    spaced = { units: { "anonymous" => "a x " } }
+    split = { units: { "anonymous" => "a", "x" => "" } }
+    c.string("auto_off", default: "", context: spaced)
+    c.string("auto_off", default: "", context: split)
+    c.exposure("auto_off", context: spaced)
+    assert_equal ["a x "], c.recorder.exposures.map(&:unit_id)
+  end
+
   def test_exposure_sends_nothing_for_a_flag_never_evaluated_with_an_experiment
     c = offline
     c.exposure("auto_off", context: ASSIGNED)
