@@ -1,14 +1,12 @@
 package postgres_test
 
 import (
-	"bytes"
 	"context"
 	"io/fs"
 	"testing"
 	"testing/fstest"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
 
@@ -33,33 +31,6 @@ func migrated(t *testing.T, url string) *pgxpool.Pool {
 	return pool
 }
 
-// copyTable copies a table's rows between clusters as a logical dump and its
-// restore do: the rows as they were, whatever the new cluster's counter reads.
-func copyTable(t *testing.T, from, to *pgxpool.Pool, table string) {
-	t.Helper()
-	// A restore brings the dump's rows over those the migrations seeded.
-	if _, err := to.Exec(t.Context(), "TRUNCATE "+pgx.Identifier{table}.Sanitize()); err != nil {
-		t.Fatal(err)
-	}
-	var dump bytes.Buffer
-	src, err := from.Acquire(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer src.Release()
-	if _, err = src.Conn().PgConn().CopyTo(t.Context(), &dump, "COPY (SELECT * FROM "+pgx.Identifier{table}.Sanitize()+") TO STDOUT"); err != nil {
-		t.Fatal(err)
-	}
-	dst, err := to.Acquire(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dst.Release()
-	if _, err = dst.Conn().PgConn().CopyFrom(t.Context(), &dump, "COPY "+pgx.Identifier{table}.Sanitize()+" FROM STDIN"); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // A logical dump moves the rows and the cursors of the streams reading them
 // into a cluster that numbers its transactions from the start. Rows the new
 // cluster receives must still come after every cursor: a stream goes on
@@ -79,9 +50,7 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 
 	old := migrated(t, testkit.EmptyDatabase(t))
 	// The old cluster has begun a great many transactions.
-	if _, err := old.Exec(ctx, `UPDATE event_cluster SET xid_offset = 1 << 40`); err != nil {
-		t.Fatal(err)
-	}
+	testkit.RaiseEventTransactionOffset(t, old, 1<<40)
 	oldStore := pgevents.NewStore(old)
 	if err := oldStore.SaveAliases(ctx, []events.AliasRecord{alias(1), alias(2)}); err != nil {
 		t.Fatal(err)
@@ -113,7 +82,7 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, table := range []string{"event_cluster", "rollup_cursors", "alias_events"} {
-		copyTable(t, old, fresh, table)
+		testkit.CopyTableAsALogicalRestore(t, old, fresh, table)
 	}
 
 	adopted, err := postgres.AdoptCluster(ctx, fresh)
@@ -224,17 +193,15 @@ func TestAdoptingTheClusterFailsWhereItCannotTellOrChange(t *testing.T) {
 	})
 	t.Run("the cluster was never recorded", func(t *testing.T) {
 		pool := migrated(t, testkit.EmptyDatabase(t))
-		if _, err := pool.Exec(t.Context(), `DROP TABLE event_cluster CASCADE`); err != nil {
-			t.Fatal(err)
-		}
+		testkit.DropClusterRecord(t, pool)
 		if _, err := postgres.AdoptCluster(t.Context(), pool); err == nil {
 			t.Error("adopting a database without the record of its cluster succeeded")
 		}
 	})
 	t.Run("the greatest stored ID cannot be read", func(t *testing.T) {
 		pool := migrated(t, testkit.EmptyDatabase(t))
-		if _, err := pool.Exec(t.Context(), `UPDATE event_cluster SET system_identifier = system_identifier + 1;
-			DROP FUNCTION event_xid_stored()`); err != nil {
+		testkit.ChangeClusterIdentity(t, pool)
+		if _, err := pool.Exec(t.Context(), `DROP FUNCTION event_xid_stored()`); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := postgres.AdoptCluster(t.Context(), pool); err == nil {

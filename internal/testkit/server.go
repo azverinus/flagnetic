@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -161,11 +162,13 @@ type serverOptions struct {
 	edge    []func(*flaghttp.Options)
 	routes  []route
 	// console is the default locale of the console served, "" for none.
-	console string
-	listen  pglisten.Options
-	targets governance.TargetPolicy
-	fault   *pgdelivery.RulesetLoadFault
-	limits  []func(*config.RateLimits)
+	console     string
+	listen      pglisten.Options
+	targets     governance.TargetPolicy
+	resolver    compose.TargetResolver
+	hashCounter *HashCounter
+	fault       *pgdelivery.RulesetLoadFault
+	limits      []func(*config.RateLimits)
 	// aliasLinksLimit and firstExposuresLimit are the limits of what an
 	// environment keeps of each; 0 keeps the configuration's.
 	aliasLinksLimit, firstExposuresLimit int
@@ -285,6 +288,57 @@ func WithWebhookTargets(p governance.TargetPolicy) ServerOption {
 	return func(o *serverOptions) { o.targets = p }
 }
 
+// WithResolver serves resolving the names of webhook and sink targets with r
+// instead of the default, which answers the names reserved for documentation
+// and tests (.example, .invalid and .test) as not found at once and
+// leaves any other to the system's resolver. A test of how a target's name
+// resolves passes one answering the addresses it wants.
+func WithResolver(r compose.TargetResolver) ServerOption {
+	return func(o *serverOptions) { o.resolver = r }
+}
+
+// HashCounter counts the password hashes and verifications of a server.
+type HashCounter struct {
+	hashes, verifications atomic.Int64
+}
+
+// Hashes is how many passwords were hashed.
+func (c *HashCounter) Hashes() int { return int(c.hashes.Load()) }
+
+// Verifications is how many passwords were verified, against a stored hash
+// or the placeholder an unknown email is verified against.
+func (c *HashCounter) Verifications() int { return int(c.verifications.Load()) }
+
+type countingVerifier struct {
+	appaccess.PasswordVerifier
+	counter *HashCounter
+}
+
+func (v countingVerifier) Hash(ctx context.Context, p secret.String) (string, error) {
+	v.counter.hashes.Add(1)
+	return v.PasswordVerifier.Hash(ctx, p)
+}
+
+func (v countingVerifier) Verify(ctx context.Context, p secret.String, encoded string) (ok, outdated bool, err error) {
+	v.counter.verifications.Add(1)
+	return v.PasswordVerifier.Verify(ctx, p, encoded)
+}
+
+// wrapHasher returns what counts with counter, or nil for none.
+func wrapHasher(counter *HashCounter) func(appaccess.PasswordVerifier) appaccess.PasswordVerifier {
+	if counter == nil {
+		return nil
+	}
+	return func(v appaccess.PasswordVerifier) appaccess.PasswordVerifier { return countingVerifier{v, counter} }
+}
+
+// WithHashCounter serves counting its password hashes and verifications in
+// c, so a test compares the work two sign-in paths do instead of how long
+// they take.
+func WithHashCounter(c *HashCounter) ServerOption {
+	return func(o *serverOptions) { o.hashCounter = c }
+}
+
 // WithClock serves with c as the application clock instead of the wall clock.
 func WithClock(c clock.Clock) ServerOption {
 	return func(o *serverOptions) { o.clock = c }
@@ -367,7 +421,8 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	sinkFault := &pgsinks.Fault{}
 	background := compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
-		RulesetLoadFault: o.fault, IngestHold: hold, SinkFault: sinkFault, RateLimits: limits,
+		WrapPasswordHasher: wrapHasher(o.hashCounter),
+		RulesetLoadFault:   o.fault, IngestHold: hold, SinkFault: sinkFault, RateLimits: limits,
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
 		EventsLossWarning:     time.Duration(cfg.EventsLossWarningHours) * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
@@ -375,6 +430,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		AliasLinksLimit:       cmp.Or(o.aliasLinksLimit, cfg.AliasLinksLimit),
 		FirstExposuresLimit:   cmp.Or(o.firstExposuresLimit, cfg.FirstExposuresLimit),
 		WebhookTargets:        o.targets,
+		Resolver:              cmp.Or[compose.TargetResolver](o.resolver, reservedNamesResolver{}),
 		WebhookTick:           cfg.WebhookTick,
 		SinkTick:              cfg.SinkTick,
 		SinkLagWarning:        cfg.SinkLagWarning,

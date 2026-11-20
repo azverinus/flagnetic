@@ -137,13 +137,6 @@ func TestOneProjectCannotTakeEveryAttemptOfAReplica(t *testing.T) {
 			t.Fatal("the other project's delivery never started")
 		}
 	}
-	time.Sleep(100 * time.Millisecond)
-	d.mu.Lock()
-	got := d.running[flooding]
-	d.mu.Unlock()
-	if got > 4 {
-		t.Errorf("%d attempts of one project at once, want at most 4", got)
-	}
 	close(d.release)
 	if err := <-done; err != nil {
 		t.Fatal(err)

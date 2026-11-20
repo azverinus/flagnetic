@@ -13,6 +13,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -132,13 +133,9 @@ func startExposures(t *testing.T) exposuresFixture {
 	return f
 }
 
-func (f exposuresFixture) stored(t *testing.T) []events.ExposureRecord {
+func (f exposuresFixture) stored(t *testing.T) []sinks.ExposureRow {
 	t.Helper()
-	xs, err := testkit.StoredExposures(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return xs
+	return testkit.ExportedExposures(t, testkit.Pool(t), f.p.projectID(t), f.p.environmentID(t, "production"))
 }
 
 // refused returns how many exposures of the fixture's experiment were refused
@@ -180,18 +177,19 @@ func TestAnExposureOfAnExperimentIsStoredOnce(t *testing.T) {
 		t.Fatalf("exposures stored = %+v, want each once", stored)
 	}
 	x := stored[0]
-	if x.EventID.String() != eventID(protocolTime, 1) || x.Experiment != f.experiment || x.SDK.Name != "flagnetic-dart" ||
-		!x.ReceivedAt.Equal(protocolTime) {
+	if x.EventID != eventID(protocolTime, 1) || x.SDKName != "flagnetic-dart" || !x.ReceivedAt.Equal(protocolTime) {
 		t.Errorf("first exposure = %+v", x)
 	}
-	want := events.Exposure{
-		OccurredAt: protocolTime, ExperimentKey: "checkout_test", FlagKey: "checkout", VariationKey: "true", UnitType: "user",
-		UnitID: "u-1001", Platform: "android", Reason: "experiment", RulesetVersion: 1,
+	want := sinks.ExposureRow{
+		EventID: x.EventID, ProjectKey: x.ProjectKey, EnvironmentKey: "production", SDKName: "flagnetic-dart", SDKVersion: x.SDKVersion,
+		OccurredAt: protocolTime, ReceivedAt: protocolTime, Seq: x.Seq,
+		ExperimentKey: "checkout_test", FlagKey: "checkout", VariationKey: "true", UnitType: "user",
+		UnitID: "u-1001", Platform: "android", EvaluationReason: "experiment", RulesetVersion: 1,
 	}
-	if x.Exposure != want {
-		t.Errorf("first exposure = %+v, want %+v", x.Exposure, want)
+	if x != want {
+		t.Errorf("first exposure = %+v, want %+v", x, want)
 	}
-	if o := stored[1].Exposure; !o.Override || o.Reason != "override" || o.VariationKey != "false" || o.RulesetVersion != 4 {
+	if o := stored[1]; !o.Override || o.EvaluationReason != "override" || o.VariationKey != "false" || o.RulesetVersion != 4 {
 		t.Errorf("override exposure = %+v", o)
 	}
 }
@@ -486,25 +484,25 @@ func TestAnEnvelopeFromAWrongClockHasEveryTimeOfEveryEventShifted(t *testing.T) 
 			map[string]any{"interval_start": at(-time.Minute), "interval_end": at(0)}),
 	)
 	pool := testkit.Pool(t)
-	production := f.p.environmentID(t, "production")
-	if x := f.stored(t); len(x) != 1 || !x[0].Exposure.OccurredAt.Equal(protocolTime.Add(-10*time.Minute)) {
+	project, production := f.p.projectID(t), f.p.environmentID(t, "production")
+	if x := f.stored(t); len(x) != 1 || !x[0].OccurredAt.Equal(protocolTime.Add(-10*time.Minute)) {
 		t.Errorf("exposure = %+v, want occurred 10 minutes before it was received", x)
 	}
-	aliases, err := testkit.StoredAliases(t.Context(), pool, production)
-	if err != nil || len(aliases) != 1 || !aliases[0].Alias.OccurredAt.Equal(protocolTime.Add(-20*time.Minute)) {
-		t.Errorf("aliases = %+v, %v, want occurred 20 minutes before it was received", aliases, err)
+	aliases := testkit.ExportedAliases(t, pool, project, production)
+	if len(aliases) != 1 || !aliases[0].OccurredAt.Equal(protocolTime.Add(-20*time.Minute)) {
+		t.Errorf("aliases = %+v, want occurred 20 minutes before it was received", aliases)
 	}
-	summaries, err := testkit.StoredEvaluationSummaries(t.Context(), pool, production)
-	if err != nil || len(summaries) != 1 || !summaries[0].PeriodStart.Equal(protocolTime.Add(-time.Minute)) ||
-		!summaries[0].PeriodEnd.Equal(protocolTime) {
-		t.Errorf("summaries = %+v, %v, want the minute before it was received", summaries, err)
+	summaries := testkit.ExportedEvaluationSummaries(t, pool, project, production)
+	if len(summaries) != 1 || !summaries[0].WindowStart.Equal(protocolTime.Add(-time.Minute)) ||
+		!summaries[0].WindowEnd.Equal(protocolTime) {
+		t.Errorf("summaries = %+v, want the minute before it was received", summaries)
 	}
 }
 
 func TestAnEnvelopeWithinAMinuteOfTheServerClockIsNotShifted(t *testing.T) {
 	f := startExposures(t)
 	skewed(t, f, time.Minute, exposureEvent(1, map[string]any{"occurred_at": protocolTime.Add(-time.Hour).Format(time.RFC3339)}))
-	if x := f.stored(t); len(x) != 1 || !x[0].Exposure.OccurredAt.Equal(protocolTime.Add(-time.Hour)) {
+	if x := f.stored(t); len(x) != 1 || !x[0].OccurredAt.Equal(protocolTime.Add(-time.Hour)) {
 		t.Errorf("exposure = %+v, want occurred an hour before it was received, as sent", x)
 	}
 }
@@ -516,7 +514,7 @@ func TestTheShiftOfAWrongClockDecidesTheWindow(t *testing.T) {
 	f := startExposures(t)
 	slow := 40 * 24 * time.Hour
 	skewed(t, f, slow, exposureEvent(1, map[string]any{"occurred_at": protocolTime.Add(-slow - time.Hour).Format(time.RFC3339)}))
-	if x := f.stored(t); len(x) != 1 || !x[0].Exposure.OccurredAt.Equal(protocolTime.Add(-time.Hour)) {
+	if x := f.stored(t); len(x) != 1 || !x[0].OccurredAt.Equal(protocolTime.Add(-time.Hour)) {
 		t.Errorf("exposure = %+v, want occurred an hour before it was received", x)
 	}
 }

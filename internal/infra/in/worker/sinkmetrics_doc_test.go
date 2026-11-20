@@ -13,8 +13,10 @@ import (
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
-// oneSink answers the scrape-time questions about the one sink the metrics
-// below are labelled with.
+// oneSink stands for a database that answers the scrape-time questions with
+// one sink and nothing wrong with it, a state the real store cannot be put
+// in without a sink's rows in several tables: it overrides the two reads
+// with a fixed snapshot so the documented series carry their labels.
 type oneSink struct{ sink sinks.ID }
 
 func (o oneSink) PendingDeadLetters(context.Context) (map[sinks.ID]int, error) {

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -18,10 +17,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
-
-// settle gives a request time to run as far as it can before it waits on a
-// lock held by the test.
-func settle() { time.Sleep(500 * time.Millisecond) }
 
 // A change made by an instance admin or through SCIM holds the instance admins
 // and then waits for the member. A sign-in that completes an invitation must
@@ -61,7 +56,7 @@ func TestASignInActivatingAnInvitedMemberWaitsForTheAdminChangeToThatMember(t *t
 		wg.Go(func() { done = b.Visit(t, held.URL.String(), e.opts()) })
 		// The completion runs as far as it can: before the fix as far as the
 		// member, whom it then holds while it waits for the admins.
-		settle()
+		testkit.WaitForLockWaits(t, e.pool, 1)
 		_, _, lockErr := store.LockMember(ctx, memberID)
 		return lockErr
 	})
@@ -119,7 +114,7 @@ func TestUnlinkingAnIdentityAndReplacingTheMappingsAtOnceLeaveNoGrantFromTheProv
 			}
 			unlinked = res.HTTPResponse
 		})
-		settle()
+		testkit.WaitForLockWaits(t, e.pool, 1)
 		wg.Go(func() {
 			res, err := admin.ReplaceAuthProviderGroupMappingsWithResponse(t.Context(), slug,
 				&management.ReplaceAuthProviderGroupMappingsParams{IfMatch: version},
@@ -130,7 +125,7 @@ func TestUnlinkingAnIdentityAndReplacingTheMappingsAtOnceLeaveNoGrantFromTheProv
 			}
 			replaced = res.StatusCode()
 		})
-		settle()
+		testkit.WaitForLockWaits(t, e.pool, 2)
 		return nil
 	})
 	wg.Wait()

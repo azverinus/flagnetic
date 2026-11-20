@@ -81,24 +81,18 @@ func TestASCIMTokenWhoseProviderOrExpiryWasChangedInTheDatabaseIsRefused(t *test
 		t.Fatalf("presenting a new token = %+v, %v; want its provider %s", caller, err, s.providerA.Slug)
 	}
 
-	if _, err = s.pool.Exec(t.Context(), `UPDATE scim_tokens SET provider_id = $2 WHERE id = $1`, token.Token.ID.Bytes(), s.providerB.ID.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	testkit.PointSCIMTokenAtProvider(t, s.pool, token.Token.ID.Bytes(), s.providerB.ID.Bytes())
 	if _, err = s.present(t, token); !errors.Is(err, identity.ErrInvalidSCIMToken) {
 		t.Errorf("a token pointed at another provider = %v, want ErrInvalidSCIMToken", err)
 	}
 
-	if _, err = s.pool.Exec(t.Context(), `UPDATE scim_tokens SET provider_id = $2, expires_at = $3 WHERE id = $1`,
-		token.Token.ID.Bytes(), s.providerA.ID.Bytes(), expires.Add(240*time.Hour)); err != nil {
-		t.Fatal(err)
-	}
+	testkit.PointSCIMTokenAtProvider(t, s.pool, token.Token.ID.Bytes(), s.providerA.ID.Bytes())
+	testkit.MoveSCIMTokenExpiry(t, s.pool, token.Token.ID.Bytes(), expires.Add(240*time.Hour))
 	if _, err = s.present(t, token); !errors.Is(err, identity.ErrInvalidSCIMToken) {
 		t.Errorf("a token whose expiry was moved = %v, want ErrInvalidSCIMToken", err)
 	}
 
-	if _, err = s.pool.Exec(t.Context(), `UPDATE scim_tokens SET expires_at = $2 WHERE id = $1`, token.Token.ID.Bytes(), expires); err != nil {
-		t.Fatal(err)
-	}
+	testkit.MoveSCIMTokenExpiry(t, s.pool, token.Token.ID.Bytes(), expires)
 	if _, err = s.present(t, token); err != nil {
 		t.Errorf("a token as it was created = %v, want it accepted", err)
 	}
@@ -113,16 +107,12 @@ func TestASCIMTokenSealedToItsRowAloneIsBoundAtItsFirstUse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.pool.Exec(t.Context(), `UPDATE scim_tokens SET token_hash_sealed = $2 WHERE id = $1`, token.Token.ID.Bytes(), legacy); err != nil {
-		t.Fatal(err)
-	}
+	testkit.ResealSCIMTokenHash(t, s.pool, token.Token.ID.Bytes(), legacy)
 
 	if _, err = s.present(t, token); err != nil {
 		t.Fatalf("a token sealed to its row alone = %v, want it accepted", err)
 	}
-	if _, err = s.pool.Exec(t.Context(), `UPDATE scim_tokens SET provider_id = $2 WHERE id = $1`, token.Token.ID.Bytes(), s.providerB.ID.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	testkit.PointSCIMTokenAtProvider(t, s.pool, token.Token.ID.Bytes(), s.providerB.ID.Bytes())
 	if _, err = s.present(t, token); !errors.Is(err, identity.ErrInvalidSCIMToken) {
 		t.Errorf("the token pointed at another provider after its first use = %v, want ErrInvalidSCIMToken", err)
 	}

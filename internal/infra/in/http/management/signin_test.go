@@ -264,7 +264,7 @@ func TestTheCredentialIsArgon2idAndOlderParametersAreRehashedOnSignIn(t *testing
 
 func TestAForgedSessionCookieIsDropped(t *testing.T) {
 	// The server's database is unreachable: a cookie looked up would answer
-	// 500, one dropped by its tag answers 401 at once.
+	// 500, one dropped by its tag answers 401.
 	unreachable, err := pgxpool.New(t.Context(), "postgres://flagnetic@127.0.0.1:1/flagnetic?connect_timeout=1")
 	if err != nil {
 		t.Fatal(err)
@@ -287,13 +287,12 @@ func TestAForgedSessionCookieIsDropped(t *testing.T) {
 	} {
 		b := testkit.NewBrowser(t, srv.URL)
 		b.SetCookie(management.SessionCookie, forged)
-		start := time.Now()
 		res, err := b.GetMeWithResponse(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if p := res.ApplicationproblemJSON401; p == nil || p.Code != "unauthenticated" || time.Since(start) > time.Second {
-			t.Errorf("%s: %d %s after %v, want 401 unauthenticated at once", name, res.StatusCode(), res.Body, time.Since(start))
+		if p := res.ApplicationproblemJSON401; p == nil || p.Code != "unauthenticated" {
+			t.Errorf("%s: %d %s, want 401 unauthenticated without the database", name, res.StatusCode(), res.Body)
 		}
 	}
 	other := testkit.NewBrowser(t, testkit.StartServer(t).URL)

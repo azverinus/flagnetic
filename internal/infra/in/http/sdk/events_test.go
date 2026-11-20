@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
@@ -81,6 +82,9 @@ func eventID(t time.Time, n int) string {
 	ms := fmt.Sprintf("%012x", t.UnixMilli())
 	return fmt.Sprintf("%s-%s-7000-8000-%012x", ms[:8], ms[8:], n)
 }
+
+// aliasEventPair is the pair of units an aliasEvent links.
+var aliasEventPair = events.AliasPair{FromUnitType: "anonymous", FromUnitID: "d-8f1c", ToUnitType: "user", ToUnitID: "u-1001"}
 
 func aliasEvent(id string) map[string]any {
 	return map[string]any{
@@ -186,11 +190,8 @@ func TestASummaryRowOfAVariationItsFlagLacksIsDropped(t *testing.T) {
 	if got.Accepted != 1 || got.DroppedRows != 2 || len(got.Rejected) != 0 {
 		t.Errorf("answer = %+v, want the summary accepted and 2 rows dropped", got)
 	}
-	summaries, err := testkit.StoredEvaluationSummaries(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(summaries) != 1 || summaries[0].Row.Variation != "true" {
+	summaries := testkit.ExportedEvaluationSummaries(t, testkit.Pool(t), p.projectID(t), p.environmentID(t, "production"))
+	if len(summaries) != 1 || summaries[0].VariationKey != "true" {
 		t.Errorf("summaries stored = %+v, want the row of the flag's own variation alone", summaries)
 	}
 	// A client key is told no count of dropped rows: it would say whether a
@@ -221,31 +222,25 @@ func TestAcceptedSummariesAndAliasesAreStoredOnce(t *testing.T) {
 	}
 
 	pool := testkit.Pool(t)
-	production := p.environmentID(t, "production")
-	summaries, err := testkit.StoredEvaluationSummaries(t.Context(), pool, production)
-	if err != nil {
-		t.Fatal(err)
-	}
+	project, production := p.projectID(t), p.environmentID(t, "production")
+	summaries := testkit.ExportedEvaluationSummaries(t, pool, project, production)
 	if len(summaries) != 2 {
 		t.Fatalf("summary rows = %+v, want checkout and banner_text once each", summaries)
 	}
 	for _, r := range summaries {
-		if r.Source != "sdk" || r.SDK.Name != "flagnetic-dart" || r.SDK.Platform != "linux" || r.AppVersion != "1.18.0" ||
-			r.RulesetVersion != 1 || !r.ReceivedAt.Equal(protocolTime) || r.EventID.String() != eventID(protocolTime, 2) {
+		if r.Source != "sdk" || r.SDKName != "flagnetic-dart" || r.Platform != "linux" || r.AppVersion != "1.18.0" ||
+			r.RulesetVersion != 1 || !r.ReceivedAt.Equal(protocolTime) || r.ReportID != eventID(protocolTime, 2) {
 			t.Errorf("summary row = %+v", r)
 		}
 	}
-	if r := summaries[0]; r.Row.Flag != "checkout" || r.Row.Variation != "true" || r.Row.Reason != "targeting_match" || r.Row.Count != 3 {
-		t.Errorf("first row = %+v", r.Row)
+	if r := summaries[0]; r.FlagKey != "checkout" || r.VariationKey != "true" || r.EvaluationReason != "targeting_match" || r.Count != 3 {
+		t.Errorf("first row = %+v", r)
 	}
-	if r := summaries[1]; r.Row.Flag != "banner_text" || r.Row.Variation != "" || r.Row.Reason != "fallback" || r.Row.Count != 2 {
-		t.Errorf("second row = %+v", r.Row)
+	if r := summaries[1]; r.FlagKey != "banner_text" || r.VariationKey != "" || r.EvaluationReason != "fallback" || r.Count != 2 {
+		t.Errorf("second row = %+v", r)
 	}
-	aliases, err := testkit.StoredAliases(t.Context(), pool, production)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(aliases) != 1 || aliases[0].Alias.FromUnitID != "d-8f1c" || aliases[0].Alias.ToUnitType != "user" {
+	aliases := testkit.ExportedAliases(t, pool, project, production)
+	if len(aliases) != 1 || aliases[0].FromUnitID != "d-8f1c" || aliases[0].ToUnitType != "user" {
 		t.Errorf("aliases = %+v, want the one posted", aliases)
 	}
 }
@@ -307,10 +302,7 @@ func TestConcurrentRetriesOnTwoReplicasStoreEachEventOnce(t *testing.T) {
 	if accepted != 50 {
 		t.Errorf("accepted across replicas = %d, want each of 50 events once", accepted)
 	}
-	aliases, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	aliases := testkit.ExportedAliases(t, testkit.Pool(t), p.projectID(t), p.environmentID(t, "production"))
 	if len(aliases) != 50 {
 		t.Errorf("aliases stored = %d, want 50", len(aliases))
 	}
@@ -442,9 +434,9 @@ func TestThePartitionWorkerKeepsPartitionsAheadOfTheClock(t *testing.T) {
 	if res := batchResult(t, srv, value, batch(aliasEvent(eventID(c.Now(), 1)))); res.Accepted != 1 {
 		t.Errorf("an event 3 days after the round = %+v", res)
 	}
-	aliases, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
-	if err != nil || len(aliases) != 1 {
-		t.Errorf("aliases = %+v, %v", aliases, err)
+	aliases := testkit.ExportedAliases(t, testkit.Pool(t), p.projectID(t), p.environmentID(t, "production"))
+	if len(aliases) != 1 {
+		t.Errorf("aliases = %+v", aliases)
 	}
 }
 
@@ -467,17 +459,9 @@ func TestACopyOfARefusedEventIsRefusedNotADuplicate(t *testing.T) {
 func TestCreatingAPartitionGivesUpRatherThanStallInserts(t *testing.T) {
 	testkit.StartServer(t)
 	pool := testkit.Pool(t)
-	reader, err := pool.Begin(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = reader.Rollback(t.Context()) }()
-	// A reader that stays open holds the parent table for as long as it runs.
-	if _, err = reader.Exec(t.Context(), `LOCK TABLE evaluation_summary_events IN ACCESS SHARE MODE`); err != nil {
-		t.Fatal(err)
-	}
+	testkit.HoldEvaluationSummariesOpenForReading(t, pool)
 	start := time.Now()
-	err = pgevents.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
+	err := pgevents.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
 	if err == nil {
 		t.Fatal("a partition was attached while a reader held its parent")
 	}

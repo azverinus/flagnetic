@@ -18,7 +18,9 @@ func TestWorkersOfTheInProcessServerRunOnlyWhenTicked(t *testing.T) {
 		rounds++
 		return nil
 	}}))
-	time.Sleep(20 * time.Millisecond)
+	// A round of a worker that runs on its own, at an interval of a
+	// millisecond, would have run before the server answers a scrape.
+	srv.Scrape(t)
 	if rounds != 0 {
 		t.Fatalf("%d rounds ran on their own", rounds)
 	}

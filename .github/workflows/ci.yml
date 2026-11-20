@@ -67,6 +67,10 @@ jobs:
           --health-interval 2s --health-timeout 5s --health-retries 30
     env:
       DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
+      # The runner is thrown away after the job, so nothing needs the reaper
+      # container that removes what the tests started; its own start timed
+      # out in one run and failed a test that had nothing to do with it.
+      TESTCONTAINERS_RYUK_DISABLED: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
@@ -77,9 +81,13 @@ jobs:
           PACKAGES: ${{ matrix.shard.packages }}
           FLAGS: ${{ matrix.shard.flags }}
           COVER: ${{ needs.plan.outputs.cover_packages }}
+          # The nightly run shuffles the order of the tests, so one that
+          # depends on another's leftovers fails there and not by chance in a
+          # pull request.
+          SHUFFLE: ${{ github.event_name == 'schedule' && '-shuffle=on' || '' }}
         run: |
           # shellcheck disable=SC2086
-          go test -race -timeout 20m ${COVER:+-coverpkg="$COVER" -coverprofile=coverage.out} $FLAGS $PACKAGES
+          go test -race -timeout 20m $SHUFFLE ${COVER:+-coverpkg="$COVER" -coverprofile=coverage.out} $FLAGS $PACKAGES
       # One PostgreSQL is enough for coverage: the first of the plan's list.
       - name: Keep the coverage profile
         if: needs.plan.outputs.cover_packages != '' && matrix.postgres == fromJSON(needs.plan.outputs.postgres)[0]
