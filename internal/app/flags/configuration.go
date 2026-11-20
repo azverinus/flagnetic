@@ -88,12 +88,12 @@ func writeConfiguration(ctx context.Context, d ConfigurationDeps, cmd Configurat
 func writeConfigurationOf(ctx context.Context, d ConfigurationDeps, cmd ConfigurationCommand, configurable func(flags.Flag) error,
 	change func(ctx context.Context, f flags.Flag, before flags.Configuration, now time.Time) (configurationChange, error),
 ) (flags.EnvironmentConfiguration, error) {
-	now := d.Recorder.now()
 	var out flags.EnvironmentConfiguration
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := d.Recorder.now()
 		f, before, err := configurationOf(ctx, d.Store, cmd.Project, cmd.Flag, cmd.Environment)
 		if err != nil {
 			return err

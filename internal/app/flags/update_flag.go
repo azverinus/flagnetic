@@ -82,12 +82,12 @@ type UpdateFlagCommand struct {
 // configurations, other flags' prerequisites or an experiment's weights; a change to the values the flag already has stores and records nothing. A change to
 // what a ruleset carries moves every environment's ruleset on.
 func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagView, error) {
-	now := h.d.Recorder.now()
 	var out FlagView
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := h.d.Recorder.now()
 		before, err := h.d.Store.FlagByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return flagNotFound(err)

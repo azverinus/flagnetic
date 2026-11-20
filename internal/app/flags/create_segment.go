@@ -66,12 +66,12 @@ type CreateSegmentCommand struct {
 // under its row lock, so no declaration it names is deleted meanwhile. Every
 // environment's ruleset carries the project's segments, so each moves on.
 func (h *CreateSegment) Handle(ctx context.Context, cmd CreateSegmentCommand) (flags.Segment, error) {
-	now := h.d.Recorder.now()
 	var s flags.Segment
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := h.d.Recorder.now()
 		existing, err := h.d.Store.CountSegments(ctx, cmd.Project)
 		if err != nil {
 			return err

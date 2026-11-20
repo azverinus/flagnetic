@@ -32,11 +32,11 @@ func NewDeleteFlag(d DeleteFlagDeps) *DeleteFlag { return &DeleteFlag{d: d} }
 // recording both as they were. An archived flag is in no ruleset already,
 // so deleting it moves none on.
 func (h *DeleteFlag) Handle(ctx context.Context, cmd FlagCommand) error {
-	now := h.d.Recorder.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := h.d.Recorder.now()
 		f, err := h.d.Store.FlagByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return flagNotFound(err)

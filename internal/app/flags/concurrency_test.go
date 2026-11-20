@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
@@ -303,4 +304,62 @@ func mustFlagID(t *testing.T, a *app, project workspace.ProjectID, key string) f
 		t.Fatal(err)
 	}
 	return f.ID
+}
+
+// A write reads its time once it holds the project's row, so a kill switch
+// that waited behind another write is stamped after what it waited for, and
+// the configuration's time never goes back while its version goes forward.
+func TestAWriteWaitingForTheProjectsRowIsStampedWhenItGetsIt(t *testing.T) {
+	a := newApp(t)
+	p := a.project()
+	a.flag(p, "banner", flags.TypeBoolean)
+	if err := a.put(t.Context(), p, "banner", flags.ConfigurationInput{On: true, OffVariation: "false", Fallthrough: "true"}); err != nil {
+		t.Fatal(err)
+	}
+
+	pool := testkit.Pool(t)
+	t1 := time.Now().Add(time.Hour).Truncate(time.Microsecond)
+	c := clock.NewFake(t1)
+	rec := appflags.NewRecorder(testkit.Record(pool), c, a.ids)
+	tx := postgres.NewTransactor(pool)
+	kill := appflags.NewKillFlag(appflags.ConfigurationDeps{
+		Tx: tx, Projects: a.store, Store: a.store, Rulesets: appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c), Recorder: rec,
+	})
+
+	locked, release, holder := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		holder <- tx.Within(t.Context(), func(ctx context.Context) error {
+			if err := a.store.LockProject(ctx, p); err != nil {
+				return err
+			}
+			close(locked)
+			<-release
+			return nil
+		})
+	}()
+	<-locked
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := kill.Handle(t.Context(), appflags.KillFlagCommand{Configuration: appflags.ConfigurationCommand{
+			Project: p, Flag: "banner", Environment: "production", Request: a.req,
+		}})
+		done <- err
+	}()
+	time.Sleep(300 * time.Millisecond)
+	t2 := t1.Add(time.Minute)
+	c.Set(t2)
+	close(release)
+	if err := <-holder; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	got, err := a.store.Configuration(t.Context(), mustFlagID(t, a, p, "banner"), "production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Configuration.UpdatedAt.Before(t2) {
+		t.Errorf("updated_at = %s, want it not before the time the row was released, %s", got.Configuration.UpdatedAt, t2)
+	}
 }
