@@ -41,11 +41,11 @@ type DeleteEnvironmentCommand struct {
 // Handle deletes the environment. The project's row is locked first, so two
 // deletions at once cannot remove its last two environments.
 func (h *DeleteEnvironment) Handle(ctx context.Context, cmd DeleteEnvironmentCommand) error {
-	now := h.rec.clock.Now()
 	return h.tx.Within(ctx, func(ctx context.Context) error {
 		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		e, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "environment")

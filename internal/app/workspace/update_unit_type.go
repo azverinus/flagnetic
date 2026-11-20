@@ -45,12 +45,12 @@ type UpdateUnitTypeCommand struct {
 // version it was based on, and returns the unit type as it is after it; a
 // change to the values it already has stores and records nothing.
 func (h *UpdateUnitType) Handle(ctx context.Context, cmd UpdateUnitTypeCommand) (workspace.UnitType, error) {
-	now := h.rec.clock.Now()
 	var out workspace.UnitType
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
 		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		before, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "unit type")

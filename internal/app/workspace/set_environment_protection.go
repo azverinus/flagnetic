@@ -40,12 +40,12 @@ type SetEnvironmentProtectionCommand struct {
 // moves with it, since SDKs read the protection from the ruleset to decide
 // whether local overrides apply.
 func (h *SetEnvironmentProtection) Handle(ctx context.Context, cmd SetEnvironmentProtectionCommand) (workspace.Environment, error) {
-	now := h.rec.clock.Now()
 	var out workspace.Environment
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
 		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		before, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, false)
 		if err != nil {
 			return notFound(err, "environment")

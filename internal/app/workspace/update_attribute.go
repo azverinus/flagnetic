@@ -44,12 +44,12 @@ type UpdateAttributeCommand struct {
 // version it was based on, and returns the attribute as it is after it; a
 // change to the values it already has stores and records nothing.
 func (h *UpdateAttribute) Handle(ctx context.Context, cmd UpdateAttributeCommand) (workspace.Attribute, error) {
-	now := h.rec.clock.Now()
 	var out workspace.Attribute
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
 		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		before, err := h.store.AttributeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "attribute")

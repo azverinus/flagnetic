@@ -45,14 +45,14 @@ type DeleteUnitTypeCommand struct {
 // type takes too, so no write starts naming it between the check and the
 // deletion.
 func (h *DeleteUnitType) Handle(ctx context.Context, cmd DeleteUnitTypeCommand) error {
-	now := h.rec.clock.Now()
 	return h.tx.Within(ctx, func(ctx context.Context) error {
 		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
-		// A rename locks the unit type's row, not the project's, so the row is
-		// locked here too: the version judged below is then the one a
-		// rename in flight committed, never the one it is replacing.
+		now := h.rec.clock.Now()
+		// A rename takes the project's row before this one, so the version
+		// judged below is the one the last rename committed; the row is
+		// locked as well so it holds still until the deletion.
 		u, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "unit type")

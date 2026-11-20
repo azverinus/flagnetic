@@ -104,10 +104,11 @@ func TestWritesOfAProjectGoneBeforeItsLockAreNotFound(t *testing.T) {
 
 // Renaming a unit type or an attribute takes the project's row, so an import
 // that read the declaration's version under that row never meets a rename
-// committed in between.
+// committed in between; and the rename is stamped with the time it took the
+// row, not the time it started waiting, so stored times follow commit order.
 func TestRenamingADeclarationWaitsForTheProjectsRow(t *testing.T) {
 	pool := testkit.Pool(t)
-	c := clock.System{}
+	c := clock.NewFake(testkit.Start)
 	ids := id.NewSource(c)
 	tx, ws := postgres.NewTransactor(pool), pgworkspace.NewStore(pool)
 	rec := appworkspace.NewRecorder(testkit.Record(pool), c, ids)
@@ -131,16 +132,16 @@ func TestRenamingADeclarationWaitsForTheProjectsRow(t *testing.T) {
 	}
 
 	name := "Renamed"
-	renames := map[string]func(ctx context.Context) error{
-		"unit type": func(ctx context.Context) error {
-			_, err := appworkspace.NewUpdateUnitType(tx, ws, rec).Handle(ctx, appworkspace.UpdateUnitTypeCommand{
+	renames := map[string]func(ctx context.Context) (time.Time, error){
+		"unit type": func(ctx context.Context) (time.Time, error) {
+			u, err := appworkspace.NewUpdateUnitType(tx, ws, rec).Handle(ctx, appworkspace.UpdateUnitTypeCommand{
 				Project: p.ID, Key: "user", Change: workspace.UnitTypeChange{Name: &name}, Expected: precondition.On(1), Request: req})
-			return err
+			return u.UpdatedAt, err
 		},
-		"attribute": func(ctx context.Context) error {
-			_, err := appworkspace.NewUpdateAttribute(tx, ws, rec).Handle(ctx, appworkspace.UpdateAttributeCommand{
+		"attribute": func(ctx context.Context) (time.Time, error) {
+			a, err := appworkspace.NewUpdateAttribute(tx, ws, rec).Handle(ctx, appworkspace.UpdateAttributeCommand{
 				Project: p.ID, Key: "plan", Change: workspace.AttributeChange{Name: &name}, Expected: precondition.On(1), Request: req})
-			return err
+			return a.UpdatedAt, err
 		},
 	}
 	for what, rename := range renames {
@@ -159,19 +160,32 @@ func TestRenamingADeclarationWaitsForTheProjectsRow(t *testing.T) {
 				})
 			}()
 			<-locked
-			done := make(chan error, 1)
-			go func() { done <- rename(t.Context()) }()
+			type renamed struct {
+				at  time.Time
+				err error
+			}
+			done := make(chan renamed, 1)
+			go func() {
+				at, err := rename(t.Context())
+				done <- renamed{at, err}
+			}()
 			select {
-			case err := <-done:
-				t.Fatalf("rename finished while the project's row was held: %v", err)
+			case r := <-done:
+				t.Fatalf("rename finished while the project's row was held: %v", r.err)
 			case <-time.After(300 * time.Millisecond):
 			}
+			c.Advance(time.Minute)
+			released := c.Now()
 			close(release)
 			if err := <-holder; err != nil {
 				t.Fatal(err)
 			}
-			if err := <-done; err != nil {
-				t.Errorf("rename after the row was released = %v", err)
+			r := <-done
+			if r.err != nil {
+				t.Fatalf("rename after the row was released = %v", r.err)
+			}
+			if !r.at.Equal(released) {
+				t.Errorf("rename stamped %v, want the time it took the row, %v", r.at, released)
 			}
 		})
 	}
