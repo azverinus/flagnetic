@@ -103,3 +103,40 @@ func TestEmitStopsAfterClose(t *testing.T) {
 	case <-time.After(10 * time.Millisecond):
 	}
 }
+
+// waitFor returns the first event type queued within a second, or "".
+func waitFor(p *Provider) of.EventType {
+	select {
+	case e := <-p.events:
+		return e.EventType
+	case <-time.After(time.Second):
+		return ""
+	}
+}
+
+// A key refused before Init returned is announced once Init has returned,
+// after the OpenFeature SDK's own READY, unless a status event has been
+// sent in between: that one is newer than the refusal.
+func TestAKeyRefusedBeforeInitIsAnnouncedAfterIt(t *testing.T) {
+	p := &Provider{events: make(chan of.Event, 4)}
+	p.observe(0, flagnetic.EventKeyRevoked, nil)
+	p.markInitialized()
+	if got := next(p); got != "" {
+		t.Errorf("sent %q at once, want the announcement after the delay", got)
+	}
+	if got := waitFor(p); got != of.ProviderError {
+		t.Errorf("announced %q, want PROVIDER_ERROR", got)
+	}
+
+	recovered := &Provider{events: make(chan of.Event, 4)}
+	recovered.observe(0, flagnetic.EventKeyRevoked, nil)
+	recovered.markInitialized()
+	recovered.onStage(flagnetic.StageFresh)
+	if got := next(recovered); got != of.ProviderReady {
+		t.Fatalf("recovery sent %q, want PROVIDER_READY", got)
+	}
+	time.Sleep(2 * announceDelay)
+	if got := next(recovered); got != "" {
+		t.Errorf("the stale announcement %q followed the newer READY", got)
+	}
+}

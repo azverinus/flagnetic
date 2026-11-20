@@ -550,3 +550,14 @@ func TestARefusedKeyKeepsTheStatusErrorUntilTheClientRecovers(t *testing.T) {
 	s.answer(t, http.StatusOK, 5)
 	becomes(t, client, of.ReadyState)
 }
+
+// A key refused before Init returns leaves the status ERROR, not the
+// READY the OpenFeature SDK sets when Init returns.
+func TestAKeyRefusedAtInitTurnsTheStatusToError(t *testing.T) {
+	s := newStatusServer(t)
+	s.mu.Lock()
+	s.status = http.StatusUnauthorized
+	s.mu.Unlock()
+	client := onlineProvider(t, s)
+	becomes(t, client, of.ErrorState)
+}
