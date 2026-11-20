@@ -12,7 +12,7 @@ import (
 	flagnetic "github.com/azverinus/flagnetic/sdks/go"
 )
 
-// streamTimeDivisor is the one factor every duration of a change stream
+// streamTimeDivisor is the one factor every duration of a ruleset stream
 // scenario is divided by — the SDK's intervals, the scenario's options and
 // its windows alike — so that four scenarios covering a minute and a half
 // of stream behaviour run in seconds. The fixtures allow it: two loops
@@ -23,7 +23,7 @@ func scaled(ms int64) time.Duration {
 	return time.Duration(ms) * time.Millisecond / streamTimeDivisor
 }
 
-// streamScenarios are the change stream scenarios of scenarios.json this
+// streamScenarios are the ruleset stream scenarios of scenarios.json this
 // SDK runs.
 var streamScenarios = map[string]bool{
 	"server: a stream event above the held version triggers a fetch":                                     true,
@@ -65,7 +65,7 @@ func TestProtocolStreamScenarios(t *testing.T) {
 }
 
 // scenarioServer answers the scenario's steps in order and hands each
-// change stream it opens to the scenario.
+// ruleset stream it opens to the scenario.
 type scenarioServer struct {
 	t     *testing.T
 	steps []protocolStep
@@ -82,7 +82,7 @@ type scenarioServer struct {
 	served   bool              // every request step has been answered
 	arrivals map[int]time.Time // when each request step's request arrived
 	counts   map[string]int    // requests per path
-	conns    chan *streamConn  // the change streams opened so far
+	conns    chan *streamConn  // the ruleset streams opened so far
 }
 
 // lastRequestStep is the index of the final step expecting a request.
@@ -214,7 +214,7 @@ func runStreamScenario(t *testing.T, file scenarioFile, pollIntervalMS int64, st
 				select {
 				case conn = <-s.conns:
 				case <-time.After(5 * time.Second):
-					t.Fatalf("step %d %s: the change stream never opened", i, note)
+					t.Fatalf("step %d %s: the ruleset stream never opened", i, note)
 				}
 			}
 		case step.StreamSend != "":

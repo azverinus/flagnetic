@@ -18,7 +18,7 @@ import (
 	flagnetic "github.com/azverinus/flagnetic/sdks/go"
 )
 
-// event is one ruleset event of the change stream, as the endpoint writes
+// event is one ruleset event of the ruleset stream, as the endpoint writes
 // it: the version and nothing else.
 func event(version int64) string {
 	return fmt.Sprintf("event: ruleset\nid: %d\ndata: {\"version\":%d}\n\n", version, version)
@@ -47,7 +47,7 @@ func killSwitch(v int64) response {
 	}
 }
 
-// streamConn is one open change stream: the test writes frames to it and
+// streamConn is one open ruleset stream: the test writes frames to it and
 // ends it from the server's side.
 type streamConn struct {
 	frames chan string
@@ -64,7 +64,7 @@ func (s *streamConn) send(t *testing.T, frames string) {
 	case <-s.done:
 		t.Error("the stream ended before the frames were written")
 	case <-time.After(10 * time.Second):
-		t.Fatal("the SDK never read the change stream")
+		t.Fatal("the SDK never read the ruleset stream")
 	}
 }
 
@@ -80,7 +80,7 @@ func (s *streamConn) close() { s.once.Do(func() { close(s.done) }) }
 type streamServer struct {
 	*httptest.Server
 	mu sync.Mutex
-	// streamStatuses answers the change stream requests in order, the last
+	// streamStatuses answers the ruleset stream requests in order, the last
 	// one repeating; empty means every connection comes up.
 	streamStatuses []int
 	responses      []response
@@ -129,7 +129,7 @@ func (m *streamServer) serveStream(w http.ResponseWriter, r *http.Request) {
 	holdOpen(w, r, m.conns)
 }
 
-// holdOpen keeps a response open as the change stream, hands the
+// holdOpen keeps a response open as the ruleset stream, hands the
 // connection to the test through conns, and writes whatever the test sends
 // until it closes the stream or the SDK hangs up. The status line and the
 // headers are already written.
@@ -158,19 +158,19 @@ func holdOpen(w http.ResponseWriter, r *http.Request, conns chan *streamConn) {
 	}
 }
 
-// connect waits for the next change stream the SDK opens.
+// connect waits for the next ruleset stream the SDK opens.
 func (m *streamServer) connect(t *testing.T) *streamConn {
 	t.Helper()
 	select {
 	case c := <-m.conns:
 		return c
 	case <-time.After(10 * time.Second):
-		t.Fatal("the SDK never opened the change stream")
+		t.Fatal("the SDK never opened the ruleset stream")
 		return nil
 	}
 }
 
-// streamRequest waits for the ith change stream request and returns its
+// streamRequest waits for the ith ruleset stream request and returns its
 // headers.
 func (m *streamServer) streamRequest(t *testing.T, i int) http.Header {
 	t.Helper()
@@ -222,7 +222,7 @@ func waitFor[T any](t *testing.T, ready func() (T, bool), what string) T {
 	}
 }
 
-// newStreaming builds an online client with the change stream on and a
+// newStreaming builds an online client with the ruleset stream on and a
 // safety poll far enough away that only the stream causes a fetch.
 func newStreaming(t *testing.T, baseURL string, opts ...flagnetic.Option) *flagnetic.Client {
 	t.Helper()
@@ -242,7 +242,7 @@ func newStreaming(t *testing.T, baseURL string, opts ...flagnetic.Option) *flagn
 	return c
 }
 
-func TestChangeStreamOpensBeforeTheFirstFetch(t *testing.T) {
+func TestRulesetStreamOpensBeforeTheFirstFetch(t *testing.T) {
 	srv := newStreamServer(t, ruleset(7))
 	c := newStreaming(t, srv.URL)
 	if got := readyNow(t, c); got != flagnetic.StageFresh {
@@ -526,7 +526,7 @@ func TestDroppedStreamReconnectsWithTheHeldVersionAndFetches(t *testing.T) {
 	}
 }
 
-func TestRefusedKeyClosesTheChangeStreamAndKeepsServing(t *testing.T) {
+func TestRefusedKeyClosesTheRulesetStreamAndKeepsServing(t *testing.T) {
 	var l logs
 	// The key was revoked while the service was down: the store holds the
 	// last good ruleset and every request, the stream included, is refused.

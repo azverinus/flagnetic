@@ -19,11 +19,11 @@ const (
 	// unauthorized, parse, schema_unsupported, wrong_scope,
 	// version_downgrade), error, and status for an HTTP status.
 	EventFetchFailed Event = "fetch_failed"
-	// EventSSEConnected (info): the change stream is open. Fields:
+	// EventSSEConnected (info): the ruleset stream is open. Fields:
 	// last_event_id, the held version the stream resumes from, 0 for none.
 	EventSSEConnected Event = "sse_connected"
 	// EventSSEDropped (info for a server-side close of a stable stream, warn
-	// otherwise): the change stream ended. Fields: cause (server_closed,
+	// otherwise): the ruleset stream ended. Fields: cause (server_closed,
 	// closed_early for a stream closed before its first heartbeat, silence,
 	// timeout, network, http_status, unauthorized, malformed), error,
 	// reconnect (false where the stream stays down), and status for an HTTP
@@ -32,8 +32,9 @@ const (
 	// EventStageChanged (info to fresh, warn otherwise): the fallback chain
 	// moved. Fields: from, to.
 	EventStageChanged Event = "stage_changed"
-	// EventKeyRevoked (error): the ruleset endpoint answered 401 or 403;
-	// logged once until a fetch succeeds again. Values keep serving and the
+	// EventKeyRevoked (error): the ruleset endpoint, the ruleset stream
+	// or the events endpoint answered 401 or 403; logged once until a fetch
+	// succeeds again. Values keep serving and the
 	// fetch retries with a backoff capped at 15 minutes. Fields: status.
 	EventKeyRevoked Event = "key_revoked"
 	// EventSchemaUnsupported (error): a ruleset carried a schema_version this

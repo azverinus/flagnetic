@@ -661,11 +661,11 @@ func TestAFullQueueDropsTheOldest(t *testing.T) {
 		t.Errorf("the queue kept %v, want the newest %v", kept, want)
 	}
 	dropped := l.named(flagnetic.EventQueueDropped)
-	if len(dropped) != 2 {
-		t.Fatalf("queue_dropped logged %d times, want 2", len(dropped))
+	if len(dropped) != 1 {
+		t.Fatalf("queue_dropped logged %d times, want once for the flush interval", len(dropped))
 	}
-	if dropped[0].Fields["cause"] != "queue_full" || dropped[0].Fields["kind"] != "exposure_or_alias" {
-		t.Errorf("queue_dropped fields = %v", dropped[0].Fields)
+	if dropped[0].Fields["cause"] != "queue_full" || dropped[0].Fields["kind"] != "exposure_or_alias" || dropped[0].Fields["events"] != 2 {
+		t.Errorf("queue_dropped fields = %v, want 2 events dropped for a full queue", dropped[0].Fields)
 	}
 }
 

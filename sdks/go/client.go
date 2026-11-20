@@ -57,12 +57,12 @@ type Client struct {
 	// happened, in Unix nanoseconds; 0 while unset.
 	staleSince atomic.Int64
 	// revoked marks the key refused, so key_revoked is logged once however
-	// many of the fetch loop and the change stream see it.
+	// many of the fetch loop and the ruleset stream see it.
 	revoked atomic.Bool
 
 	wait intervals
 
-	// Change stream. streamReady is closed once the first connection
+	// Ruleset stream. streamReady is closed once the first connection
 	// attempt has resolved, so the first fetch follows it; wake asks the
 	// fetch loop for a ruleset; target is the highest version an event has
 	// announced.
@@ -183,7 +183,7 @@ func WithStore(path string) Option {
 }
 
 // WithPollInterval sets how often the ruleset is fetched with
-// If-None-Match while the change stream is connected; default 5 minutes,
+// If-None-Match while the ruleset stream is connected; default 5 minutes,
 // at least 30 seconds. While the stream is down or disabled the safety
 // poll runs every 30 seconds instead, so a kill switch is never further
 // away than that.
@@ -191,7 +191,7 @@ func WithPollInterval(d time.Duration) Option {
 	return func(o *options) { o.pollInterval = d }
 }
 
-// WithChangeStream turns the change stream on or off; it is on by
+// WithChangeStream turns the ruleset stream on or off; it is on by
 // default. The stream carries nothing but the new ruleset version, so a
 // kill switch reaches the client within two seconds; with it off the
 // safety poll every 30 seconds is the only notice, which is what a proxy
@@ -201,7 +201,7 @@ func WithChangeStream(enabled bool) Option {
 }
 
 // WithRequestTimeout bounds each request; default 10 seconds. For the
-// change stream it bounds the wait for the response to start, not the
+// ruleset stream it bounds the wait for the response to start, not the
 // stream itself, which stays open for as long as heartbeats arrive.
 func WithRequestTimeout(d time.Duration) Option {
 	return func(o *options) { o.requestTimeout = d }
@@ -300,7 +300,7 @@ func New(sdkKey, baseURL string, opts ...Option) (*Client, error) {
 		c.http = &http.Client{}
 		c.ownsHTTP = true
 	}
-	// The change stream stays open for an hour at a time, so no Timeout
+	// The ruleset stream stays open for an hour at a time, so no Timeout
 	// of the caller's client may cut it short.
 	streamHTTP := *c.http
 	streamHTTP.Timeout = 0
@@ -384,11 +384,11 @@ func (c *Client) startLoops(o options, online func(context.Context, *sync.WaitGr
 // intervals are the SDK's default waits: what the two
 // background loops wait for, and the bounds their backoffs grow to.
 type intervals struct {
-	// requestTimeout bounds one ruleset request, and the change stream's
+	// requestTimeout bounds one ruleset request, and the ruleset stream's
 	// wait for its response headers. The open stream is long-lived and is
 	// bounded by heartbeat instead.
 	requestTimeout time.Duration
-	// poll is the safety poll while the change stream is connected,
+	// poll is the safety poll while the ruleset stream is connected,
 	// downPoll while it is down or disabled.
 	poll     time.Duration
 	downPoll time.Duration
@@ -400,7 +400,7 @@ type intervals struct {
 	unauthorizedCap time.Duration
 	streamRetryCap  time.Duration
 	closeJitterCap  time.Duration
-	// heartbeat is how long the change stream may stay silent.
+	// heartbeat is how long the ruleset stream may stay silent.
 	heartbeat time.Duration
 	// catchUp are the waits before re-fetching while a replica is behind
 	// the version an event announced.

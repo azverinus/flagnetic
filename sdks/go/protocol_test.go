@@ -39,7 +39,7 @@ func decompress(r *http.Request) ([]byte, error) {
 }
 
 // protocolScenarios are the server-mode scenarios of readScenarios this
-// SDK runs on the fetch loop's own clock. The change stream's four run in
+// SDK runs on the fetch loop's own clock. The ruleset stream's four run in
 // TestProtocolStreamScenarios, where two loops wait at once.
 var protocolScenarios = map[string]bool{
 	"server: the fallback chain keeps the held document through every failure":                true,
@@ -85,7 +85,7 @@ type protocolResponse struct {
 	Headers      map[string]string `json:"headers"`
 	Body         string            `json:"body"`
 	NetworkError bool              `json:"network_error"`
-	// Stream keeps the response open as the change stream, which later
+	// Stream keeps the response open as the ruleset stream, which later
 	// steps write to and close.
 	Stream bool `json:"stream"`
 }
@@ -158,7 +158,7 @@ type protocolStep struct {
 	Note    string           `json:"note"`
 	Request *protocolRequest `json:"request"`
 	Respond protocolResponse `json:"respond"`
-	// StreamSend writes bytes to the open change stream; StreamClose ends
+	// StreamSend writes bytes to the open ruleset stream; StreamClose ends
 	// it from the server's side.
 	StreamSend  string `json:"stream_send"`
 	StreamClose bool   `json:"stream_close"`
@@ -200,7 +200,7 @@ type scenarioFile struct {
 // scenarios of versioning-scenarios.json appended: the same step language
 // over the same documents, for what only the SDKs decide (versioning and
 // compatibility); those of stream-stability-scenarios.json, which pin when
-// the change stream counts as stable; and those of experiment-scenarios.json,
+// the ruleset stream counts as stable; and those of experiment-scenarios.json,
 // with the answers of the experiment documents they name.
 func readScenarios(t *testing.T) scenarioFile {
 	t.Helper()

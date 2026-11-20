@@ -65,7 +65,7 @@ func userAgent() string {
 // after a failure, a catch-up delay while a replica is behind, or a change
 // the stream announces — until ctx is done.
 func (c *Client) run(ctx context.Context) {
-	// The change stream opens before the first fetch, so that no change
+	// The ruleset stream opens before the first fetch, so that no change
 	// falls between the two. A connection that neither comes up nor fails
 	// — a black hole between the SDK and the instance — must not hold the
 	// first fetch for longer than one request would take.
@@ -81,7 +81,7 @@ func (c *Client) run(ctx context.Context) {
 	// failures counts consecutive failures of any kind; the kind of the
 	// latest only picks the cap.
 	failures := 0
-	// announced is the version the change stream last asked for, and
+	// announced is the version the ruleset stream last asked for, and
 	// catchUps how many times this fetch loop has re-asked for it.
 	var announced int64
 	catchUps := 0
@@ -134,7 +134,7 @@ func (c *Client) run(ctx context.Context) {
 }
 
 // pollWait is how long the safety poll waits: the poll interval while the
-// change stream is connected, the short interval while it is down or
+// ruleset stream is connected, the short interval while it is down or
 // disabled.
 func (c *Client) pollWait() time.Duration {
 	if c.streamConnected.Load() {
@@ -143,7 +143,7 @@ func (c *Client) pollWait() time.Duration {
 	return c.wait.downPoll
 }
 
-// waitNext waits d, returning early when the change stream asks for a
+// waitNext waits d, returning early when the ruleset stream asks for a
 // fetch, and false when the client is closing. When polling is set and the
 // stream drops during the wait, a wait longer than the down poll shortens
 // to it, counted from the drop.

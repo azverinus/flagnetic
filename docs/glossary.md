@@ -388,7 +388,7 @@ The value compiled into the client application, used when no ruleset has ever be
 _Avoid_: code default, hardcoded value
 
 **Fallback chain**:
-The order in which an SDK picks what to evaluate against: fresh ruleset, then last good ruleset, then built-in defaults.
+The order in which an SDK picks what to evaluate against: fresh ruleset, then last good ruleset, then built-in defaults. Each step is a _stage_ of the chain (`fresh`, `last_good`, `built_in`), the term the SDKs' `stage_changed` log event and their `Stage` carry; it is unrelated to an environment, which is never called a stage.
 
 **Propagation time**:
 The time between saving a change and SDKs evaluating with it. For a mobile app it is declared separately for the foreground and for the next resume.

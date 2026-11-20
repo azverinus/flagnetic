@@ -230,6 +230,11 @@ type exposures struct {
 	failures  int
 	notBefore time.Time
 
+	// overflowed counts the events dropped because the queue was full since
+	// the last queue_dropped line, so an outage that keeps a full queue
+	// full costs one line per flush interval, not one per event.
+	overflowed atomic.Int64
+
 	// closing is set by Close once its last flush is done: nothing reads
 	// the queue after it, so an event arriving then is not queued.
 	// afterClose makes the log line about it one line.
@@ -527,14 +532,25 @@ func (q *exposures) trim() int {
 	return dropped
 }
 
+// reportDropped counts events dropped over the capacity; reportOverflow
+// says so, once per flush interval.
 func (q *exposures) reportDropped(dropped int) {
+	if dropped > 0 {
+		q.overflowed.Add(int64(dropped))
+	}
+}
+
+// reportOverflow logs the events dropped for a full queue since the last
+// line, when there are any.
+func (q *exposures) reportOverflow() {
+	dropped := q.overflowed.Swap(0)
 	if dropped == 0 {
 		return
 	}
 	q.log(slog.LevelWarn, EventQueueDropped, map[string]any{
 		"kind":     eventQueueKind,
 		"cause":    "queue_full",
-		"events":   dropped,
+		"events":   int(dropped),
 		"capacity": q.capacity,
 	})
 }
@@ -572,6 +588,7 @@ func (q *exposures) stop() int {
 	if q == nil || q.offline() || !q.closing.CompareAndSwap(false, true) {
 		return 0
 	}
+	q.reportOverflow()
 	q.queueMu.Lock()
 	left := len(q.queue)
 	q.queueMu.Unlock()
@@ -597,10 +614,12 @@ func (q *exposures) run(ctx context.Context) {
 	for {
 		select {
 		case <-q.ticks:
+			q.reportOverflow()
 			_ = q.send(ctx, false)
 		case <-q.full:
 			_ = q.send(ctx, false)
 		case reply := <-q.flushes:
+			q.reportOverflow()
 			reply <- q.send(ctx, true)
 		case <-ctx.Done():
 			return
