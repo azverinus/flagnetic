@@ -173,7 +173,11 @@ export function changeRequestOffers(changeRequest: ChangeRequest, caller: Caller
     offer("approve", decide);
     offer("reject", decide);
   }
-  if (state === "approved") offer("apply", byAuthorOrDecider(isAuthor || isApprover));
+  // A scheduled change request is applied by the system at its time; the
+  // server refuses anyone else's apply, so it is not offered.
+  if (state === "approved" && changeRequest.apply_at === null) {
+    offer("apply", byAuthorOrDecider(isAuthor || isApprover));
+  }
   if (pending.includes(state)) offer("cancel", byAuthorOrDecider(isAuthor));
   offer("copy", needs("change_request.propose", canPropose));
   return offers;

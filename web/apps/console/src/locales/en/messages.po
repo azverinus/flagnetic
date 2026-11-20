@@ -339,6 +339,10 @@ msgstr "{name} is no longer protected."
 msgid "{name} is not signed in anywhere."
 msgstr "{name} is not signed in anywhere."
 
+#: src/components/compare-environments.tsx
+msgid "{name} is protected, so a copy is not written into it: it would change what its SDKs receive without a review."
+msgstr "{name} is protected, so a copy is not written into it: it would change what its SDKs receive without a review."
+
 #: src/components/flag-history.tsx
 msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 msgstr "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
@@ -717,9 +721,17 @@ msgstr "A project token does what its role allows in this project, narrowed to i
 msgid "A project token never approves or rejects change requests."
 msgstr "A project token never approves or rejects change requests."
 
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
+msgid "A protected environment cannot be deleted: stop protecting it first."
+msgstr "A protected environment cannot be deleted: stop protecting it first."
+
 #: src/lib/problem-messages.ts
 msgid "A protected environment cannot be deleted. Stop protecting it on its page first."
 msgstr "A protected environment cannot be deleted. Stop protecting it on its page first."
+
+#: src/components/configuration-editor.tsx
+msgid "A protected environment never takes a new salt: it would move units to other variations without a review."
+msgstr "A protected environment never takes a new salt: it would move units to other variations without a review."
 
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
@@ -8235,6 +8247,10 @@ msgid "The environment already has 10 active keys of this kind. Revoke one, or w
 msgstr "The environment already has 10 active keys of this kind. Revoke one, or wait for a rotated one to end, first."
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The environment is protected, so overrides are not added or removed here: each would change what its SDKs receive without a review."
+msgstr "The environment is protected, so overrides are not added or removed here: each would change what its SDKs receive without a review."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "The environment is protected: changes to its configuration are proposed as change requests and go live once approved and applied."
 msgstr "The environment is protected: changes to its configuration are proposed as change requests and go live once approved and applied."
 
@@ -8390,6 +8406,10 @@ msgstr "The flag is created off in every environment, serving its off variation 
 #: src/components/tester-panel.tsx
 msgid "The flag is off here: the off variation is served."
 msgstr "The flag is off here: the off variation is served."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag is on in {names}, which is protected, so archiving or restoring it would change what its SDKs receive. Switch it off there first."
+msgstr "The flag is on in {names}, which is protected, so archiving or restoring it would change what its SDKs receive. Switch it off there first."
 
 #: src/components/experiment-fields.tsx
 msgid "The flag whose variations the experiment compares"

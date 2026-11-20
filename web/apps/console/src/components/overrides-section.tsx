@@ -201,7 +201,9 @@ export function OverridesSection({
               : remove.error
           }
         />
-        {frozen ? null : can ? (
+        {frozen ? (
+          <p className="text-sm text-muted-foreground">{frozen}</p>
+        ) : can ? (
           <AddOverride
             project={project}
             flag={flag}

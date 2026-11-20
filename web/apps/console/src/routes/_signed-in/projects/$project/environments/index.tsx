@@ -82,7 +82,16 @@ function Environments() {
       return (
         <>
           <RowAction label={t`Rename ${key}`} icon={PencilIcon} onClick={() => setRenaming(row)} />
-          <RowAction label={t`Delete ${key}`} icon={Trash2Icon} onClick={() => setDeleting(row)} />
+          <RowAction
+            label={t`Delete ${key}`}
+            icon={Trash2Icon}
+            onClick={() => setDeleting(row)}
+            refused={
+              row.protected
+                ? t`A protected environment cannot be deleted: stop protecting it first.`
+                : undefined
+            }
+          />
         </>
       );
     });

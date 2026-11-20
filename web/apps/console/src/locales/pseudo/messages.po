@@ -339,6 +339,10 @@ msgstr ""
 msgid "{name} is not signed in anywhere."
 msgstr ""
 
+#: src/components/compare-environments.tsx
+msgid "{name} is protected, so a copy is not written into it: it would change what its SDKs receive without a review."
+msgstr ""
+
 #: src/components/flag-history.tsx
 msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 msgstr ""
@@ -717,8 +721,16 @@ msgstr ""
 msgid "A project token never approves or rejects change requests."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
+msgid "A protected environment cannot be deleted: stop protecting it first."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "A protected environment cannot be deleted. Stop protecting it on its page first."
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "A protected environment never takes a new salt: it would move units to other variations without a review."
 msgstr ""
 
 #: src/components/auth-provider-form.tsx
@@ -8235,6 +8247,10 @@ msgid "The environment already has 10 active keys of this kind. Revoke one, or w
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The environment is protected, so overrides are not added or removed here: each would change what its SDKs receive without a review."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "The environment is protected: changes to its configuration are proposed as change requests and go live once approved and applied."
 msgstr ""
 
@@ -8389,6 +8405,10 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "The flag is off here: the off variation is served."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag is on in {names}, which is protected, so archiving or restoring it would change what its SDKs receive. Switch it off there first."
 msgstr ""
 
 #: src/components/experiment-fields.tsx

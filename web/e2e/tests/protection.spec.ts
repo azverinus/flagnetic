@@ -90,6 +90,26 @@ test.describe("protected environments", () => {
   }
 });
 
+test.describe("what a protected environment always refuses", () => {
+  test("reads overrides with the reason, and offers them where it is not protected", async ({
+    page,
+  }) => {
+    const project = await seedProject("protect-overrides");
+    await seedFlag(project, stringFlag("checkout_variant"));
+    await signIn(page);
+
+    // A new project's production starts protected, staging does not.
+    await page.goto(`/projects/${project}/flags/checkout_variant?environment=production`);
+    await expect(
+      page.getByText(/The environment is protected, so overrides are not added or removed here/),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add override" })).toHaveCount(0);
+
+    await page.goto(`/projects/${project}/flags/checkout_variant?environment=staging`);
+    await expect(page.getByRole("button", { name: "Add override" })).toBeVisible();
+  });
+});
+
 test.describe("the kill switch in a protected environment", () => {
   test("asks for the flag's key, and switches off once it is typed", async ({ page }) => {
     const project = await seedProject("protect-kill");
