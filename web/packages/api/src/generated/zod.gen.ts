@@ -2797,7 +2797,7 @@ export const zDocumentUnitType = z.object({
 
 export const zDocumentAttribute = z.object({
   key: z.string(),
-  type: z.string(),
+  type: z.enum(["string", "number", "boolean", "semver", "date", "list"]),
   name: z.string(),
   description: z.string().optional(),
 });

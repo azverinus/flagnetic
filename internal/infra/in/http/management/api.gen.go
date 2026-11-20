@@ -234,6 +234,36 @@ func (e CredentialMethod) Valid() bool {
 	}
 }
 
+// Defines values for DocumentAttributeType.
+const (
+	DocumentAttributeTypeBoolean DocumentAttributeType = "boolean"
+	DocumentAttributeTypeDate    DocumentAttributeType = "date"
+	DocumentAttributeTypeList    DocumentAttributeType = "list"
+	DocumentAttributeTypeNumber  DocumentAttributeType = "number"
+	DocumentAttributeTypeSemver  DocumentAttributeType = "semver"
+	DocumentAttributeTypeString  DocumentAttributeType = "string"
+)
+
+// Valid indicates whether the value is a known member of the DocumentAttributeType enum.
+func (e DocumentAttributeType) Valid() bool {
+	switch e {
+	case DocumentAttributeTypeBoolean:
+		return true
+	case DocumentAttributeTypeDate:
+		return true
+	case DocumentAttributeTypeList:
+		return true
+	case DocumentAttributeTypeNumber:
+		return true
+	case DocumentAttributeTypeSemver:
+		return true
+	case DocumentAttributeTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EvaluationSource.
 const (
 	EvaluationSourceRemoteEvaluation EvaluationSource = "remote_evaluation"
@@ -2015,13 +2045,14 @@ type DiscoveredAttributeList struct {
 
 // DocumentAttribute defines model for DocumentAttribute.
 type DocumentAttribute struct {
-	Description *string `json:"description,omitempty"`
-	Key         string  `json:"key"`
-	Name        string  `json:"name"`
-
-	// Type `string`, `number`, `boolean`, `semver` or `date`.
-	Type string `json:"type"`
+	Description *string               `json:"description,omitempty"`
+	Key         string                `json:"key"`
+	Name        string                `json:"name"`
+	Type        DocumentAttributeType `json:"type"`
 }
+
+// DocumentAttributeType defines model for DocumentAttribute.Type.
+type DocumentAttributeType string
 
 // DocumentCondition One comparison inside a rule or a segment. An `attribute` condition
 // names an `attribute`, an operator (`op`) and a `value` (none for

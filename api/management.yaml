@@ -13243,6 +13243,7 @@ components:
           description: The values a client explains the warning with, such as the `email` of an owner replaced.
     ProjectDocument:
       type: object
+      additionalProperties: false
       description: |
         A project's whole configuration, versioned apart from this API: it
         has its own `schema_version`, a server imports every version it ever
@@ -13289,6 +13290,7 @@ components:
             $ref: "#/components/schemas/DocumentExperiment"
     DocumentProject:
       type: object
+      additionalProperties: false
       required: [key, name]
       properties:
         key:
@@ -13299,6 +13301,7 @@ components:
           type: string
     DocumentEnvironment:
       type: object
+      additionalProperties: false
       required: [key, name, protected]
       properties:
         key:
@@ -13309,6 +13312,7 @@ components:
           type: boolean
     DocumentUnitType:
       type: object
+      additionalProperties: false
       required: [key, name]
       properties:
         key:
@@ -13319,19 +13323,21 @@ components:
           type: string
     DocumentAttribute:
       type: object
+      additionalProperties: false
       required: [key, type, name]
       properties:
         key:
           type: string
         type:
           type: string
-          description: "`string`, `number`, `boolean`, `semver` or `date`."
+          enum: [string, number, boolean, semver, date, list]
         name:
           type: string
         description:
           type: string
     DocumentSegment:
       type: object
+      additionalProperties: false
       required: [key, name, private, conditions]
       properties:
         key:
@@ -13348,6 +13354,7 @@ components:
             $ref: "#/components/schemas/DocumentCondition"
     DocumentCondition:
       type: object
+      additionalProperties: false
       description: |
         One comparison inside a rule or a segment. An `attribute` condition
         names an `attribute`, an operator (`op`) and a `value` (none for
@@ -13373,6 +13380,7 @@ components:
           type: string
     DocumentFlag:
       type: object
+      additionalProperties: false
       required: [key, type, name, lifetime, variations, configurations]
       properties:
         key:
@@ -13415,6 +13423,7 @@ components:
             $ref: "#/components/schemas/DocumentConfiguration"
     DocumentVariation:
       type: object
+      additionalProperties: false
       required: [key, value]
       properties:
         key:
@@ -13427,6 +13436,7 @@ components:
           type: string
     DocumentConfiguration:
       type: object
+      additionalProperties: false
       required: ["on", off_variation, fallthrough, rules]
       properties:
         "on":
@@ -13452,6 +13462,7 @@ components:
             $ref: "#/components/schemas/DocumentRule"
     DocumentPrerequisite:
       type: object
+      additionalProperties: false
       required: [flag, variation]
       properties:
         flag:
@@ -13460,6 +13471,7 @@ components:
           type: string
     DocumentOverride:
       type: object
+      additionalProperties: false
       required: [unit_type, unit_id, variation]
       properties:
         unit_type:
@@ -13473,6 +13485,7 @@ components:
           description: Why the unit has a fixed variation. Who set it does not travel.
     DocumentRule:
       type: object
+      additionalProperties: false
       required: [conditions, serve]
       properties:
         id:
@@ -13489,6 +13502,7 @@ components:
           $ref: "#/components/schemas/DocumentServe"
     DocumentServe:
       type: object
+      additionalProperties: false
       description: |
         What a matching rule serves. `variation` serves `variation`; `rollout`
         serves `variation` to `percentage` (basis points, 0 to 10,000) of the
@@ -13512,6 +13526,7 @@ components:
           description: A rollout's salt, 16 lower-case letters and digits; it decides which units fall in the share, so it travels. Minted on import when absent.
     DocumentExperiment:
       type: object
+      additionalProperties: false
       required: [key, name, flag, unit_type, variations, traffic_allocation, status]
       properties:
         key:
@@ -13569,6 +13584,7 @@ components:
             - $ref: "#/components/schemas/DocumentDecision"
     DocumentExperimentVariation:
       type: object
+      additionalProperties: false
       required: [variation, weight]
       properties:
         variation:
@@ -13578,6 +13594,7 @@ components:
           description: The share of the allocated traffic, in basis points.
     DocumentDecision:
       type: object
+      additionalProperties: false
       required: [outcome]
       properties:
         outcome:
