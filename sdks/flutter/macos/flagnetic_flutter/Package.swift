@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "flagnetic_flutter",
     platforms: [
-        .macOS("12.0")
+        .macOS("10.15")
     ],
     products: [
         .library(name: "flagnetic-flutter", targets: ["flagnetic_flutter"])
