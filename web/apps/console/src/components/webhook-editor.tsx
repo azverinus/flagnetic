@@ -35,6 +35,7 @@ import {
   patchOf,
   type WebhookForm,
   type WebhookScope,
+  webhookUrlIssue,
   webhookApi,
   webhookEventTypesQuery,
   webhooksKey,
@@ -73,17 +74,10 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
       .string()
       .trim()
       .min(1, t`Enter the URL the events are posted to.`)
-      .refine(
-        (value) => {
-          try {
-            const url = new URL(value);
-            return url.protocol === "https:" || url.protocol === "http:";
-          } catch {
-            return false;
-          }
-        },
-        t`Enter an absolute URL, such as https://example.com/flagnetic.`,
-      ),
+      .superRefine((value, context) => {
+        const issue = webhookUrlIssue(i18n, value);
+        if (issue !== undefined) context.addIssue({ code: "custom", message: issue });
+      }),
     events: z.array(z.string()).min(1, t`Choose at least one event type.`),
     environments: z.array(z.string()),
     enabled: z.boolean(),

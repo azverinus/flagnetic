@@ -16,6 +16,7 @@ import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { languageName } from "@/i18n/format";
 import { locales } from "@/i18n/locale";
 import { unwrap } from "@/lib/errors";
+import { withinCodePoints } from "@/lib/forms";
 import { chosenLocale, followBrowser, followMemberLocale, localeChoice } from "@/lib/member-locale";
 import { violationMessage } from "@/lib/problem-messages";
 import { isProjectMembersRead, meQuery } from "@/lib/queries";
@@ -38,8 +39,8 @@ export function ProfileForm({ member }: { member: ProfileMember }) {
       .string()
       .trim()
       .min(1, i18n._(msg`Enter a display name.`))
-      .max(
-        displayNameMax,
+      .refine(
+        (value) => withinCodePoints(value, displayNameMax),
         violationMessage(i18n, {
           pointer: "/display_name",
           code: "too_long",

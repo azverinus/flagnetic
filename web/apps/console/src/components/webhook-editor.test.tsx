@@ -80,6 +80,30 @@ describe("the webhook editor", () => {
     });
   });
 
+  it("refuses a target with credentials or a fragment before sending anything", async () => {
+    const server = fakeServer({
+      ...common,
+      "POST /projects/checkout/webhooks": { status: 201, body: created },
+    });
+    renderWithProviders(
+      <WebhookEditor scope={{ project: "checkout" }} layout="dialog" onSaved={() => undefined} />,
+    );
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Name"), "Chat");
+    await user.click(await screen.findByRole("checkbox", { name: /flag\.created/ }));
+    const url = screen.getByLabelText("URL");
+
+    await user.type(url, "https://user@hooks.example.com/chat");
+    await user.click(screen.getByRole("button", { name: "Create webhook" }));
+    expect(await screen.findByText("Enter a URL without credentials or a fragment.")).toBeVisible();
+
+    await user.clear(url);
+    await user.type(url, "https://hooks.example.com/chat#x");
+    await user.click(screen.getByRole("button", { name: "Create webhook" }));
+    expect(await screen.findByText("Enter a URL without credentials or a fragment.")).toBeVisible();
+    expect(server.requests.some((r) => r.method === "POST")).toBe(false);
+  });
+
   it("covers every individual type with the every-event choice", async () => {
     const server = fakeServer({
       ...common,

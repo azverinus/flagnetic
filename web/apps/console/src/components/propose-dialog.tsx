@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, unwrap } from "@/lib/errors";
 import { auditQueryKey, changeRequestQuery, changeRequestsQueryKey } from "@/lib/queries";
+import { lengthIssue } from "@/lib/forms";
 
 /** The longest title and description the server takes. */
 const maxTitleLength = 200;
@@ -173,17 +174,21 @@ function ProposeForm({
   onPropose: (details: Details) => void;
   children: ReactNode;
 }) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [applyAt, setApplyAt] = useState("");
   const [checked, setChecked] = useState(false);
-  const titleIssue = title.trim() === "" ? t`Enter a title.` : undefined;
+  const titleIssue =
+    title.trim() === "" ? t`Enter a title.` : lengthIssue(i18n, title.trim(), maxTitleLength);
+  const descriptionIssue = lengthIssue(i18n, description.trim(), maxDescriptionLength);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setChecked(true);
-    if (titleIssue === undefined) onPropose({ title, description, applyAt });
+    if (titleIssue === undefined && descriptionIssue === undefined) {
+      onPropose({ title, description, applyAt });
+    }
   };
   return (
     <DialogForm
@@ -200,21 +205,17 @@ function ProposeForm({
         refusal={refusal}
         pointer="/title"
       >
-        <Input
-          value={title}
-          maxLength={maxTitleLength}
-          onChange={(event) => setTitle(event.target.value)}
-        />
+        <Input value={title} onChange={(event) => setTitle(event.target.value)} />
       </Field>
       <Field
         label={<Trans>Description</Trans>}
         hint={<Trans>Why the change is needed, for whoever reviews it; optional</Trans>}
+        error={checked ? descriptionIssue : undefined}
         refusal={refusal}
         pointer="/description"
       >
         <Textarea
           rows={4}
-          maxLength={maxDescriptionLength}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />

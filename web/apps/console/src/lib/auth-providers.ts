@@ -19,6 +19,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { ApiError, unwrap } from "./errors";
+import { withinCodePoints } from "./forms";
 import { ifMatch } from "./http";
 import { violationMessage } from "./problem-messages";
 
@@ -306,7 +307,10 @@ export function providerFields(i18n: I18n, { creating }: { creating: boolean }) 
       .string()
       .trim()
       .min(1, i18n._(msg`Enter a name.`))
-      .max(200, violation("/display_name", "invalid_display_name")),
+      .refine(
+        (value) => withinCodePoints(value, 200),
+        violation("/display_name", "invalid_display_name"),
+      ),
     domains: z.string().superRefine((value, ctx) => {
       const domains = domainsOf(value);
       if (domains.length === 0) {
@@ -339,11 +343,9 @@ export function oidcFormSchema(
         .string()
         .trim()
         .min(1, i18n._(msg`Enter the client ID.`)),
+      // Kept as typed on create and on edit alike, as the server stores it.
       client_secret: creating
-        ? z
-            .string()
-            .trim()
-            .min(1, i18n._(msg`Enter the client secret.`))
+        ? z.string().refine((value) => value.trim() !== "", i18n._(msg`Enter the client secret.`))
         : z.string(),
       scopes: z.string(),
       claim_email: z

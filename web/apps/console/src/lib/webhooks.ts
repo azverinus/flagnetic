@@ -400,6 +400,29 @@ export function changedFieldNames(i18n: I18n, before: Webhook, after: Webhook): 
   return names;
 }
 
+/**
+ * What the server would refuse in a subscription's target before it is
+ * asked: it must be an absolute http or https URL, without credentials
+ * (`user@`, even empty) or a fragment. A value already trimmed.
+ */
+export function webhookUrlIssue(i18n: I18n, value: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return i18n._(msg`Enter an absolute URL, such as https://example.com/flagnetic.`);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return i18n._(msg`Enter an absolute URL, such as https://example.com/flagnetic.`);
+  }
+  const credentials =
+    url.username !== "" || url.password !== "" || /^[^/]*\/\/[^/?#]*@/.test(value);
+  if (credentials || value.includes("#")) {
+    return i18n._(msg`Enter a URL without credentials or a fragment.`);
+  }
+  return undefined;
+}
+
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((item) => b.includes(item));
 }

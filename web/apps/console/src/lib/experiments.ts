@@ -11,7 +11,7 @@ import {
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
-import { nameSchema } from "./forms";
+import { fitsRule, nameSchema } from "./forms";
 
 /** The basis points of a whole: weights and traffic allocations are written in them. */
 export const wholeBasisPoints = 10_000;
@@ -394,15 +394,15 @@ export function experimentIssues(
         "hypothesis",
         i18n._(msg`Write the hypothesis: an experiment starts only with one.`),
       );
-    } else if (!hypothesisRule.safeParse(hypothesis).success) {
+    } else if (!fitsRule(hypothesisRule, hypothesis)) {
       const max = hypothesisRule.maxLength ?? 0;
       fields.set("hypothesis", i18n._(msg`At most ${max} characters.`));
     }
   }
   if (open("tags")) {
-    if (!values.tags.every((tag) => tagRules.element.safeParse(tag).success)) {
+    if (!values.tags.every((tag) => fitsRule(tagRules.element, tag))) {
       fields.set("tags", i18n._(msg`A tag has at most 64 characters.`));
-    } else if (!tagRules.safeParse(values.tags).success) {
+    } else if (!tagRules.safeParse(values.tags.map(() => "t")).success) {
       fields.set("tags", i18n._(msg`An experiment has at most 50 tags.`));
     }
   }

@@ -10,6 +10,7 @@ import { DialogForm } from "@/components/ui/dialog-form";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/errors";
+import { withinCodePoints } from "@/lib/forms";
 import { formRefusal, violationMessage } from "@/lib/problem-messages";
 
 /**
@@ -42,7 +43,10 @@ export function memberFields(i18n: I18n) {
       .string()
       .trim()
       .min(1, i18n._(msg`Enter a display name.`))
-      .max(displayNameMax, tooLong("/display_name", displayNameMax)),
+      .refine(
+        (value) => withinCodePoints(value, displayNameMax),
+        tooLong("/display_name", displayNameMax),
+      ),
   };
 }
 

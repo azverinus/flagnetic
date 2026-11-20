@@ -11,7 +11,7 @@ import { msg } from "@lingui/core/macro";
 
 import type { ApiError } from "./errors";
 import { parsePercent, percentText, weightDrafts, weightIssues } from "./experiments";
-import { nameSchema } from "./forms";
+import { fitsRule, nameSchema } from "./forms";
 import { problemMessage, violationMessage } from "./problem-messages";
 
 /** A rule serving an experiment: the environment, its place there (from 1), what it says. */
@@ -108,7 +108,7 @@ export const maxNoteLength = noteRule.maxLength ?? 0;
 
 /** What a note is refused for, if anything. */
 export function noteIssue(i18n: I18n, note: string): string | undefined {
-  return noteRule.safeParse(note.trim()).success
+  return fitsRule(noteRule, note.trim())
     ? undefined
     : i18n._(msg`At most ${maxNoteLength} characters.`);
 }

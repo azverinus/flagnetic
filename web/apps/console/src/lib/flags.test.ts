@@ -1,11 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { i18n } from "@lingui/core";
+import { beforeAll, describe, expect, it } from "vitest";
+
+import { activateForTests } from "@/test/render";
 
 import {
   isFlagsFiltered,
   listFlagsQueryOf,
   resolveEnvironment,
+  tagsSchema,
   validateFlagsSearch,
 } from "./flags";
+
+beforeAll(() => activateForTests("en"));
 
 describe("the flags list's search", () => {
   it("keeps every filter it can use, trimmed", () => {
@@ -129,5 +135,18 @@ describe("the environment the flags list shows", () => {
 
   it("is none in a project without environments", () => {
     expect(resolveEnvironment([], "staging", "staging")).toBeUndefined();
+  });
+});
+
+describe("a flag's tags", () => {
+  it("count each tag in code points: 64 characters outside the Basic Multilingual Plane fit", () => {
+    expect(tagsSchema(i18n).safeParse(["😀".repeat(64)]).success).toBe(true);
+    expect(tagsSchema(i18n).safeParse(["😀".repeat(65)]).success).toBe(false);
+  });
+
+  it("hold a flag to 50 tags", () => {
+    const tags = (n: number) => Array.from({ length: n }, (_, i) => `t${i}`);
+    expect(tagsSchema(i18n).safeParse(tags(50)).success).toBe(true);
+    expect(tagsSchema(i18n).safeParse(tags(51)).success).toBe(false);
   });
 });

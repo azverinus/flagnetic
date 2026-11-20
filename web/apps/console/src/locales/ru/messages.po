@@ -885,6 +885,10 @@ msgstr "Имя пользователя и пароль отправляются
 msgid "A username needs a password."
 msgstr "Для имени пользователя нужен пароль."
 
+#: src/lib/flags.ts
+msgid "A value has at most 64 KiB of compact JSON."
+msgstr "Значение занимает не более 64 КиБ в компактном JSON."
+
 #: src/components/condition-row.tsx
 msgid "A value, then Enter"
 msgstr "Значение, затем Enter"
@@ -2095,6 +2099,7 @@ msgid "Chosen: <0>{name}</0>"
 msgstr "Выбран: <0>{name}</0>"
 
 #: src/components/auth-provider-form.tsx
+#: src/lib/auth-providers.ts
 msgid "Claims"
 msgstr "Claims"
 
@@ -2136,10 +2141,12 @@ msgid "Client"
 msgstr "Клиентский"
 
 #: src/components/auth-provider-form.tsx
+#: src/lib/auth-providers.ts
 msgid "Client ID"
 msgstr "ID клиента"
 
 #: src/components/auth-provider-form.tsx
+#: src/lib/auth-providers.ts
 msgid "Client secret"
 msgstr "Секрет клиента"
 
@@ -2387,6 +2394,7 @@ msgstr "Создать ключ"
 
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
+#: src/lib/auth-providers.ts
 msgid "Create members on first sign-in"
 msgstr "Создавать участников при первом входе"
 
@@ -2989,6 +2997,10 @@ msgstr "Атрибут с почтой"
 msgid "Email claim"
 msgstr "Claim с почтой"
 
+#: src/lib/auth-providers.ts
+msgid "Email domains"
+msgstr "Почтовые домены"
+
 #: src/components/experiment-transitions.tsx
 msgid "Empty clears it"
 msgstr "Пустая заметка удаляет её"
@@ -3021,7 +3033,9 @@ msgstr "Включить приёмник"
 #: src/components/sink-screen.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-status.tsx
+#: src/lib/auth-providers.ts
 #: src/lib/sinks.ts
+#: src/lib/webhooks.ts
 msgid "Enabled"
 msgstr "Включён"
 
@@ -3135,6 +3149,10 @@ msgstr "Введите заголовок."
 msgid "Enter a unit ID."
 msgstr "Введите ID юнита."
 
+#: src/lib/webhooks.ts
+msgid "Enter a URL without credentials or a fragment."
+msgstr "Введите URL без учётных данных и фрагмента."
+
 #: src/lib/problem-messages.ts
 msgid "Enter a username of at most 256 characters on one line."
 msgstr "Введите имя пользователя не длиннее 256 символов в одну строку."
@@ -3171,7 +3189,7 @@ msgstr "Введите абсолютный URL с http или https без уч
 msgid "Enter an absolute http or https URL without credentials, a query or a fragment."
 msgstr "Введите абсолютный URL с http или https без учётных данных, запроса и фрагмента."
 
-#: src/components/webhook-editor.tsx
+#: src/lib/webhooks.ts
 msgid "Enter an absolute URL, such as https://example.com/flagnetic."
 msgstr "Введите абсолютный URL, например https://example.com/flagnetic."
 
@@ -3355,6 +3373,7 @@ msgstr "Окружение: {environment}"
 #: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
 #: src/lib/sinks.ts
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/environments/route.tsx
 #: src/routes/_signed-in/projects/$project/index.tsx
@@ -3438,6 +3457,10 @@ msgstr "Виды событий"
 #: src/components/webhook-deliveries.tsx
 msgid "Event type"
 msgstr "Тип события"
+
+#: src/lib/webhooks.ts
+msgid "Event types"
+msgstr "Типы событий"
 
 #: src/components/area-screens.ts
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
@@ -4459,6 +4482,7 @@ msgstr "Выпустить ссылку"
 
 #: src/components/auth-provider-detail.tsx
 #: src/components/auth-provider-form.tsx
+#: src/lib/auth-providers.ts
 msgid "Issuer"
 msgstr "Issuer"
 
@@ -4792,6 +4816,7 @@ msgstr "Привязать провайдера"
 
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
+#: src/lib/auth-providers.ts
 msgid "Link members by email"
 msgstr "Привязывать участников по почте"
 
@@ -4824,11 +4849,6 @@ msgstr "Список"
 #: src/components/webhook-deliveries.tsx
 msgid "Load older deliveries"
 msgstr "Загрузить более старые доставки"
-
-#: src/components/auth-provider-form.tsx
-#: src/components/saml-provider-form.tsx
-msgid "Load their version"
-msgstr "Загрузить их версию"
 
 #: src/components/firebase-wizard.tsx
 msgid "Loading the project's environments and unit types…"
@@ -5085,6 +5105,10 @@ msgstr "Сливает документ проекта с этим проект�
 msgid "Metadata"
 msgstr "Метаданные"
 
+#: src/lib/auth-providers.ts
+msgid "Metadata and requests"
+msgstr "Метаданные и запросы"
+
 #: src/components/saml-provider-detail.tsx
 msgid "Metadata from a URL is read again every day."
 msgstr "Метаданные по URL перечитываются каждый день."
@@ -5172,7 +5196,9 @@ msgstr "Перемещено из {from} в {path}"
 #: src/components/variations-editor.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-list.tsx
+#: src/lib/auth-providers.ts
 #: src/lib/sinks.ts
+#: src/lib/webhooks.ts
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
@@ -6721,6 +6747,7 @@ msgid "Request ID: {requestId}"
 msgstr "ID запроса: {requestId}"
 
 #: src/components/auth-provider-form.tsx
+#: src/lib/auth-providers.ts
 msgid "Require a verified email"
 msgstr "Требовать подтверждённую почту"
 
@@ -7121,6 +7148,7 @@ msgstr "токены SCIM"
 #: src/components/auth-provider-form.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
+#: src/lib/auth-providers.ts
 msgid "Scopes"
 msgstr "Области доступа"
 
@@ -9625,6 +9653,7 @@ msgstr "Загрузка"
 #: src/components/sink-editor.tsx
 #: src/components/webhook-editor.tsx
 #: src/components/webhook-list.tsx
+#: src/lib/webhooks.ts
 msgid "URL"
 msgstr "URL"
 

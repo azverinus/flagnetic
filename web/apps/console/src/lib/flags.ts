@@ -10,6 +10,7 @@ import { msg } from "@lingui/core/macro";
 import { z } from "zod";
 
 import { ApiError } from "./errors";
+import { fitsRule } from "./forms";
 import { violationMessage } from "./problem-messages";
 
 /** What a flag's configuration in the list's environment is filtered by. */
@@ -162,6 +163,9 @@ export function flagViolationMessage(i18n: I18n, violation: Violation): string {
   if (violation.code === "duplicate" && field === "key") {
     return i18n._(msg`Another variation has this key.`);
   }
+  if (violation.code === "too_long" && field === "value") {
+    return i18n._(msg`A value has at most 64 KiB of compact JSON.`);
+  }
   if (violation.code === "invalid_type" && field === "value") {
     return i18n._(msg`Enter a value of the flag's type.`);
   }
@@ -180,14 +184,17 @@ const tagRules = zFlagCreate.shape.tags.unwrap();
 
 /** A flag's tags, checked by the server's rules before it is asked. */
 export function tagsSchema(i18n: I18n) {
-  return z
-    .array(z.string())
-    .refine((tags) => tags.every((tag) => tagRules.element.safeParse(tag).success), {
-      message: i18n._(msg`A tag has at most 64 characters.`),
-    })
-    .refine((tags) => tagRules.safeParse(tags).success, {
-      message: i18n._(msg`A flag has at most 50 tags.`),
-    });
+  return (
+    z
+      .array(z.string())
+      .refine((tags) => tags.every((tag) => fitsRule(tagRules.element, tag)), {
+        message: i18n._(msg`A tag has at most 64 characters.`),
+      })
+      // The count only: each tag is held to its bound in code points above.
+      .refine((tags) => tagRules.safeParse(tags.map(() => "t")).success, {
+        message: i18n._(msg`A flag has at most 50 tags.`),
+      })
+  );
 }
 
 /** The first instant of a day (YYYY-MM-DD) in the member's time zone. */

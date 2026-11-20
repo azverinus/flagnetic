@@ -33,6 +33,7 @@ import {
 } from "@/lib/change-requests";
 import { ApiError, unwrap } from "@/lib/errors";
 import { ifMatch } from "@/lib/http";
+import { lengthIssue } from "@/lib/forms";
 import {
   auditQueryKey,
   changeRequestQuery,
@@ -335,16 +336,20 @@ function EditForm({
   onCancel: () => void;
   onSave: (title: string, description: string) => void;
 }) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const [title, setTitle] = useState(changeRequest.title);
   const [description, setDescription] = useState(changeRequest.description);
   const [checked, setChecked] = useState(false);
-  const titleIssue = title.trim() === "" ? t`Enter a title.` : undefined;
+  const titleIssue =
+    title.trim() === "" ? t`Enter a title.` : lengthIssue(i18n, title.trim(), maxTitleLength);
+  const descriptionIssue = lengthIssue(i18n, description.trim(), maxDescriptionLength);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setChecked(true);
-    if (titleIssue === undefined) onSave(title.trim(), description.trim());
+    if (titleIssue === undefined && descriptionIssue === undefined) {
+      onSave(title.trim(), description.trim());
+    }
   };
   return (
     <DialogForm
@@ -360,21 +365,17 @@ function EditForm({
         refusal={refusal}
         pointer="/title"
       >
-        <Input
-          value={title}
-          maxLength={maxTitleLength}
-          onChange={(event) => setTitle(event.target.value)}
-        />
+        <Input value={title} onChange={(event) => setTitle(event.target.value)} />
       </Field>
       <Field
         label={<Trans>Description</Trans>}
         hint={<Trans>Why the change is needed, for whoever reviews it; optional</Trans>}
+        error={checked ? descriptionIssue : undefined}
         refusal={refusal}
         pointer="/description"
       >
         <Textarea
           rows={5}
-          maxLength={maxDescriptionLength}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
@@ -397,13 +398,13 @@ export function DecisionForm({
   onCancel: () => void;
   onDecide: (comment: string) => void;
 }) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const [comment, setComment] = useState("");
   const [checked, setChecked] = useState(false);
   const issue =
     decision === "reject" && comment.trim() === ""
       ? t`Say why, so the author knows what to change.`
-      : undefined;
+      : lengthIssue(i18n, comment.trim(), maxCommentLength);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -431,12 +432,7 @@ export function DecisionForm({
         refusal={refusal}
         pointer="/comment"
       >
-        <Textarea
-          rows={4}
-          maxLength={maxCommentLength}
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-        />
+        <Textarea rows={4} value={comment} onChange={(event) => setComment(event.target.value)} />
       </Field>
     </DialogForm>
   );

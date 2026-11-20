@@ -153,3 +153,33 @@ describe("what is wrong with a flag's variations", () => {
     ]);
   });
 });
+
+describe("the size of a variation's value", () => {
+  const sizeIssues = (type: "string" | "json", value: string) =>
+    variationIssues(i18n, type, [row("a", value)])
+      .filter(({ path }) => path[1] === "value")
+      .map(({ message }) => message);
+
+  it("is held to 64 KiB of compact JSON, counted in bytes", () => {
+    // A string's JSON is its text between quotes: 2 bytes of quotes.
+    const fits = "a".repeat(64 * 1024 - 2);
+    expect(sizeIssues("string", fits)).toEqual([]);
+    expect(sizeIssues("string", `${fits}a`)).toEqual([
+      "A value has at most 64 KiB of compact JSON.",
+    ]);
+  });
+
+  it("counts a multi-byte character by its UTF-8 bytes", () => {
+    // 3 bytes each: 21,845 of them and the quotes fill 65,537 bytes.
+    expect(sizeIssues("string", "€".repeat(21_845))).toEqual([
+      "A value has at most 64 KiB of compact JSON.",
+    ]);
+    expect(sizeIssues("string", "€".repeat(21_844))).toEqual([]);
+  });
+
+  it("measures a JSON value compact, however it is laid out", () => {
+    const items = Array.from({ length: 16_000 }, () => 1).join(", ");
+    // 16,000 ones and 15,999 commas, 2 brackets: 32,001 bytes compact; with spaces 48,000.
+    expect(sizeIssues("json", `[${items}]`)).toEqual([]);
+  });
+});
