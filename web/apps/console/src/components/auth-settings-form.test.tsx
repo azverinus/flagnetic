@@ -29,6 +29,9 @@ const provider = (slug: string, name: string, domains: string[], enabled = true)
   auto_provision: false,
   version: 1,
 });
+/** The provider list the enforced-domains rows read, with no provider in it. */
+const noProviders = { "GET /instance/auth-providers": { status: 200, body: { items: [] } } };
+
 const providers = {
   "GET /instance/auth-providers": {
     status: 200,
@@ -55,7 +58,7 @@ async function retype(label: string, value: string) {
 
 describe("the auth settings form", () => {
   it("shows each duration in the unit that holds it whole", async () => {
-    fakeServer({});
+    fakeServer(noProviders);
     await renderWithRouter(() => <AuthSettingsForm settings={fresh} />);
 
     expect(screen.getByLabelText("Session idle timeout")).toHaveValue("1");
@@ -72,7 +75,10 @@ describe("the auth settings form", () => {
 
   it("sends every setting in seconds, and is clean again once saved", async () => {
     const saved = { ...fresh, session_idle_timeout_seconds: 7_200, password_min_length: 16 };
-    const server = fakeServer({ "PUT /instance/auth-settings": { status: 200, body: saved } });
+    const server = fakeServer({
+      ...noProviders,
+      "PUT /instance/auth-settings": { status: 200, body: saved },
+    });
     await renderWithRouter(() => <AuthSettingsForm settings={fresh} />);
 
     await retype("Session idle timeout", "7200");
@@ -91,7 +97,7 @@ describe("the auth settings form", () => {
   });
 
   it("puts every edit back on discard", async () => {
-    fakeServer({});
+    fakeServer(noProviders);
     await renderWithRouter(() => <AuthSettingsForm settings={fresh} />);
 
     const user = await retype("Password minimum length", "20");
@@ -102,7 +108,7 @@ describe("the auth settings form", () => {
   });
 
   it("refuses an idle timeout longer than the absolute one before asking the server", async () => {
-    const server = fakeServer({});
+    const server = fakeServer(noProviders);
     await renderWithRouter(() => <AuthSettingsForm settings={fresh} />);
 
     const user = await retype("Session idle timeout", "31");
@@ -156,7 +162,10 @@ describe("the auth settings form", () => {
 
   it("switches self-service password reset off, saying it also takes an SMTP server", async () => {
     const saved = { ...fresh, self_service_password_reset: false };
-    const server = fakeServer({ "PUT /instance/auth-settings": { status: 200, body: saved } });
+    const server = fakeServer({
+      ...noProviders,
+      "PUT /instance/auth-settings": { status: 200, body: saved },
+    });
     await renderWithRouter(() => <AuthSettingsForm settings={fresh} />);
 
     const toggle = screen.getByRole("switch", { name: "Self-service password reset" });

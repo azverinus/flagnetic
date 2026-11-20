@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/offline_client.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   late FlutterStore store;
 
@@ -143,4 +144,24 @@ void main() {
     expect(await store.get(key), anyOf(first, second));
     expect(Directory('${directory.path}/flagnetic').listSync(), hasLength(1));
   });
+
+  test(
+    'a temporary left by an interrupted write is removed on first use',
+    () async {
+      final folder = Directory('${directory.path}/flagnetic')
+        ..createSync(recursive: true);
+      final stale = File('${folder.path}/entry.json.0.tmp')
+        ..writeAsStringSync('half a doc');
+      stale.setLastModifiedSync(
+        DateTime.now().subtract(const Duration(hours: 1)),
+      );
+      // A write in flight, or just finished: too young to be a leftover.
+      final fresh = File('${folder.path}/entry.json.1.tmp')
+        ..writeAsStringSync('being written');
+
+      await store.get(clientKeys.lastGood(testContext.units));
+      expect(stale.existsSync(), isFalse);
+      expect(fresh.existsSync(), isTrue);
+    },
+  );
 }

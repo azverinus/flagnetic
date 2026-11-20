@@ -19,7 +19,7 @@ const types: Record<AuditFormat, string> = {
  * (`audit-{project key|instance}-{UTC time}.{ext}`) when the header is
  * not readable.
  */
-export function auditFileName(
+function auditFileName(
   disposition: string | null,
   scope: AuditFileScope,
   format: AuditFormat,

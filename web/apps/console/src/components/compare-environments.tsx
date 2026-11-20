@@ -11,7 +11,7 @@ import { CopyIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { Can } from "@/components/can";
+import { Can, DisabledAction } from "@/components/can";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Field } from "@/components/ui/field";
@@ -112,6 +112,10 @@ function Comparison({ project, flag, environments, initial }: CompareEnvironment
             rows={comparisonRows(a, b)}
             left={nameOf(left)}
             right={nameOf(right)}
+            protectedSides={{
+              left: environments.find((env) => env.key === left)?.protected === true,
+              right: environments.find((env) => env.key === right)?.protected === true,
+            }}
             copyHere={
               flag.archived_at === null
                 ? (side) =>
@@ -143,11 +147,14 @@ function SideBySide({
   rows,
   left,
   right,
+  protectedSides,
   copyHere,
 }: {
   rows: ComparisonRow[];
   left: string;
   right: string;
+  /** Which sides are protected environments, which refuse a copy into them. */
+  protectedSides: { left: boolean; right: boolean };
   /** Asks to copy the other side into this one; absent while the flag cannot be configured. */
   copyHere?: (side: "left" | "right") => void;
 }) {
@@ -157,12 +164,25 @@ function SideBySide({
       <span className="flex flex-wrap items-center gap-2">
         {name}
         {copyHere ? (
-          <Can permission="flag_configuration.update" whenMissing="disable">
-            <Button size="sm" variant="outline" onClick={() => copyHere(side)}>
-              <CopyIcon aria-hidden />
-              <Trans>Copy {other} here</Trans>
-            </Button>
-          </Can>
+          protectedSides[side] ? (
+            // A copy writes the target's configuration at once; a protected
+            // environment refuses that, and no change request carries a copy.
+            <DisabledAction
+              reason={t`${name} is protected, so a copy is not written into it: it would change what its SDKs receive without a review.`}
+            >
+              <Button size="sm" variant="outline">
+                <CopyIcon aria-hidden />
+                <Trans>Copy {other} here</Trans>
+              </Button>
+            </DisabledAction>
+          ) : (
+            <Can permission="flag_configuration.update" whenMissing="disable">
+              <Button size="sm" variant="outline" onClick={() => copyHere(side)}>
+                <CopyIcon aria-hidden />
+                <Trans>Copy {other} here</Trans>
+              </Button>
+            </Can>
+          )
         ) : null}
       </span>
     </th>

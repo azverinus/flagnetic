@@ -339,6 +339,10 @@ msgstr "{name} is no longer protected."
 msgid "{name} is not signed in anywhere."
 msgstr "{name} is not signed in anywhere."
 
+#: src/components/compare-environments.tsx
+msgid "{name} is protected, so a copy is not written into it: it would change what its SDKs receive without a review."
+msgstr "{name} is protected, so a copy is not written into it: it would change what its SDKs receive without a review."
+
 #: src/components/flag-history.tsx
 msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
 msgstr "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
@@ -717,9 +721,17 @@ msgstr "A project token does what its role allows in this project, narrowed to i
 msgid "A project token never approves or rejects change requests."
 msgstr "A project token never approves or rejects change requests."
 
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
+msgid "A protected environment cannot be deleted: stop protecting it first."
+msgstr "A protected environment cannot be deleted: stop protecting it first."
+
 #: src/lib/problem-messages.ts
 msgid "A protected environment cannot be deleted. Stop protecting it on its page first."
 msgstr "A protected environment cannot be deleted. Stop protecting it on its page first."
+
+#: src/components/configuration-editor.tsx
+msgid "A protected environment never takes a new salt: it would move units to other variations without a review."
+msgstr "A protected environment never takes a new salt: it would move units to other variations without a review."
 
 #: src/components/auth-provider-form.tsx
 #: src/components/saml-provider-form.tsx
@@ -754,6 +766,10 @@ msgstr "A rule has at most {max} conditions."
 #: src/components/rule-editor.tsx
 msgid "A rule has at most {maxConditionsText} conditions."
 msgstr "A rule has at most {maxConditionsText} conditions."
+
+#: src/lib/problem-messages.ts
+msgid "A rule that serves an experiment would change. Change it from the experiment instead."
+msgstr "A rule that serves an experiment would change. Change it from the experiment instead."
 
 #: src/components/tester-panel.tsx
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
@@ -4863,8 +4879,8 @@ msgid "Local login"
 msgstr "Local login"
 
 #: src/lib/problem-messages.ts
-msgid "Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one to your account, then try again."
-msgstr "Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one to your account, then try again."
+msgid "Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one, then try again."
+msgstr "Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one, then try again."
 
 #: src/lib/audit.ts
 msgid "Locked out after failed sign-ins"
@@ -6650,6 +6666,10 @@ msgstr "Remove SMTP server"
 msgid "Remove tag {tag}"
 msgstr "Remove tag {tag}"
 
+#: src/lib/problem-messages.ts
+msgid "Remove the control character. Text holds visible characters, tabs and line breaks only."
+msgstr "Remove the control character. Text holds visible characters, tabs and line breaks only."
+
 #: src/components/ui/toolbar.tsx
 msgid "Remove the filter {label}"
 msgstr "Remove the filter {label}"
@@ -7601,9 +7621,17 @@ msgstr "Some exposures were refused and are not counted above. An SDK sends expo
 msgid "Some fields need correcting."
 msgstr "Some fields need correcting."
 
+#: src/lib/problem-messages.ts
+msgid "Some text holds a control character. Remove it: text holds visible characters, tabs and line breaks only."
+msgstr "Some text holds a control character. Remove it: text holds visible characters, tabs and line breaks only."
+
 #: src/components/flag-on-off.tsx
 msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
 msgstr "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
+
+#: src/lib/problem-messages.ts
+msgid "Someone else changed this at the same moment. Try again."
+msgstr "Someone else changed this at the same moment. Try again."
 
 #: src/lib/problem-messages.ts
 msgid "Someone else changed this since you opened it. Reload to see their changes, then make yours again."
@@ -7622,8 +7650,8 @@ msgid "Someone saved this configuration after this draft was loaded."
 msgstr "Someone saved this configuration after this draft was loaded."
 
 #: src/components/project-invitations.tsx
-msgid "Someone without an account here joins the instance through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
-msgstr "Someone without an account here joins the instance through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
+msgid "Someone who is not a member of the instance joins it through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
+msgstr "Someone who is not a member of the instance joins it through the invitation, and accepting it grants them the role. A member of the instance is granted a role instead."
 
 #: src/components/import-project.tsx
 msgid "Something that is still in use is not deleted."
@@ -8247,6 +8275,10 @@ msgid "The environment already has 10 active keys of this kind. Revoke one, or w
 msgstr "The environment already has 10 active keys of this kind. Revoke one, or wait for a rotated one to end, first."
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The environment is protected, so overrides are not added or removed here: each would change what its SDKs receive without a review."
+msgstr "The environment is protected, so overrides are not added or removed here: each would change what its SDKs receive without a review."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "The environment is protected: changes to its configuration are proposed as change requests and go live once approved and applied."
 msgstr "The environment is protected: changes to its configuration are proposed as change requests and go live once approved and applied."
 
@@ -8304,8 +8336,8 @@ msgid "The experiment is archived: nothing about it changes any more."
 msgstr "The experiment is archived: nothing about it changes any more."
 
 #: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
-msgid "The experiment is created as a draft: nothing changes for users until a rule serves it and it starts."
-msgstr "The experiment is created as a draft: nothing changes for users until a rule serves it and it starts."
+msgid "The experiment is created as a draft: nothing changes for any unit until a rule serves it and it starts."
+msgstr "The experiment is created as a draft: nothing changes for any unit until a rule serves it and it starts."
 
 #: src/lib/problem-messages.ts
 msgid "The experiment is not ready to start."
@@ -8402,6 +8434,10 @@ msgstr "The flag is created off in every environment, serving its off variation 
 #: src/components/tester-panel.tsx
 msgid "The flag is off here: the off variation is served."
 msgstr "The flag is off here: the off variation is served."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag is on in {names}, which is protected, so archiving or restoring it would change what its SDKs receive. Switch it off there first."
+msgstr "The flag is on in {names}, which is protected, so archiving or restoring it would change what its SDKs receive. Switch it off there first."
 
 #: src/components/experiment-fields.tsx
 msgid "The flag whose variations the experiment compares"
@@ -8906,6 +8942,10 @@ msgstr "The share of units included in the experiment; the others get what the f
 #: src/lib/problem-messages.ts
 msgid "The sink is not ready to be enabled: {failure}."
 msgstr "The sink is not ready to be enabled: {failure}."
+
+#: src/lib/problem-messages.ts
+msgid "The sink was changed or removed meanwhile. Reload it and try again."
+msgstr "The sink was changed or removed meanwhile. Reload it and try again."
 
 #: src/components/sink-secret-dialog.tsx
 msgid "The sink's signing secret"
@@ -10049,6 +10089,10 @@ msgstr "Writes that would change what SDKs receive from {name} are refused until
 msgid "Yes"
 msgstr "Yes"
 
+#: src/lib/sso-errors.ts
+msgid "You are deactivated here. Ask an instance admin to reactivate you."
+msgstr "You are deactivated here. Ask an instance admin to reactivate you."
+
 #: src/components/invitation-acceptance.tsx
 msgid "You are invited to the project {projectName} as {role}. Accepting grants you that role there."
 msgstr "You are invited to the project {projectName} as {role}. Accepting grants you that role there."
@@ -10143,16 +10187,12 @@ msgid "You need the permission to {name}."
 msgstr "You need the permission to {name}."
 
 #: src/components/sign-in-methods.tsx
-msgid "You will no longer be able to sign in through {name} with this account. Your own account here, and everything in it, stays. You can link it again later."
-msgstr "You will no longer be able to sign in through {name} with this account. Your own account here, and everything in it, stays. You can link it again later."
+msgid "You will no longer be able to sign in through {name} with this account. You, and everything you hold here, stay. You can link it again later."
+msgstr "You will no longer be able to sign in through {name} with this account. You, and everything you hold here, stay. You can link it again later."
 
 #: src/components/sign-in-methods.tsx
 msgid "You will sign in only through the providers you linked. Any invitation link or password reset link still open for you stops working. This device and your other sessions stay signed in. It is refused while no linked provider is left that lets you in."
 msgstr "You will sign in only through the providers you linked. Any invitation link or password reset link still open for you stops working. This device and your other sessions stay signed in. It is refused while no linked provider is left that lets you in."
-
-#: src/lib/sso-errors.ts
-msgid "Your account here is deactivated. Ask an instance admin to reactivate it."
-msgstr "Your account here is deactivated. Ask an instance admin to reactivate it."
 
 #: src/components/token-list.tsx
 msgid "Your API tokens"

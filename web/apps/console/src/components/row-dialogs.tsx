@@ -4,6 +4,7 @@ import type { RowData } from "@tanstack/react-table";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { DisabledAction } from "@/components/can";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
@@ -43,17 +44,24 @@ export type RowActionProps = {
   label: string;
   icon: LucideIcon;
   onClick: () => void;
+  /** Why the row's server refuses this action whoever asks; the button is then shown off with it. */
+  refused?: string;
 };
 
 /**
  * One action of a row, as an icon button, in the column `withRowActions`
  * adds only for a caller holding the permission the actions need.
  */
-export function RowAction({ label, icon: Icon, onClick }: RowActionProps) {
-  return (
+export function RowAction({ label, icon: Icon, onClick, refused }: RowActionProps) {
+  const button = (
     <Button variant="ghost" size="icon" aria-label={label} onClick={onClick}>
       <Icon aria-hidden />
     </Button>
+  );
+  return refused === undefined ? (
+    button
+  ) : (
+    <DisabledAction reason={refused}>{button}</DisabledAction>
   );
 }
 

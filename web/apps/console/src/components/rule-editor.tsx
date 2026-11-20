@@ -63,6 +63,8 @@ export type RuleEditorProps = {
   errors: ReadonlyMap<string, string>;
   /** Asks to regenerate a saved rollout's salt; absent where it cannot be. */
   onRegenerateSalt?: (rule: RuleDraft) => void;
+  /** Why regenerating a salt is refused now, when it is: the button is shown off, with the reason. */
+  regenerateBlocked?: string;
   /** The identifiers of the saved rules serving a rollout, whose salt can be regenerated. */
   saltedRules: ReadonlySet<string>;
   /** The card of the rule that served the tester's last result, by its key. */
@@ -89,6 +91,7 @@ export function RuleEditor({
   experiments,
   errors,
   onRegenerateSalt,
+  regenerateBlocked,
   saltedRules,
   matchedRule,
   disabled = false,
@@ -196,6 +199,7 @@ export function RuleEditor({
                     ? () => onRegenerateSalt(rule)
                     : undefined
                 }
+                regenerateBlocked={regenerateBlocked}
                 matched={matchedRule === rule.key}
                 disabled={disabled}
               />
@@ -250,6 +254,7 @@ type RuleCardProps = Omit<
   /** A card was dropped on this one: the dragged card's position, from 1. */
   onDrop: (from: number) => void;
   onRegenerateSalt?: () => void;
+  regenerateBlocked?: string;
 };
 
 function RuleCard({
@@ -272,6 +277,7 @@ function RuleCard({
   experiments,
   errors,
   onRegenerateSalt,
+  regenerateBlocked,
   matched,
   disabled = false,
 }: RuleCardProps) {
@@ -526,6 +532,7 @@ function RuleCard({
             percent: errors.get(`${rule.key}/percent`),
           }}
           onRegenerateSalt={onRegenerateSalt}
+          regenerateBlocked={regenerateBlocked}
           disabled={disabled}
         />
       </section>
@@ -543,6 +550,7 @@ function ServeEditor({
   experiments,
   errors,
   onRegenerateSalt,
+  regenerateBlocked,
   disabled,
 }: {
   position: number;
@@ -560,11 +568,12 @@ function ServeEditor({
     percent?: string;
   };
   onRegenerateSalt?: () => void;
+  regenerateBlocked?: string;
   disabled: boolean;
 }) {
   const { t } = useLingui();
   const name = useId();
-  const ids = { percent: useId(), salt: useId(), hint: useId() };
+  const ids = { percent: useId(), salt: useId(), hint: useId(), blocked: useId() };
   const errorId = (field: string) => `${name}-${field}-error`;
   const fieldError = (field: string, message?: string) =>
     message ? (
@@ -721,9 +730,23 @@ function ServeEditor({
               </p>
             )}
             {onRegenerateSalt && !disabled ? (
-              <Button type="button" variant="outline" size="sm" onClick={onRegenerateSalt}>
-                <Trans>Regenerate salt</Trans>
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={regenerateBlocked !== undefined}
+                  aria-describedby={regenerateBlocked === undefined ? undefined : ids.blocked}
+                  onClick={onRegenerateSalt}
+                >
+                  <Trans>Regenerate salt</Trans>
+                </Button>
+                {regenerateBlocked === undefined ? null : (
+                  <p id={ids.blocked} className="text-sm text-muted-foreground">
+                    {regenerateBlocked}
+                  </p>
+                )}
+              </>
             ) : null}
           </div>
         </>

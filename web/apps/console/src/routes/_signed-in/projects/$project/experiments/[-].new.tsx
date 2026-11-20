@@ -46,8 +46,8 @@ function NewExperiment() {
           title={t`New experiment`}
           description={
             <Trans>
-              The experiment is created as a draft: nothing changes for users until a rule serves it
-              and it starts.
+              The experiment is created as a draft: nothing changes for any unit until a rule serves
+              it and it starts.
             </Trans>
           }
         />

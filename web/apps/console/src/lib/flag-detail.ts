@@ -150,7 +150,7 @@ export function entryOfVersion(
 export const unitIdMaxBytes = 256;
 
 /** How many characters an override's note has at most, once trimmed. */
-export const overrideNoteMax = 200;
+const overrideNoteMax = 200;
 
 export type OverrideIssues = { unitId?: string; note?: string };
 

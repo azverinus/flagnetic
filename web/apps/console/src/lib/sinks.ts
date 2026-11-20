@@ -320,7 +320,7 @@ export function healthTone(health: SinkHealth): "default" | "muted" | "destructi
 }
 
 /** Why a call to a target failed, in a few words. */
-export function failureClassName(i18n: I18n, failureClass: SinkFailureClass): string {
+function failureClassName(i18n: I18n, failureClass: SinkFailureClass): string {
   switch (failureClass) {
     case "dns":
       return i18n._(msg`The address could not be resolved`);

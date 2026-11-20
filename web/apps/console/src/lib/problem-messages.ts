@@ -31,6 +31,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
         ? i18n._(msg`Too many failed attempts for this email. Try again in ${retry}.`)
         : i18n._(msg`Too many failed attempts for this email. Try again later.`);
     case "rate_limited":
+    case "too_many_requests":
       return retry
         ? i18n._(msg`Too many requests. Try again in ${retry}.`)
         : i18n._(msg`Too many requests. Try again later.`);
@@ -285,7 +286,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       );
     case "identity_required":
       return i18n._(
-        msg`Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one to your account, then try again.`,
+        msg`Local login stays on until you hold an identity of your own at an enabled auth provider, so that you cannot lock yourself out. Sign in through a provider or link one, then try again.`,
       );
     case "local_login_disabled":
       return i18n._(
@@ -299,6 +300,18 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(
         msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,
       );
+    case "invalid_character":
+      return i18n._(
+        msg`Some text holds a control character. Remove it: text holds visible characters, tabs and line breaks only.`,
+      );
+    case "experiment_rules_changed":
+      return i18n._(
+        msg`A rule that serves an experiment would change. Change it from the experiment instead.`,
+      );
+    case "concurrent_change":
+      return i18n._(msg`Someone else changed this at the same moment. Try again.`);
+    case "sink_changed":
+      return i18n._(msg`The sink was changed or removed meanwhile. Reload it and try again.`);
     default:
       if (error.code.startsWith("invalid_") && error.violations.length > 0) {
         return i18n._(msg`Some fields need correcting.`);
@@ -482,6 +495,10 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       );
     case "invalid_value":
       return i18n._(msg`This value is not valid here.`);
+    case "invalid_character":
+      return i18n._(
+        msg`Remove the control character. Text holds visible characters, tabs and line breaks only.`,
+      );
     case "unknown_flag":
       return i18n._(msg`The project has no such flag.`);
     case "flag_archived":
@@ -678,13 +695,32 @@ export function violationsByPointer(i18n: I18n, error: ApiError): Map<string, st
 }
 
 /**
+ * Whether a violation's pointer is the field's or lies inside it: the
+ * server points as deep as the value it refused (`/variations/0/value/msg`),
+ * and the nearest field the form has is the one it starts with.
+ */
+function pointsInto(pointer: string, field: string): boolean {
+  return pointer === field || pointer.startsWith(`${field}/`);
+}
+
+/** The violation of a refusal that concerns the field at pointer: its own, else one inside it. */
+export function violationAt(error: ApiError, pointer: string): Violation | undefined {
+  return (
+    error.violations.find((violation) => violation.pointer === pointer) ??
+    error.violations.find((violation) => pointsInto(violation.pointer, pointer))
+  );
+}
+
+/**
  * The refusal a form explains above its actions: none when it concerns
  * one of the form's fields, since that field says it under itself, and
  * the refusal as it is otherwise.
  */
 export function formRefusal(refusal: unknown, fieldPointers: readonly string[]): unknown {
   return refusal instanceof ApiError &&
-    refusal.violations.some((violation) => fieldPointers.includes(violation.pointer))
+    refusal.violations.some((violation) =>
+      fieldPointers.some((field) => pointsInto(violation.pointer, field)),
+    )
     ? undefined
     : refusal;
 }

@@ -190,7 +190,7 @@ test.describe("auth providers", () => {
       ["attempt_mismatch", "That sign-in was started in another browser or window"],
       ["sso_failed", "Signing in through the identity provider failed."],
       ["idp_error", "The identity provider refused the sign-in."],
-      ["member_deactivated", "Your account here is deactivated."],
+      ["member_deactivated", "You are deactivated here."],
       ["sso_required", "Your email address signs in through Dex only."],
     ] as const) {
       await page.goto(

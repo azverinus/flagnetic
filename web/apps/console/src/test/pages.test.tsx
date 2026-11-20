@@ -72,6 +72,9 @@ const permissions = [
   "flag_configuration.update",
 ];
 
+/** A read a page makes that the test does not look at: nothing there. */
+const absent = problem(404, "not_found");
+
 /** What every page under the project reads, answered with nothing in particular. */
 const shell = {
   "GET /projects/checkout": { status: 200, body: project },
@@ -80,6 +83,13 @@ const shell = {
   "GET /projects/checkout/attributes": { status: 200, body: { items: [] } },
   "GET /projects/checkout/unit-types": { status: 200, body: { items: [] } },
   "GET /projects/checkout/segments": { status: 200, body: { items: [] } },
+  "GET /projects/checkout/segments/vip/usages": absent,
+  "GET /projects/checkout/environments": absent,
+  "GET /projects/checkout/members": absent,
+  "GET /projects/checkout/flags/checkout-flow": absent,
+  "GET /projects/checkout/experiments/new-checkout/alerts": absent,
+  "GET /projects/checkout/change-requests": absent,
+  "GET /projects/checkout/flags/checkout-flow/environments/production/evaluations": absent,
 };
 
 describe("a segment's page", () => {

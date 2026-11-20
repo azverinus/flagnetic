@@ -39,7 +39,7 @@ export const mailSettingsApi = {
 };
 
 /** The security modes, in the order the form offers them. */
-export const securities = ["starttls", "tls", "none"] as const satisfies readonly SmtpSecurity[];
+const securities = ["starttls", "tls", "none"] as const satisfies readonly SmtpSecurity[];
 
 /** The SMTP settings as their form holds them; the port is what was typed. */
 export type MailForm = {

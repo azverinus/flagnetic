@@ -58,7 +58,7 @@ import {
 import { useNameOf } from "@/lib/use-known-members";
 import { FlagPanel } from "@/components/flag-panel";
 import { registerFlagActions } from "@/lib/flag-actions";
-import { environmentLabel } from "@/lib/environments";
+import { environmentLabel, protectedWhereOn } from "@/lib/environments";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/flags/$flag")({
   staticData: { crumb: { param: "flag" }, panel: FlagPanel },
@@ -134,7 +134,11 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   const [editing, setEditing] = useState(false);
   const [comparing, setComparing] = useState(false);
   const testerButton = useRef<HTMLButtonElement>(null);
-  const lifecycle = useFlagLifecycle(project, flag);
+  const lifecycle = useFlagLifecycle(
+    project,
+    flag,
+    protectedWhereOn(flag, environments.data ?? []),
+  );
   // Closing the tester returns the keyboard to the button that opens it.
   const closeTester = () => {
     setTester(false);
@@ -317,8 +321,13 @@ type Retiring = "archive" | "restore" | "delete";
  * items go behind the header's "More actions"; the dialogs that confirm
  * them stay outside the menu, which unmounts its items once it closes.
  */
-function useFlagLifecycle(project: string, flag: Flag): { menu: ReactNode; dialogs: ReactNode } {
-  const { t } = useLingui();
+function useFlagLifecycle(
+  project: string,
+  flag: Flag,
+  /** The protected environments the flag is on in, by name. */
+  protectedOn: readonly string[],
+): { menu: ReactNode; dialogs: ReactNode } {
+  const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [asking, setAsking] = useState<Retiring>();
@@ -369,25 +378,40 @@ function useFlagLifecycle(project: string, flag: Flag): { menu: ReactNode; dialo
     refusal: act.error,
     onConfirm: () => act.mutate(action),
   });
-  const item = (action: Retiring, label: ReactNode, destructive = false) => (
+  // Archiving or restoring a flag that is on in a protected environment
+  // changes what that environment's SDKs receive, which it refuses with no
+  // change request that carries it: the flag is switched off there first.
+  const names = new Intl.ListFormat(i18n.locale, { type: "conjunction" }).format(protectedOn);
+  const protectedReason =
+    protectedOn.length > 0
+      ? t`The flag is on in ${names}, which is protected, so archiving or restoring it would change what its SDKs receive. Switch it off there first.`
+      : undefined;
+  const item = (action: Retiring, label: ReactNode, destructive = false) => {
+    const why = can ? (action === "delete" ? undefined : protectedReason) : reason;
+    const refused = why !== undefined;
     // A refused item is marked disabled rather than made disabled: a disabled
     // menu item is skipped by the keyboard and takes no pointer, so its
     // reason could be neither reached nor hovered.
-    <DropdownMenuItem
-      aria-disabled={can ? undefined : true}
-      title={can ? undefined : reason}
-      className={cn(destructive && "text-destructive focus:text-destructive", !can && "opacity-50")}
-      onSelect={(event) => {
-        if (!can) {
-          event.preventDefault();
-          return;
-        }
-        ask(action);
-      }}
-    >
-      {label}
-    </DropdownMenuItem>
-  );
+    return (
+      <DropdownMenuItem
+        aria-disabled={refused ? true : undefined}
+        title={why}
+        className={cn(
+          destructive && "text-destructive focus:text-destructive",
+          refused && "opacity-50",
+        )}
+        onSelect={(event) => {
+          if (refused) {
+            event.preventDefault();
+            return;
+          }
+          ask(action);
+        }}
+      >
+        {label}
+      </DropdownMenuItem>
+    );
+  };
 
   return {
     menu:
@@ -480,6 +504,12 @@ function EnvironmentPage(props: EnvironmentPageProps) {
     editing.kind === "read"
       ? missingPermissionReason(i18n, editing.missing, access.roles)
       : undefined;
+  // An override is written at once, on its own, and a protected environment
+  // refuses every write that changes what its SDKs receive, with no change
+  // request that carries one, so overrides are read there.
+  const overridesProtected = environment?.protected
+    ? t`The environment is protected, so overrides are not added or removed here: each would change what its SDKs receive without a review.`
+    : undefined;
   const attributes = useQuery(attributesQuery(project));
   const segments = useQuery(segmentsQuery(project));
   const flags = useQuery(flagChoicesQuery(project));
@@ -547,7 +577,11 @@ function EnvironmentPage(props: EnvironmentPageProps) {
             experiments: experiments.data,
           }}
           switches={switches}
-          overrides={<OverridesSection {...props} frozen={frozen} />}
+          overrides={
+            // The archived flag's reason is the page's status above; saying it
+            // again under the overrides would repeat it.
+            <OverridesSection {...props} frozen={frozen ? true : overridesProtected} />
+          }
           evaluations={evaluations}
           readOnly={frozen ?? missing}
           proposes={editing.kind === "propose"}

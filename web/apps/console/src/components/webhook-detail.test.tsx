@@ -31,6 +31,7 @@ const base = `/projects/checkout/webhooks/${id}`;
 const common = {
   "GET /webhook-event-types": { status: 200, body: { items: [] } },
   "GET /projects/checkout/environments": { status: 200, body: { items: [] } },
+  "GET /projects/checkout/audit": { status: 200, body: { items: [], next_cursor: null } },
 };
 
 function renderScreen(onSearch = vi.fn()) {
@@ -50,7 +51,7 @@ describe("a webhook's screen", () => {
   });
 
   it("says the subscription is missing when the server has none", async () => {
-    fakeServer({ ...common });
+    fakeServer({ ...common, [`GET ${base}`]: problem(404, "not_found") });
     await renderScreen();
     expect(await screen.findByRole("heading", { name: "Webhook not found" })).toBeVisible();
   });

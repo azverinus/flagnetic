@@ -64,7 +64,7 @@ export const authProviderApi = {
 };
 
 /** The scopes and claim names a provider is created with unless told otherwise. */
-export const defaultScopes = ["openid", "email", "profile"] as const;
+const defaultScopes = ["openid", "email", "profile"] as const;
 export const defaultClaims = { email: "email", name: "name", groups: "groups" } as const;
 
 /** The slug that cannot name a provider: `/sso/complete/…` finishes a sign-in. */

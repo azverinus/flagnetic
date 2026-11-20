@@ -47,8 +47,9 @@ typedef IngestSettings = ({
   /// The platform named in `User-Agent` and the batch envelope.
   String? platform,
 
-  /// The `app_version` of the evaluation summary.
-  String? appVersion,
+  /// The `app_version` of the evaluation summary, read when the summary is
+  /// built: the context's attribute, else the option.
+  String? Function() appVersion,
   Duration requestTimeout,
 
   /// How often the queue is sent when it holds an exposure or an alias.
@@ -132,9 +133,6 @@ final class Ingest {
   bool _closed = false;
   bool _foreground = true;
   int _failures = 0;
-
-  /// How many events wait to be sent.
-  int get queued => _queue.length;
 
   /// Reads what an earlier run left in the store, so that events recorded
   /// while offline are sent after a restart. Failing to read one is not a
@@ -456,7 +454,7 @@ final class Ingest {
       at,
       SummaryWindow(start: start, end: window.end, rows: rows),
       _rulesetVersion() ?? 0,
-      appVersion: _settings.appVersion,
+      appVersion: _settings.appVersion(),
     )) {
       _append(event);
     }

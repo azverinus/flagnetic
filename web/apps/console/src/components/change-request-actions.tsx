@@ -385,7 +385,7 @@ function EditForm({
 }
 
 /** An approval, whose comment is optional, or a rejection, whose comment says why. */
-export function DecisionForm({
+function DecisionForm({
   decision,
   pending,
   refusal,

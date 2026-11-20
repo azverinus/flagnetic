@@ -11,7 +11,7 @@ import { z } from "zod";
 
 import { ApiError } from "./errors";
 import { fitsRule } from "./forms";
-import { violationMessage } from "./problem-messages";
+import { violationAt, violationMessage } from "./problem-messages";
 
 /** What a flag's configuration in the list's environment is filtered by. */
 export type FlagStateFilter = "on" | "off" | "rules" | "rollout" | "experiment";
@@ -144,7 +144,7 @@ export function resolveEnvironment(
   return keys[0];
 }
 
-const variationField = /^\/variations\/\d+\/(key|value)$/;
+const variationField = /^\/variations\/\d+\/(key|value)(\/|$)/;
 
 /**
  * The sentence for a violation of a flag write. A flag's key and its
@@ -175,7 +175,7 @@ export function flagViolationMessage(i18n: I18n, violation: Violation): string {
 /** What the refusal of a flag write says of the field at pointer, if anything. */
 export function flagRefusalAt(i18n: I18n, refusal: unknown, pointer: string): string | undefined {
   if (!(refusal instanceof ApiError)) return undefined;
-  const violation = refusal.violations.find((candidate) => candidate.pointer === pointer);
+  const violation = violationAt(refusal, pointer);
   return violation && flagViolationMessage(i18n, violation);
 }
 

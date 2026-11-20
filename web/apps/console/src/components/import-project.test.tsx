@@ -77,6 +77,8 @@ describe("importing a project document", () => {
   it("sends the file untouched with its media type in a merge dry run", async () => {
     const server = fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
     renderWithProviders(<ImportProject project="checkout" />, signedInClient());
@@ -95,6 +97,8 @@ describe("importing a project document", () => {
   it("groups the changes by kind with each update's patch", async () => {
     fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
     renderWithProviders(<ImportProject project="checkout" />, signedInClient());
@@ -114,6 +118,8 @@ describe("importing a project document", () => {
   it("names the protected environments the import writes to", async () => {
     fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
     renderWithProviders(<ImportProject project="checkout" />, signedInClient());
@@ -146,6 +152,8 @@ describe("importing a project document", () => {
   it("renders every warning by its code with its pointer", async () => {
     fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: {
         status: 200,
         headers: { ETag: '"entry-7"' },
@@ -174,6 +182,8 @@ describe("importing a project document", () => {
   it("says Unchanged and leaves Apply disabled when nothing moves", async () => {
     fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: { status: 200, body: answer(), headers: { ETag: '"entry-7"' } },
     });
     renderWithProviders(<ImportProject project="checkout" />, signedInClient());
@@ -187,6 +197,8 @@ describe("importing a project document", () => {
   it("applies with the dry run's ETag as If-Match and shows what was done", async () => {
     const server = fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: (request) =>
         new URL(request.url).searchParams.get("dry_run") === "true"
           ? { status: 200, body: changed, headers: { ETag: '"entry-7"' } }
@@ -209,6 +221,8 @@ describe("importing a project document", () => {
     let dryRuns = 0;
     const server = fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: (request) => {
         if (new URL(request.url).searchParams.get("dry_run") === "true") {
           dryRuns += 1;
@@ -238,6 +252,8 @@ describe("importing a project document", () => {
   it("shows the server's refusal of the document with the pointer of each fault", async () => {
     fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: problem(422, "invalid_document", {
         errors: [
           { pointer: "/flags/2/key", code: "invalid_key", detail: "bad", params: {} },
@@ -271,6 +287,8 @@ describe("importing a project document", () => {
   it("returns to the review of the kept document after a reload, with a new dry run", async () => {
     const server = fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: { status: 200, body: changed, headers: { ETag: '"entry-7"' } },
     });
     const first = renderWithProviders(<ImportProject project="checkout" />, signedInClient());
@@ -308,6 +326,8 @@ describe("importing a project document", () => {
     });
     const server = fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: {
         status: 200,
         body: { ...replaced, mode: "replace" },
@@ -335,6 +355,8 @@ describe("importing a project document", () => {
   it("lists every reference of an in_use refusal, SDK keys included", async () => {
     fakeServer({
       "GET /projects/checkout/environments": environments,
+      // Applying an import reads who the member is again; the test does not look at the answer.
+      "GET /me": problem(404, "not_found"),
       [path]: problem(409, "in_use", {
         references: [
           { kind: "segment", key: "beta", environment: "production" },

@@ -215,6 +215,9 @@ describe("the conflict banner on a notice", () => {
   const notice = { kind: "thing", key: "web", environment: null, version: 2 };
 
   it("shows at once for a form with unsaved edits when someone saved a newer version", async () => {
+    fakeServer({
+      "GET /projects/shop/audit": { status: 200, body: { items: [], next_cursor: null } },
+    });
     const { source, open } = stream();
     renderWithProviders(
       <ChangeStream project="shop" open={open}>

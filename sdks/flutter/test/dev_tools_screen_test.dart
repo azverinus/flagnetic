@@ -94,6 +94,16 @@ void main() {
     expect(find.text('Not a valid number value'), findsOne);
     expect(devTools.list(), isEmpty);
 
+    // Parsed by `num.parse`, but no server serves one and the store cannot
+    // encode it.
+    for (final text in ['Infinity', '-Infinity', 'NaN']) {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Not a valid number value'), findsOne, reason: text);
+    }
+    expect(devTools.list(), isEmpty);
+
     await tester.enterText(find.byType(TextField), '25');
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();

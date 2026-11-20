@@ -1,7 +1,7 @@
 github.com/azverinus/flagnetic/eval v0.1.0 h1:6SwOjQofhclh91vfgzCzW810xvthdR/nSXFt5J9YzQs=
 github.com/azverinus/flagnetic/eval v0.1.0/go.mod h1:69B4i5/VhaQwvWrguKBdOj0axK/8NeLpZ8SYg6JKIbY=
-github.com/azverinus/flagnetic/sdks/go v0.1.0 h1:tLUWCXRLU0crmn1JdsktP4YWcPWaGViYQCm27tBzHBM=
-github.com/azverinus/flagnetic/sdks/go v0.1.0/go.mod h1:AQ4D8mRN0cJ9Uq7zjai+HnyXdwdaMhD1iNqaA45b87k=
+github.com/azverinus/flagnetic/sdks/go v0.1.1 h1:BxMdilWZL8cwL7np8R3AYNF1C0eiL1zGtZUn5N3Cxr8=
+github.com/azverinus/flagnetic/sdks/go v0.1.1/go.mod h1:AQ4D8mRN0cJ9Uq7zjai+HnyXdwdaMhD1iNqaA45b87k=
 github.com/open-feature/go-sdk v1.20.0 h1:cQV15LaPAQi1bLEoR2KHlzVxm6UuEqrohJ7qXVq+ZAk=
 github.com/open-feature/go-sdk v1.20.0/go.mod h1:lnLzUUPhw3J9gfj1utYmc7vXG9eM0apShLvr/rGAyCs=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=

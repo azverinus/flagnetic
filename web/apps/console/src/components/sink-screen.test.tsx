@@ -14,6 +14,7 @@ import { SinkScreen } from "./sink-screen";
 const base = (id: string) => `/projects/checkout/sinks/${id}`;
 const common = {
   "GET /projects/checkout/environments": { status: 200, body: { items: [] } },
+  "GET /projects/checkout/audit": { status: 200, body: { items: [], next_cursor: null } },
 };
 
 describe("a sink's screen", () => {
@@ -33,7 +34,10 @@ describe("a sink's screen", () => {
   });
 
   it("says the sink is missing when the server has none", async () => {
-    fakeServer(common);
+    fakeServer({
+      ...common,
+      [`GET ${base(clickhouseSink.id)}`]: problem(404, "not_found"),
+    });
     await renderWithRouter(() => <SinkScreen project="checkout" sink={clickhouseSink.id} />);
     expect(await screen.findByRole("heading", { name: "Sink not found" })).toBeVisible();
   });

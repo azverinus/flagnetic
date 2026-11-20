@@ -12,7 +12,7 @@ import { SignInForm } from "@/components/sign-in-form";
 import { TokenList } from "@/components/token-list";
 import { languageName } from "@/i18n/format";
 import { locales } from "@/i18n/locale";
-import { fakeServer, type FakeAnswer } from "@/test/fake-server";
+import { fakeServer, type FakeAnswer, problem, type Route } from "@/test/fake-server";
 import { activateForTests, renderWithRouter } from "@/test/render";
 
 /**
@@ -51,8 +51,16 @@ const none: FakeAnswer = { status: 200, body: { items: [] } };
  * The screens' own components, each with what it needs to render without
  * data of its own to show, so every string left is the console's.
  */
-const screens: { name: string; routes?: Record<string, FakeAnswer>; ui: () => ReactNode }[] = [
-  { name: "the sign-in form", ui: () => <SignInForm ended onSignedIn={vi.fn()} /> },
+const screens: {
+  name: string;
+  routes?: Partial<Record<Route, FakeAnswer>>;
+  ui: () => ReactNode;
+}[] = [
+  {
+    name: "the sign-in form",
+    routes: { "GET /auth/methods": problem(404, "not_found") },
+    ui: () => <SignInForm ended onSignedIn={vi.fn()} />,
+  },
   {
     name: "the invitation acceptance",
     routes: { "GET /auth/invitations/s3cret": { status: 404 } },
