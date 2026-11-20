@@ -57,12 +57,12 @@ type CreateEnvironmentCommand struct {
 // project's row lock so two created at once never share a place and no flag
 // created meanwhile misses a configuration in it.
 func (h *CreateEnvironment) Handle(ctx context.Context, cmd CreateEnvironmentCommand) (workspace.Environment, error) {
-	now := h.rec.clock.Now()
 	var e workspace.Environment
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		existing, err := h.store.CountEnvironments(ctx, cmd.Project)
 		if err != nil {
 			return err

@@ -43,15 +43,15 @@ type UpdateEnvironmentCommand struct {
 // version it was based on, and returns the environment as it is after it;
 // a change to the values it already has stores and records nothing.
 func (h *UpdateEnvironment) Handle(ctx context.Context, cmd UpdateEnvironmentCommand) (workspace.Environment, error) {
-	now := h.rec.clock.Now()
 	var out workspace.Environment
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
 		// The project's row, not the environment's: whether an environment
 		// is protected decides which writes in the project may change its
 		// ruleset, and those writes hold the project's row alone.
-		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		before, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, false)
 		if err != nil {
 			return notFound(err, "environment")

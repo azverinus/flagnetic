@@ -63,7 +63,7 @@ func (a *api) KillFlag(ctx context.Context, req KillFlagRequestObject) (KillFlag
 	}, nil
 }
 
-// PutOverride pins a variation for one unit.
+// PutOverride fixes a variation for one unit.
 func (a *api) PutOverride(ctx context.Context, req PutOverrideRequestObject) (PutOverrideResponseObject, error) {
 	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, nil)
 	if err != nil {

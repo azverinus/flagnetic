@@ -46,11 +46,11 @@ type SegmentCommand struct {
 // segment a rule names, an archived flag's included, is not deleted: the
 // rule would name nothing, and a restored flag would come back broken.
 func (h *DeleteSegment) Handle(ctx context.Context, cmd SegmentCommand) error {
-	now := h.d.Recorder.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := h.d.Recorder.now()
 		s, err := h.d.Store.SegmentByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return segmentNotFound(err)

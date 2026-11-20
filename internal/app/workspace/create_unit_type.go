@@ -19,7 +19,7 @@ type DeclarationKeys interface {
 // claimDeclarationKey locks project and refuses key when one of its unit
 // types or attributes has it, in the unit of work ctx carries.
 func claimDeclarationKey(ctx context.Context, store DeclarationKeys, project workspace.ProjectID, key string) error {
-	if _, err := store.LockProject(ctx, project); err != nil {
+	if _, err := lockProject(ctx, store, project); err != nil {
 		return err
 	}
 	taken, err := store.DeclarationKeyTaken(ctx, project, key)

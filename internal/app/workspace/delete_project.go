@@ -45,12 +45,12 @@ type DeleteProjectCommand struct {
 // ends the project's change requests too, which go with the rows, with no
 // entry of their own: every one of them ends for the same reason.
 func (h *DeleteProject) Handle(ctx context.Context, cmd DeleteProjectCommand) error {
-	now := h.rec.clock.Now()
 	return h.tx.Within(ctx, func(ctx context.Context) error {
-		p, err := h.store.LockProject(ctx, cmd.Project)
+		p, err := lockProject(ctx, h.store, cmd.Project)
 		if err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		if err = precondition.Check(cmd.Expected, p.Version); err != nil {
 			return err
 		}

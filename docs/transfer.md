@@ -102,7 +102,7 @@ A configuration is:
 | `off_variation` | The variation served while it is off. |
 | `fallthrough` | The variation served when no rule matches. |
 | `prerequisites[]` | `{flag, variation}`: another flag that must serve a variation. |
-| `overrides[]` | `{unit_type, unit_id, variation, note}`: a variation pinned for one unit. The override's author does not travel. |
+| `overrides[]` | `{unit_type, unit_id, variation, note}`: a variation fixed for one unit. The override's author does not travel. |
 | `rules[]` | Ordered `{id, description, conditions, serve}`. |
 
 `serve` is `{kind: variation, variation}`, `{kind: rollout, variation, unit_type, percentage, salt}` or `{kind: experiment, experiment}`. `percentage` is in basis points (`2500` is a quarter of the units). A rule's `id` and a rollout's `salt` are what keep a unit in its bucket: they travel, so a unit that was in a rollout stays in it in the copy.

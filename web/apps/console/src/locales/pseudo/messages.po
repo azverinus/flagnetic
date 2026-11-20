@@ -9665,8 +9665,11 @@ msgid "Used by flags"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Used by flags and segments"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Used by flags, segments and experiments"
 msgstr ""
 
 #: src/components/auth-provider-detail.tsx

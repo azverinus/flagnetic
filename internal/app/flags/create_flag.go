@@ -60,12 +60,12 @@ type CreateFlagCommand struct {
 // Handle creates the flag and its configuration in every environment, which
 // changes every environment's ruleset: SDKs now receive a flag they did not.
 func (h *CreateFlag) Handle(ctx context.Context, cmd CreateFlagCommand) (FlagView, error) {
-	now := h.d.Recorder.now()
 	var out FlagView
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := h.d.Recorder.now()
 		existing, err := h.d.Store.CountFlags(ctx, cmd.Project)
 		if err != nil {
 			return err

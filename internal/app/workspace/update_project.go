@@ -39,13 +39,13 @@ type UpdateProjectCommand struct {
 // version it was based on, and returns the project as it is after it. A
 // change to the values the project already has stores and records nothing.
 func (h *UpdateProject) Handle(ctx context.Context, cmd UpdateProjectCommand) (workspace.Project, error) {
-	now := h.rec.clock.Now()
 	var out workspace.Project
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
-		before, err := h.store.LockProject(ctx, cmd.Project)
+		before, err := lockProject(ctx, h.store, cmd.Project)
 		if err != nil {
 			return err
 		}
+		now := h.rec.clock.Now()
 		after, changed, err := before.Change(cmd.Change, now)
 		if err != nil {
 			return err

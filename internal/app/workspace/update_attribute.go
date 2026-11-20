@@ -10,13 +10,15 @@ import (
 
 // AttributeUpdater stores an attribute's changed name and description.
 type AttributeUpdater interface {
+	ProjectLocker
 	// AttributeByKey returns the attribute, locking its row when lock is set,
 	// or ErrNotFound.
 	AttributeByKey(ctx context.Context, project workspace.ProjectID, key string, lock bool) (workspace.Attribute, error)
 	UpdateAttribute(ctx context.Context, attr workspace.Attribute) error
 }
 
-// UpdateAttribute renames an attribute or changes its description.
+// UpdateAttribute renames an attribute or changes its description, under the
+// project's row lock, as a unit type's rename is.
 type UpdateAttribute struct {
 	tx    Transactor
 	store AttributeUpdater
@@ -42,9 +44,12 @@ type UpdateAttributeCommand struct {
 // version it was based on, and returns the attribute as it is after it; a
 // change to the values it already has stores and records nothing.
 func (h *UpdateAttribute) Handle(ctx context.Context, cmd UpdateAttributeCommand) (workspace.Attribute, error) {
-	now := h.rec.clock.Now()
 	var out workspace.Attribute
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
+		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
+			return err
+		}
+		now := h.rec.clock.Now()
 		before, err := h.store.AttributeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "attribute")

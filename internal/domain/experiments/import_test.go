@@ -245,8 +245,8 @@ func TestAnImportedDecisionIsJudgedAsAStopJudgesIt(t *testing.T) {
 		decision experiments.Decision
 		want     string
 	}{
-		"winner not compared":    {experiments.Decision{Outcome: experiments.OutcomeWinner, WinnerVariation: "huge"}, "/decision/winner_variation unknown_variation"},
-		"winner without variant": {experiments.Decision{Outcome: experiments.OutcomeWinner}, "/decision/winner_variation required"},
+		"winner not compared":        {experiments.Decision{Outcome: experiments.OutcomeWinner, WinnerVariation: "huge"}, "/decision/winner_variation unknown_variation"},
+		"winner without a variation": {experiments.Decision{Outcome: experiments.OutcomeWinner}, "/decision/winner_variation required"},
 		"removal naming a winner": {experiments.Decision{Outcome: experiments.OutcomeRemoved, WinnerVariation: "short"},
 			"/decision/winner_variation invalid_value"},
 		"unknown outcome": {experiments.Decision{Outcome: "tie"}, "/decision/outcome invalid_value"},

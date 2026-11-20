@@ -47,12 +47,12 @@ type UpdateSegmentCommand struct {
 // change to the values it already has stores and records nothing. A change
 // to its conditions or private switch moves every environment's ruleset on.
 func (h *UpdateSegment) Handle(ctx context.Context, cmd UpdateSegmentCommand) (flags.Segment, error) {
-	now := h.d.Recorder.now()
 	var out flags.Segment
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := h.d.Recorder.now()
 		before, err := h.d.Store.SegmentByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return segmentNotFound(err)

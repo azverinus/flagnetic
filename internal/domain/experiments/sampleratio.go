@@ -154,21 +154,31 @@ func RaiseAlert(alert AlertID, experiment ExperimentID, environment *workspace.E
 	return Alert{ID: alert, Experiment: experiment, Environment: environment, Kind: kind, RaisedAt: now, Details: details}
 }
 
-// Active reports whether the alert has not cleared.
-func (a Alert) Active() bool { return a.ClearedAt == nil }
-
-// Clear returns the alert cleared at now.
+// Clear returns the alert cleared at now, or at its raising when now is
+// earlier: replicas' clocks differ by seconds, and an alert never ends before
+// it began.
 func (a Alert) Clear(now time.Time) Alert {
+	now = laterOf(now, a.RaisedAt)
 	a.ClearedAt = &now
 	return a
 }
 
 // Acknowledge returns the alert acknowledged at now, and whether that changed
-// it: the first acknowledgement is the one kept.
+// it: the first acknowledgement is the one kept. An acknowledgement made on a
+// replica whose clock is behind the one that raised the alert is stamped at
+// the raising, since an alert is never acknowledged before it began.
 func (a Alert) Acknowledge(now time.Time) (Alert, bool) {
 	if a.AcknowledgedAt != nil {
 		return a, false
 	}
+	now = laterOf(now, a.RaisedAt)
 	a.AcknowledgedAt = &now
 	return a, true
+}
+
+func laterOf(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return b
+	}
+	return a
 }

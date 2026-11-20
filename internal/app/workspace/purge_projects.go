@@ -15,10 +15,10 @@ type ProjectPurgeStore interface {
 	PurgeDeletedProjects(ctx context.Context, limit int) (int, error)
 }
 
-// ProjectPurgeBatch is how many rows one transaction of the purge deletes,
+// projectPurgeBatch is how many rows one transaction of the purge deletes,
 // so a large project's leftovers never hold locks or a transaction open for
 // long.
-const ProjectPurgeBatch = 1000
+const projectPurgeBatch = 1000
 
 // PurgeDeletedProjects deletes what deleted projects left in tables without
 // a foreign key to projects, which their deletion could not cascade to.
@@ -46,11 +46,11 @@ func (h *PurgeDeletedProjects) Handle(ctx context.Context) (int, error) {
 			if held, err = h.store.TryLockProjectPurge(ctx); err != nil || !held {
 				return err
 			}
-			n, err = h.store.PurgeDeletedProjects(ctx, ProjectPurgeBatch)
+			n, err = h.store.PurgeDeletedProjects(ctx, projectPurgeBatch)
 			return err
 		})
 		purged += n
-		if err != nil || !held || n < ProjectPurgeBatch {
+		if err != nil || !held || n < projectPurgeBatch {
 			return purged, err
 		}
 	}

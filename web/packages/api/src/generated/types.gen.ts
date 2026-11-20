@@ -1432,7 +1432,8 @@ export type UnitTypeListItem = UnitType & {
 /**
  * How many flags (archived ones included, each counted once whatever
  * its environments) and segments name it, in a rule's condition, a
- * rollout, an override or a segment's condition. Deleting it is
+ * rollout, an override or a segment's condition, plus the draft and
+ * running experiments that assign the unit type. Deleting it is
  * refused while this is above zero.
  *
  */
@@ -2289,14 +2290,14 @@ export type Prerequisite = {
 };
 
 /**
- * A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+ * A variation fixed for one unit. Its note and author stay on the server; SDKs receive neither.
  */
 export type Override = {
   unit_type: string;
   unit_id: string;
   variation: string;
   /**
-   * Why the unit is pinned; null for none.
+   * Why the unit has a fixed variation; null for none.
    */
   note: string | null;
   /**
@@ -4253,7 +4254,7 @@ export type DocumentOverride = {
   unit_id: string;
   variation: string;
   /**
-   * Why the unit is pinned. Who pinned it does not travel.
+   * Why the unit has a fixed variation. Who set it does not travel.
    */
   note?: string;
 };

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -90,6 +91,19 @@ func (rec Recorder) record(ctx context.Context, now time.Time, req governance.Re
 		return err
 	}
 	return rec.audit.Record(ctx, entry)
+}
+
+// lockProject takes project's row lock through l and returns the project. The
+// request found the project before the handler ran, so a project missing now
+// was deleted in between, and is answered as the unknown project a
+// moment-later request would have been told of, not as a failure of the
+// server.
+func lockProject(ctx context.Context, l ProjectLocker, project workspace.ProjectID) (workspace.Project, error) {
+	p, err := l.LockProject(ctx, project)
+	if errors.Is(err, ErrNotFound) {
+		return workspace.Project{}, access.ErrProjectNotFound
+	}
+	return p, err
 }
 
 // notFound answers ErrNotFound as the not_found refusal naming what, such as

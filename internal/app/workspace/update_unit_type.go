@@ -10,13 +10,16 @@ import (
 
 // UnitTypeUpdater stores a unit type's changed name and description.
 type UnitTypeUpdater interface {
+	ProjectLocker
 	// UnitTypeByKey returns the unit type, locking its row when lock is set,
 	// or ErrNotFound.
 	UnitTypeByKey(ctx context.Context, project workspace.ProjectID, key string, lock bool) (workspace.UnitType, error)
 	UpdateUnitType(ctx context.Context, u workspace.UnitType) error
 }
 
-// UpdateUnitType renames a unit type or changes its description.
+// UpdateUnitType renames a unit type or changes its description, under the
+// project's row lock, so an import that read the unit type's version under
+// the same lock never meets a rename committed meanwhile.
 type UpdateUnitType struct {
 	tx    Transactor
 	store UnitTypeUpdater
@@ -42,9 +45,12 @@ type UpdateUnitTypeCommand struct {
 // version it was based on, and returns the unit type as it is after it; a
 // change to the values it already has stores and records nothing.
 func (h *UpdateUnitType) Handle(ctx context.Context, cmd UpdateUnitTypeCommand) (workspace.UnitType, error) {
-	now := h.rec.clock.Now()
 	var out workspace.UnitType
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
+		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
+			return err
+		}
+		now := h.rec.clock.Now()
 		before, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "unit type")

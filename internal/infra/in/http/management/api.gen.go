@@ -1339,7 +1339,8 @@ type AttributeListItem struct {
 
 	// UsageCount How many flags (archived ones included, each counted once whatever
 	// its environments) and segments name it, in a rule's condition, a
-	// rollout, an override or a segment's condition. Deleting it is
+	// rollout, an override or a segment's condition, plus the draft and
+	// running experiments that assign the unit type. Deleting it is
 	// refused while this is above zero.
 	UsageCount DeclarationUsageCount `json:"usage_count"`
 
@@ -1978,7 +1979,8 @@ type CredentialMethod string
 
 // DeclarationUsageCount How many flags (archived ones included, each counted once whatever
 // its environments) and segments name it, in a rule's condition, a
-// rollout, an override or a segment's condition. Deleting it is
+// rollout, an override or a segment's condition, plus the draft and
+// running experiments that assign the unit type. Deleting it is
 // refused while this is above zero.
 type DeclarationUsageCount = int
 
@@ -2139,7 +2141,7 @@ type DocumentFlag struct {
 
 // DocumentOverride defines model for DocumentOverride.
 type DocumentOverride struct {
-	// Note Why the unit is pinned. Who pinned it does not travel.
+	// Note Why the unit has a fixed variation. Who set it does not travel.
 	Note      *string `json:"note,omitempty"`
 	UnitId    string  `json:"unit_id"`
 	UnitType  string  `json:"unit_type"`
@@ -3551,12 +3553,12 @@ type NoExposuresAlertDetails struct {
 	Since time.Time `json:"since"`
 }
 
-// Override A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+// Override A variation fixed for one unit. Its note and author stay on the server; SDKs receive neither.
 type Override struct {
 	// AddedBy The member who last wrote the override; null when a project token did.
 	AddedBy *openapi_types.UUID `json:"added_by"`
 
-	// Note Why the unit is pinned; null for none.
+	// Note Why the unit has a fixed variation; null for none.
 	Note      *string `json:"note"`
 	UnitId    string  `json:"unit_id"`
 	UnitType  string  `json:"unit_type"`
@@ -5082,7 +5084,8 @@ type UnitTypeListItem struct {
 
 	// UsageCount How many flags (archived ones included, each counted once whatever
 	// its environments) and segments name it, in a rule's condition, a
-	// rollout, an override or a segment's condition. Deleting it is
+	// rollout, an override or a segment's condition, plus the draft and
+	// running experiments that assign the unit type. Deleting it is
 	// refused while this is above zero.
 	UsageCount DeclarationUsageCount `json:"usage_count"`
 
@@ -10522,7 +10525,7 @@ type ClientInterface interface {
 	// Corresponds with DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `DeleteOverride` operationId).
 	DeleteOverride(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutOverrideWithBody Pin a variation for one unit
+	// PutOverrideWithBody Fix a variation for one unit
 	//
 	// Sets one override without replacing the configuration, and needs
 	// no `If-Match`; the configuration's version still moves on. An
@@ -10536,7 +10539,7 @@ type ClientInterface interface {
 	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
 	PutOverrideWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutOverride Pin a variation for one unit
+	// PutOverride Fix a variation for one unit
 	//
 	// Sets one override without replacing the configuration, and needs
 	// no `If-Match`; the configuration's version still moves on. An
@@ -16494,7 +16497,7 @@ func (c *Client) DeleteOverride(ctx context.Context, project ProjectKey, flag Fl
 	return c.Client.Do(req)
 }
 
-// PutOverrideWithBody Pin a variation for one unit
+// PutOverrideWithBody Fix a variation for one unit
 //
 // Sets one override without replacing the configuration, and needs
 // no `If-Match`; the configuration's version still moves on. An
@@ -16518,7 +16521,7 @@ func (c *Client) PutOverrideWithBody(ctx context.Context, project ProjectKey, fl
 	return c.Client.Do(req)
 }
 
-// PutOverride Pin a variation for one unit
+// PutOverride Fix a variation for one unit
 //
 // Sets one override without replacing the configuration, and needs
 // no `If-Match`; the configuration's version still moves on. An
@@ -32684,7 +32687,7 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `DeleteOverride` operationId).
 	DeleteOverrideWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, reqEditors ...RequestEditorFn) (*DeleteOverrideResponse, error)
 
-	// PutOverrideWithBodyWithResponse Pin a variation for one unit
+	// PutOverrideWithBodyWithResponse Fix a variation for one unit
 	//
 	// Sets one override without replacing the configuration, and needs
 	// no `If-Match`; the configuration's version still moves on. An
@@ -32698,7 +32701,7 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
 	PutOverrideWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutOverrideResponse, error)
 
-	// PutOverrideWithResponse Pin a variation for one unit
+	// PutOverrideWithResponse Fix a variation for one unit
 	//
 	// Sets one override without replacing the configuration, and needs
 	// no `If-Match`; the configuration's version still moves on. An
@@ -54936,7 +54939,7 @@ func (c *ClientWithResponses) DeleteOverrideWithResponse(ctx context.Context, pr
 	return ParseDeleteOverrideResponse(rsp)
 }
 
-// PutOverrideWithBodyWithResponse Pin a variation for one unit
+// PutOverrideWithBodyWithResponse Fix a variation for one unit
 //
 // Sets one override without replacing the configuration, and needs
 // no `If-Match`; the configuration's version still moves on. An
@@ -54956,7 +54959,7 @@ func (c *ClientWithResponses) PutOverrideWithBodyWithResponse(ctx context.Contex
 	return ParsePutOverrideResponse(rsp)
 }
 
-// PutOverrideWithResponse Pin a variation for one unit
+// PutOverrideWithResponse Fix a variation for one unit
 //
 // Sets one override without replacing the configuration, and needs
 // no `If-Match`; the configuration's version still moves on. An
@@ -72824,7 +72827,7 @@ type ServerInterface interface {
 	// DeleteOverride Remove the override of one unit
 	// (DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
 	DeleteOverride(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string)
-	// PutOverride Pin a variation for one unit
+	// PutOverride Fix a variation for one unit
 	// (PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
 	PutOverride(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string)
 	// RevertFlagConfiguration Revert a flag's configuration in one environment to an earlier version
@@ -103295,7 +103298,7 @@ type StrictServerInterface interface {
 	// DeleteOverride Remove the override of one unit
 	// (DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
 	DeleteOverride(ctx context.Context, request DeleteOverrideRequestObject) (DeleteOverrideResponseObject, error)
-	// PutOverride Pin a variation for one unit
+	// PutOverride Fix a variation for one unit
 	// (PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
 	PutOverride(ctx context.Context, request PutOverrideRequestObject) (PutOverrideResponseObject, error)
 	// RevertFlagConfiguration Revert a flag's configuration in one environment to an earlier version

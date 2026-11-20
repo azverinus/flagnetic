@@ -844,7 +844,8 @@ export const zEnvironmentPatch = z.object({
 /**
  * How many flags (archived ones included, each counted once whatever
  * its environments) and segments name it, in a rule's condition, a
- * rollout, an override or a segment's condition. Deleting it is
+ * rollout, an override or a segment's condition, plus the draft and
+ * running experiments that assign the unit type. Deleting it is
  * refused while this is above zero.
  *
  */
@@ -1509,7 +1510,7 @@ export const zPrerequisite = z.object({
 });
 
 /**
- * A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+ * A variation fixed for one unit. Its note and author stay on the server; SDKs receive neither.
  */
 export const zOverride = z.object({
   unit_type: z.string(),

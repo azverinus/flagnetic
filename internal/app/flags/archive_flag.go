@@ -88,12 +88,12 @@ func (h *ArchiveFlag) Handle(ctx context.Context, cmd FlagCommand) (FlagView, er
 func archival(ctx context.Context, d ArchivalDeps, cmd FlagCommand, action string,
 	change func(flags.Flag, time.Time) (flags.Flag, bool), allowed func(context.Context, flags.Flag) error,
 ) (FlagView, error) {
-	now := d.Recorder.now()
 	var out FlagView
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := lockProject(ctx, d.Projects, cmd.Project); err != nil {
 			return err
 		}
+		now := d.Recorder.now()
 		before, err := d.Store.FlagByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return flagNotFound(err)
