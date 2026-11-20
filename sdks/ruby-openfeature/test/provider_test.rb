@@ -67,6 +67,7 @@ class ProviderTest < Minitest::Test
   end
 
   def test_integer_refused_is_counted_as_the_fallback_and_never_exposed
+    skip "needs a flagnetic with int_detail" unless Flagnetic::Client.method_defined?(:int_detail)
     provider, client = of_provider
     d = client.fetch_integer_details(flag_key: "auto_ratio", default_value: 7, evaluation_context: user)
     assert_equal [7, "TYPE_MISMATCH"], [d.value, d.error_code]
