@@ -250,7 +250,11 @@ func TestStartingOrTickingAStoppedRunnerRunsNothing(t *testing.T) {
 	if err := f.runner.Tick(t.Context(), "rollup"); err == nil {
 		t.Error("Tick ran a round on a stopped runner")
 	}
-	time.Sleep(20 * time.Millisecond)
+	// Stop returns once every worker has ended, so a worker Start launched
+	// would have run its round by now.
+	if !f.runner.Stop(time.Second) {
+		t.Fatal("the runner holds a worker Start launched after Stop")
+	}
 	if n := rounds.Load(); n != 0 {
 		t.Errorf("%d rounds ran after Stop", n)
 	}

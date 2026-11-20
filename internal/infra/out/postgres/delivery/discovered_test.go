@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
 
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
@@ -100,11 +99,14 @@ func TestAMembersChangeToADiscoveredAttributeHoldsAgainstAFlushUnderWay(t *testi
 			go func() { flushed <- flush.Flush(context.Background()) }()
 			<-pausing.reading
 
-			changed := make(chan error, 1)
-			go func() { changed <- change(tx, store, p.ID) }()
+			changed, finished := make(chan error, 1), make(chan struct{})
+			go func() {
+				changed <- change(tx, store, p.ID)
+				close(finished)
+			}()
 			// The change either waits for the flush, or commits before it
 			// resumes: the second is what the flush must not undo.
-			time.Sleep(300 * time.Millisecond)
+			testkit.WaitForLockWaitsOrDone(t, testkit.Pool(t), 1, finished)
 			close(pausing.resume)
 			if err := <-flushed; err != nil {
 				t.Fatal(err)

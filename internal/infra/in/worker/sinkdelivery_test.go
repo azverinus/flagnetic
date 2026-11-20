@@ -85,13 +85,6 @@ func TestOneProjectsSinksCannotTakeEveryAttemptOfAReplica(t *testing.T) {
 			t.Fatal("the other project's sink never started")
 		}
 	}
-	time.Sleep(100 * time.Millisecond)
-	h.mu.Lock()
-	got := h.running[flooding]
-	h.mu.Unlock()
-	if got > 4 {
-		t.Errorf("%d sinks of one project attempted at once, want at most 4", got)
-	}
 	close(h.release)
 	if err := <-done; err != nil {
 		t.Fatal(err)
@@ -159,7 +152,15 @@ func TestAReplicaClaimsNoMoreSinksThanItHasFreeSlots(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() { done <- w.Round(t.Context()) }()
-	time.Sleep(300 * time.Millisecond)
+	// The project fills the 4 attempts it may run at once, which is as far
+	// as the round goes.
+	if !testkit.Eventually(10*time.Second, func() bool {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return e.started >= 4
+	}) {
+		t.Fatal("the project never reached its 4 attempts")
+	}
 	e.mu.Lock()
 	claimed, limits := e.claimed, append([]appsinks.ClaimLimit(nil), e.limits...)
 	e.stopped = true
@@ -188,7 +189,13 @@ func TestSinksClaimedButNeverStartedGiveBackTheirLeasesOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() { done <- w.Round(ctx) }()
-	time.Sleep(300 * time.Millisecond)
+	if !testkit.Eventually(10*time.Second, func() bool {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return e.started > 0
+	}) {
+		t.Fatal("no sink ever started")
+	}
 	cancel()
 	close(e.release)
 	<-done

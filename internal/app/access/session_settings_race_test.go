@@ -171,7 +171,7 @@ func TestASingleSignOnSessionOpenedWhileItsDomainIsEnforcedToAnotherProviderIsEn
 		})
 		// The change waits for this unit of work, which holds the settings
 		// shared, however long it takes to commit.
-		time.Sleep(300 * time.Millisecond)
+		testkit.WaitForLockWaits(t, pool, 1)
 		return nil
 	})
 	wg.Wait()
