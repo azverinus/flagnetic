@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -256,5 +257,61 @@ func TestTheSlugThatNamesTheCompletionAddressIsReserved(t *testing.T) {
 	_, err := identity.CheckProviderInput(in)
 	if code, pointers := problemOf(t, err); code != "invalid_auth_provider" || !slices.Equal(pointers, []string{"/slug"}) {
 		t.Errorf("slug complete = %v, %v", code, pointers)
+	}
+}
+
+// violationsOf returns the violations of err.
+func violationsOf(t *testing.T, err error) []apperrors.Violation {
+	t.Helper()
+	var e *apperrors.Error
+	if !errors.As(err, &e) {
+		t.Fatalf("error %v carries no kind", err)
+	}
+	return e.Violations
+}
+
+func TestAProviderNamesAtMost100DomainsAnd50Scopes(t *testing.T) {
+	domains := func(n int) []string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = fmt.Sprintf("d%d.example.com", i)
+		}
+		return out
+	}
+	scopes := func(n int) []string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = fmt.Sprintf("scope%d", i)
+		}
+		return out
+	}
+	for name, tc := range map[string]struct {
+		change  func(*identity.ProviderInput)
+		pointer string
+		code    string
+		max     int
+	}{
+		"101 domains": {func(in *identity.ProviderInput) { in.Domains = domains(101) }, "/domains", "too_many_domains", 100},
+		"51 scopes":   {func(in *identity.ProviderInput) { in.OIDC.Scopes = scopes(51) }, "/scopes", "too_many_scopes", 50},
+	} {
+		t.Run(name+" are refused", func(t *testing.T) {
+			in := validInput()
+			tc.change(&in)
+			_, err := identity.CheckProviderInput(in)
+			vs := violationsOf(t, err)
+			if len(vs) != 1 || vs[0].Pointer != tc.pointer || vs[0].Code != tc.code || vs[0].Params["max"] != tc.max {
+				t.Errorf("violations = %+v, want %s at %s with max %d", vs, tc.code, tc.pointer, tc.max)
+			}
+		})
+	}
+
+	in := validInput()
+	in.Domains, in.OIDC.Scopes = domains(100), scopes(50)
+	got, err := identity.CheckProviderInput(in)
+	if err != nil {
+		t.Fatalf("100 domains and 50 scopes refused: %v", err)
+	}
+	if len(got.Domains) != 100 || len(got.OIDC.Scopes) != 50 {
+		t.Errorf("kept %d domains and %d scopes, want 100 and 50", len(got.Domains), len(got.OIDC.Scopes))
 	}
 }

@@ -103,6 +103,68 @@ func TestEveryLimitedAnswerTellsTheDefaultLimitAndWhatIsLeft(t *testing.T) {
 	s = openStream(t, srv, nil, bearer(clientKey))
 	s.started(t)
 	budget(t, "client stream", s.res.Header, 10, 9)
+
+	// The per-minute budgets of evaluate and events, per kind of key.
+	const body = `{"context":{"units":{"user":"u-1"}}}`
+	a := postEvaluate(t, srv, serverKey, "application/json", []byte(body))
+	budget(t, "server evaluate", a.header, 6000, 5999)
+	a = postEvaluate(t, srv, clientKey, "application/json", []byte(body))
+	budget(t, "client evaluate", a.header, 120, 119)
+	a = postEvents(t, srv, serverKey, batch())
+	budget(t, "server events", a.header, 600, 599)
+	a = postEvents(t, srv, clientKey, batch())
+	budget(t, "client events", a.header, 60, 59)
+}
+
+func TestAServerKeysEvaluateAndEventsAreLimitedPerKeyWhateverTheClientIP(t *testing.T) {
+	c := fakeClock()
+	srv := testkit.StartServer(t, testkit.WithClock(c), behindAProxy(), limits(func(l *config.RateLimits) {
+		l.ServerEvaluate, l.ServerEvents = 2, 3
+	}))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	_, other := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	const body = `{"context":{"units":{"user":"u-1"}}}`
+	evaluate := func(key, ip string) answer {
+		return postEvaluate(t, srv, key, "application/json", []byte(body), "X-Forwarded-For", ip)
+	}
+	events := func(key, ip string) answer { return postEvents(t, srv, key, batch(), "X-Forwarded-For", ip) }
+
+	for i, ip := range []string{"203.0.113.1", "203.0.113.2"} {
+		a := evaluate(value, ip)
+		if a.status != http.StatusOK {
+			t.Fatalf("evaluate %d = %d: %s", i+1, a.status, a.body)
+		}
+		budget(t, "evaluate "+strconv.Itoa(i+1), a.header, 2, 1-i)
+	}
+	a := evaluate(value, "203.0.113.3")
+	rateLimited(t, "the third evaluate, from a third IP", a.status, a.header, a.body, 2)
+
+	// Evaluate's budget does not draw on events', which is its own.
+	for i, ip := range []string{"203.0.113.1", "203.0.113.2", "203.0.113.3"} {
+		a := events(value, ip)
+		if a.status != http.StatusAccepted {
+			t.Fatalf("events %d = %d: %s", i+1, a.status, a.body)
+		}
+		budget(t, "events "+strconv.Itoa(i+1), a.header, 3, 2-i)
+	}
+	a = events(value, "203.0.113.4")
+	rateLimited(t, "the fourth events batch, from a fourth IP", a.status, a.header, a.body, 3)
+
+	if a := evaluate(other, "203.0.113.1"); a.status != http.StatusOK {
+		t.Errorf("another key's evaluate = %d, want its own budget", a.status)
+	}
+	if a := events(other, "203.0.113.1"); a.status != http.StatusAccepted {
+		t.Errorf("another key's events = %d, want its own budget", a.status)
+	}
+
+	c.Advance(time.Minute)
+	if a := evaluate(value, "203.0.113.1"); a.status != http.StatusOK {
+		t.Errorf("evaluate the next minute = %d, want a new window", a.status)
+	}
+	if a := events(value, "203.0.113.1"); a.status != http.StatusAccepted {
+		t.Errorf("events the next minute = %d, want a new window", a.status)
+	}
 }
 
 func TestThe31stRefusedKeyFromOneIPIsRefusedBeforeAnyKeyIsLookedUp(t *testing.T) {
