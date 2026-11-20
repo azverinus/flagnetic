@@ -124,6 +124,12 @@ module Flagnetic
     # type_mismatch rather than a truncated value.
     def int(key, default:, context: nil) = serve(key, "number", default, context, int: true).value
 
+    # int_detail serves a number flag as int does, with why it was served:
+    # the value is narrowed to an Integer before the evaluation is counted
+    # or exposed, so a number that is not whole is counted as the fallback it
+    # serves and exposes nothing. default is an Integer.
+    def int_detail(key, default:, context: nil) = serve(key, "number", default, context, int: true)
+
     # json serves a JSON flag's value, parsed and frozen, for context, or
     # default.
     def json(key, default:, context: nil) = serve(key, "json", default, context).value

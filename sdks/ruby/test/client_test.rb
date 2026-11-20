@@ -25,6 +25,15 @@ class ClientTest < Minitest::Test
     assert c.bool(:on, default: false, context: { units: { user: "u-1" } })
   end
 
+  def test_int_detail_narrows_before_it_is_counted
+    c = offline({ "float_limit" => 5.0, "ratio" => 2.5 })
+    whole = c.int_detail("float_limit", default: 0)
+    assert_equal [5, :fallthrough], [whole.value, whole.reason]
+    assert_kind_of Integer, whole.value
+    refused = c.int_detail("ratio", default: 7)
+    assert_equal [7, :fallback, :type_mismatch], [refused.value, refused.reason, refused.error_code]
+  end
+
   def test_int_serves_a_whole_number_as_an_integer
     c = offline({ "limit" => 5, "float_limit" => 5.0, "ratio" => 2.5, "copy" => "hi" })
     assert_equal 5, c.int("limit", default: 0)
