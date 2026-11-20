@@ -217,11 +217,11 @@ func mapKeys[T any](in []T, key func(T) string) []string {
 // project waiting. The project holds what current holds, plus what the
 // document names that current does not.
 func (f *faults) limits(d, current Document) {
-	check := func(section string, max int, held, named []string) {
+	check := func(section string, limit int, held, named []string) {
 		total := len(slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(held), named...)))))
-		if total > max {
-			f.add(Pointer(section), "too_many", fmt.Sprintf("a project holds at most %d of these", max),
-				map[string]any{"max": max, "count": total})
+		if total > limit {
+			f.add(Pointer(section), "too_many", fmt.Sprintf("a project holds at most %d of these", limit),
+				map[string]any{"max": limit, "count": total})
 		}
 	}
 	check("environments", workspace.MaxEnvironments, mapKeys(current.Environments, func(e Environment) string { return e.Key }),
