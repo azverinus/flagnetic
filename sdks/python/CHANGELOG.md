@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.6](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.5...sdks/python/v0.1.6) (2026-11-20)
+
+
+### Bug Fixes
+
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **sdks:** close the Python and Ruby SDK review findings ([#414](https://github.com/azverinus/flagnetic/issues/414)) ([d02c998](https://github.com/azverinus/flagnetic/commit/d02c998264c98f3a0904f0187d779be749270237))
+
+
+### Dependencies
+
+* **sdk-python:** Bump the sdk-python group in /sdks/python with 3 updates ([#411](https://github.com/azverinus/flagnetic/issues/411)) ([c7e2ae2](https://github.com/azverinus/flagnetic/commit/c7e2ae20cae912b122c9555de2f2bd00c5f77a40))
+
 ## [0.1.5](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.4...sdks/python/v0.1.5) (2026-11-17)
 
 
