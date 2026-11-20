@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.6.1](https://github.com/azverinus/flagnetic/compare/v0.6.0...v0.6.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **access:** close races in sign-in, sessions and member access ([#387](https://github.com/azverinus/flagnetic/issues/387)) ([fae224f](https://github.com/azverinus/flagnetic/commit/fae224fac4f233c5d500f65d8707d8ef8005aafc))
+* **config:** bound settings, report unknown keys, bound the stop ([#389](https://github.com/azverinus/flagnetic/issues/389)) ([e636383](https://github.com/azverinus/flagnetic/commit/e636383b09cdc73fb73eb521e204f535168cb93f))
+* **console:** close protection, pattern, code and test-seam findings ([#420](https://github.com/azverinus/flagnetic/issues/420)) ([8bd8dcf](https://github.com/azverinus/flagnetic/commit/8bd8dcf56013ba51cd32df5e46ba0353427342c1))
+* **console:** keep form edits across newer versions, match server checks ([#419](https://github.com/azverinus/flagnetic/issues/419)) ([482cdca](https://github.com/azverinus/flagnetic/commit/482cdca2afa63c68e56da80b33a557980082a8ef))
+* **delivery:** bound ruleset stream and listener-down work ([#390](https://github.com/azverinus/flagnetic/issues/390)) ([71edd59](https://github.com/azverinus/flagnetic/commit/71edd5954da02da43c4d05866b2de8c6d30ea02a))
+* **deploy:** trusted proxies, probe budgets, upgrade docs and chart fixes ([#386](https://github.com/azverinus/flagnetic/issues/386)) ([9e451b5](https://github.com/azverinus/flagnetic/commit/9e451b5e0311bdcc55bff7a954419fcf7817e9bd))
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **events:** close rollup, retention, alias link and ingest findings ([#395](https://github.com/azverinus/flagnetic/issues/395)) ([662cf99](https://github.com/azverinus/flagnetic/commit/662cf991582436535bcc57a4d7adb086356d849b))
+* **governance:** close the governance review findings ([#397](https://github.com/azverinus/flagnetic/issues/397)) ([7c91525](https://github.com/azverinus/flagnetic/commit/7c91525bfdc0d752ee0a64d1599bf9a0a84a27e1))
+* **http:** answer dropped bodies as gone, tidy edge and dead code ([#394](https://github.com/azverinus/flagnetic/issues/394)) ([bd41082](https://github.com/azverinus/flagnetic/commit/bd4108295c7f0c538d9c0afa59c5551606a154bf))
+* **identity:** close the identity provider and SCIM review findings ([#399](https://github.com/azverinus/flagnetic/issues/399)) ([9d14e4a](https://github.com/azverinus/flagnetic/commit/9d14e4a2ea517763f07557bccd12c7195667d1d8))
+* **management:** close the Management API boundary findings ([#392](https://github.com/azverinus/flagnetic/issues/392)) ([6e436c8](https://github.com/azverinus/flagnetic/commit/6e436c816ce6de02ec136ee68ba2d42a38d60e78))
+* **postgres:** pin released migrations and bound migration locks ([#388](https://github.com/azverinus/flagnetic/issues/388)) ([43039c2](https://github.com/azverinus/flagnetic/commit/43039c2f25de14f7f585272b25ee2af5c94e7ed9))
+* **sdks:** close the Dart and Flutter review findings ([#417](https://github.com/azverinus/flagnetic/issues/417)) ([0ef349e](https://github.com/azverinus/flagnetic/commit/0ef349ea9beab8bbd6a1fe54138382aafa3c15f9))
+* **sdks:** close the Go SDK and provider review findings ([#406](https://github.com/azverinus/flagnetic/issues/406)) ([3d12bd8](https://github.com/azverinus/flagnetic/commit/3d12bd8eb37c8daa4547ef381512d16aedca243b))
+* **sdks:** close the JavaScript review findings, add summaryInterval ([#413](https://github.com/azverinus/flagnetic/issues/413)) ([f018603](https://github.com/azverinus/flagnetic/commit/f018603be9a9876438b2490c7bc4efefd23fbe71))
+* **sinks:** close the sinks review findings ([#398](https://github.com/azverinus/flagnetic/issues/398)) ([4c1f9cd](https://github.com/azverinus/flagnetic/commit/4c1f9cd150e3fb721126e39f457530cf761c8df8))
+* **transfer:** close the import concurrency, declaration and Firebase findings ([#407](https://github.com/azverinus/flagnetic/issues/407)) ([d46c37f](https://github.com/azverinus/flagnetic/commit/d46c37f3533e01b95e47d51713e626b1efbe951c))
+* **workspace:** close the workspace, flags and experiments review findings ([#405](https://github.com/azverinus/flagnetic/issues/405)) ([f4e49a5](https://github.com/azverinus/flagnetic/commit/f4e49a5ea5b6e0fffc336f83f69e226152901b4f))
+
+
+### Dependencies
+
+* **console:** Bump the console group in /web with 7 updates ([#412](https://github.com/azverinus/flagnetic/issues/412)) ([f1e4e70](https://github.com/azverinus/flagnetic/commit/f1e4e7080d782bc0e98b26c71e036c3c1d3200d8))
+
 ## [0.6.0](https://github.com/azverinus/flagnetic/compare/v0.5.0...v0.6.0) (2026-11-19)
 
 
