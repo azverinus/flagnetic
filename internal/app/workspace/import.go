@@ -77,7 +77,7 @@ func NewImporter(tx Transactor, store ImportStore, configure EnvironmentConfigur
 func (i *Importer) UpdateProject(ctx context.Context, project workspace.ProjectID, name, description string,
 	req governance.Request,
 ) (workspace.Project, bool, error) {
-	before, err := i.store.LockProject(ctx, project)
+	before, err := lockProject(ctx, i.store, project)
 	if err != nil {
 		return workspace.Project{}, false, err
 	}

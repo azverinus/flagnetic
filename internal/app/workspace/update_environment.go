@@ -49,7 +49,7 @@ func (h *UpdateEnvironment) Handle(ctx context.Context, cmd UpdateEnvironmentCom
 		// The project's row, not the environment's: whether an environment
 		// is protected decides which writes in the project may change its
 		// ruleset, and those writes hold the project's row alone.
-		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
 		before, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, false)

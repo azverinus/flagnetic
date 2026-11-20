@@ -86,7 +86,7 @@ var errKeyImmutable = apperrors.Invalid("key_immutable", "a key never changes", 
 })
 
 // DiscoverableAttributeKey reports whether key could be declared as an
-// attribute: a key of the workspace, not the reserved one. Only such keys
+// attribute: a well-formed key, not the reserved one. Only such keys
 // are worth showing as discovered, since nothing else can be declared.
 func DiscoverableAttributeKey(key string) bool {
 	return keyPattern.MatchString(key) && key != reservedAttributeKey

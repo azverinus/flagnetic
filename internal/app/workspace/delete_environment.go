@@ -43,7 +43,7 @@ type DeleteEnvironmentCommand struct {
 func (h *DeleteEnvironment) Handle(ctx context.Context, cmd DeleteEnvironmentCommand) error {
 	now := h.rec.clock.Now()
 	return h.tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
 		e, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, true)

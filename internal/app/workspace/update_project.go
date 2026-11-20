@@ -42,7 +42,7 @@ func (h *UpdateProject) Handle(ctx context.Context, cmd UpdateProjectCommand) (w
 	now := h.rec.clock.Now()
 	var out workspace.Project
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
-		before, err := h.store.LockProject(ctx, cmd.Project)
+		before, err := lockProject(ctx, h.store, cmd.Project)
 		if err != nil {
 			return err
 		}

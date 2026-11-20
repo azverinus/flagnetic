@@ -47,7 +47,7 @@ type DeleteAttributeCommand struct {
 func (h *DeleteAttribute) Handle(ctx context.Context, cmd DeleteAttributeCommand) error {
 	now := h.rec.clock.Now()
 	return h.tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+		if _, err := lockProject(ctx, h.store, cmd.Project); err != nil {
 			return err
 		}
 		// A rename locks the attribute's row, not the project's, so the row is

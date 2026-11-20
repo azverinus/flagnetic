@@ -47,7 +47,7 @@ type DeleteProjectCommand struct {
 func (h *DeleteProject) Handle(ctx context.Context, cmd DeleteProjectCommand) error {
 	now := h.rec.clock.Now()
 	return h.tx.Within(ctx, func(ctx context.Context) error {
-		p, err := h.store.LockProject(ctx, cmd.Project)
+		p, err := lockProject(ctx, h.store, cmd.Project)
 		if err != nil {
 			return err
 		}
