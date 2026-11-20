@@ -81,13 +81,14 @@ func TestADeliveryLeaseIsTheTokensWhileItRuns(t *testing.T) {
 		t.Fatalf("a second claim leased %d beside four running leases", len(more))
 	}
 	d := leased[0]
-	if _, held, err := s.RenewLease(t.Context(), d, second, now, now.Add(time.Minute)); err != nil || held {
-		t.Errorf("another token renewed the lease: %v, %v", held, err)
+	if _, renewal, err := s.RenewLease(t.Context(), d, second, now, now.Add(time.Minute)); err != nil ||
+		renewal != appgovernance.LeaseNotHeld {
+		t.Errorf("another token's renewal = %v, %v; want the lease not held", renewal, err)
 	}
-	l, held, err := s.RenewLease(t.Context(), d, first, now, now.Add(time.Minute))
-	if err != nil || !held || l.Delivery.ID != d || l.URL != "https://receiver.example/hook" || len(l.SealedSecrets) != 1 ||
+	l, renewal, err := s.RenewLease(t.Context(), d, first, now, now.Add(time.Minute))
+	if err != nil || renewal != appgovernance.LeaseRenewed || l.Delivery.ID != d || l.URL != "https://receiver.example/hook" || len(l.SealedSecrets) != 1 ||
 		len(l.Delivery.Attempts) != 0 {
-		t.Fatalf("renew = %+v, %v, %v", l, held, err)
+		t.Fatalf("renew = %+v, %v, %v", l, renewal, err)
 	}
 	attempt := governance.DeliveryAttempt{N: 1, At: now, StatusCode: new(500)}
 	next := now.Add(time.Hour)
@@ -102,8 +103,9 @@ func TestADeliveryLeaseIsTheTokensWhileItRuns(t *testing.T) {
 	}
 
 	later := now.Add(2 * time.Minute)
-	if _, held, err := s.RenewLease(t.Context(), leased[1], first, later, later.Add(time.Minute)); err != nil || held {
-		t.Errorf("a lease that ran out was renewed: %v, %v", held, err)
+	if _, renewal, err := s.RenewLease(t.Context(), leased[1], first, later, later.Add(time.Minute)); err != nil ||
+		renewal != appgovernance.LeaseNotHeld {
+		t.Errorf("renewing a lease that ran out = %v, %v; want the lease not held", renewal, err)
 	}
 	// The three leases that ran out and the two never leased are due; the
 	// one recorded waits for its retry.
@@ -187,5 +189,42 @@ func TestAClaimedDeliveryNamesTheProjectOfItsSubscription(t *testing.T) {
 	}
 	if len(claimed) != 1 || claimed[0].ID != d.ID || claimed[0].Project != p.ID {
 		t.Errorf("claimed = %+v, want the delivery of project %s", claimed, p.ID)
+	}
+}
+
+// The platform disabling a subscription drops its deliveries, those another
+// replica is attempting too: that replica's outcome, recorded under the lease
+// token the drop cleared, writes nothing, so the delivery stays dropped with
+// no attempt on it.
+func TestAnAttemptLateAfterAPlatformDisableRecordsNothing(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	ids := testkit.IDs(testkit.Clock())
+	s := pggovernance.NewDeliveries(pool)
+	pending := pendingDeliveries(t, pool, ids, 1)
+	token := id.New[appgovernance.Lease](ids)
+	now := testkit.Start.Add(time.Second)
+	claimed := claim(t, pool, s, token, now)
+	if len(claimed) != 1 {
+		t.Fatalf("claimed %d deliveries, want 1", len(claimed))
+	}
+
+	if err := s.DropPending(t.Context(), pending[0].Webhook, now); err != nil {
+		t.Fatal(err)
+	}
+	next := now.Add(time.Hour)
+	attempt := governance.DeliveryAttempt{N: 1, At: now, StatusCode: new(500)}
+	if recorded, err := s.RecordAttempt(t.Context(), claimed[0], token, attempt, governance.DeliveryPending, &next, now); err != nil || recorded {
+		t.Errorf("the late attempt was recorded = %v, %v; want nothing written", recorded, err)
+	}
+	if _, renewal, err := s.RenewLease(t.Context(), claimed[0], token, now, now.Add(time.Minute)); err != nil ||
+		renewal != appgovernance.LeaseNotNeeded {
+		t.Errorf("renewing the dropped delivery's lease = %v, %v; want it no longer needed", renewal, err)
+	}
+	got, err := pggovernance.NewWebhooks(pool).Delivery(t.Context(), pending[0].Webhook, claimed[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != governance.DeliveryDropped || len(got.Attempts) != 0 || got.NextAttemptAt != nil {
+		t.Errorf("delivery after the late attempt = %+v, want dropped with no attempt and none due", got)
 	}
 }

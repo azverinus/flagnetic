@@ -62,6 +62,9 @@ func TestADigestSlotIsHandledOnceAndForgottenAfterTheCutoff(t *testing.T) {
 	if again, err := s.RecordDigestSlot(t.Context(), web.ID, recent); err != nil || again {
 		t.Errorf("recording a handled slot again = %v, %v; want false", again, err)
 	}
+	if first, err := s.RecordDigestSlot(t.Context(), id.New[workspace.Project](ids), recent); err != nil || first {
+		t.Errorf("recording a slot for a project deleted since the round listed it = %v, %v; want false and no error", first, err)
+	}
 	if got := awaiting(t, s, recent); len(got) != 1 || got[0] != "api" {
 		t.Errorf("after web handled the slot, projects awaiting it = %v, want [api]", got)
 	}

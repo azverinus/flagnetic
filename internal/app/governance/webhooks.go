@@ -414,7 +414,10 @@ func (h *UpdateWebhook) update(ctx context.Context, cmd UpdateWebhookCommand, no
 	after := before
 	after.WebhookInput = in
 	if in.Enabled && !before.Enabled {
-		after.EnabledAt = now
+		// Enabling by an edit starts afresh as the enable operation does,
+		// else a streak of failures from before it disables the
+		// subscription on its next failure.
+		after.EnabledAt, after.ConsecutiveFailures, after.FailingSince = now, 0, nil
 	}
 	after.UpdatedAt, after.Version = now, before.Version+1
 	if err = h.d.Store.UpdateWebhook(ctx, after); err != nil {

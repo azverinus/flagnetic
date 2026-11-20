@@ -137,7 +137,7 @@ func TestAnAddressOutsideThePublicInternetIsRefused(t *testing.T) {
 
 func TestTheAddressPredicatesSplitTheRefusedAddressesWithoutLosingOne(t *testing.T) {
 	for addr, want := range map[string][3]bool{
-		// unreachable, private or loopback, link-local
+		// unreachable, private or loopback (not a predicate: the operator's allowance decides), link-local
 		"127.0.0.1": {false, true, false}, "::1": {false, true, false}, "10.0.0.1": {false, true, false},
 		"fd00::1": {false, true, false}, "::ffff:192.168.1.1": {false, true, false},
 		"169.254.169.254": {false, false, true}, "fe80::1": {false, false, true}, "::ffff:169.254.169.254": {false, false, true},
@@ -145,7 +145,7 @@ func TestTheAddressPredicatesSplitTheRefusedAddressesWithoutLosingOne(t *testing
 		"ff02::1": {true, false, true}, "93.184.216.34": {}, "2606:2800:220:1::1": {},
 	} {
 		a := netip.MustParseAddr(addr)
-		got := [3]bool{governance.AddressUnreachable(a), governance.AddressPrivateOrLoopback(a), governance.AddressLinkLocal(a)}
+		got := [3]bool{governance.AddressUnreachable(a), a.Unmap().IsLoopback() || a.Unmap().IsPrivate(), governance.AddressLinkLocal(a)}
 		if got != want {
 			t.Errorf("%s: unreachable, private or loopback, link-local = %v, want %v", addr, got, want)
 		}

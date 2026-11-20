@@ -534,6 +534,18 @@ func credentialOf(r *http.Request, secure bool) credential {
 // must not stand between a member and signing in again. A cookie the server
 // did not issue is no credential at all.
 func (a *api) authenticate(ctx context.Context, c credential, op access.Operation) (access.Caller, error) {
+	return a.resolve(ctx, c, op, true)
+}
+
+// recheck judges the credential of a caller already served, as authenticate
+// does but without recording a session's use: an open stream asking again
+// is no request of the member's and must not keep their session from
+// idling out.
+func (a *api) recheck(ctx context.Context, c credential, op access.Operation) (access.Caller, error) {
+	return a.resolve(ctx, c, op, false)
+}
+
+func (a *api) resolve(ctx context.Context, c credential, op access.Operation, touch bool) (access.Caller, error) {
 	if c.authorization != nil {
 		scheme, value, _ := strings.Cut(*c.authorization, " ")
 		value = strings.TrimSpace(value)
@@ -545,7 +557,13 @@ func (a *api) authenticate(ctx context.Context, c credential, op access.Operatio
 	if c.cookie == nil || op.Requirement == access.RequirePublic {
 		return access.Caller{}, errUnauthenticated
 	}
-	caller, err := a.h.AuthenticateSession.Handle(ctx, *c.cookie)
+	var caller access.Caller
+	var err error
+	if touch {
+		caller, err = a.h.AuthenticateSession.Handle(ctx, *c.cookie)
+	} else {
+		caller, err = a.h.AuthenticateSession.Check(ctx, *c.cookie)
+	}
 	if errors.Is(err, appaccess.ErrNoSession) {
 		return access.Caller{}, errUnauthenticated
 	}

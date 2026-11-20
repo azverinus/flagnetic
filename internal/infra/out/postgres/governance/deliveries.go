@@ -111,14 +111,16 @@ func (s *Deliveries) ClaimDeliveries(ctx context.Context, token appgovernance.Le
 
 // RenewLease pushes token's lease on delivery to until and returns the
 // delivery with its subscription's target and secrets, the previous one
-// while its overlap lasts at now; false when token no longer holds a
-// pending delivery of an enabled subscription. A lease that ran out is not
-// renewed even when no other replica took it yet: it no longer counts
-// towards the subscription's deliveries in flight, so renewing it could put
-// one more in flight than the claim allows.
+// while its overlap lasts at now. When token no longer holds a pending
+// delivery of an enabled subscription it tells a lease that went, run out or
+// taken by another replica, from a delivery no longer to be attempted, so
+// that only the first counts as a claim outrunning its lease. A lease that
+// ran out is not renewed even when no other replica took it yet: it no
+// longer counts towards the subscription's deliveries in flight, so renewing
+// it could put one more in flight than the claim allows.
 func (s *Deliveries) RenewLease(ctx context.Context, delivery governance.DeliveryID, token appgovernance.LeaseToken,
 	now, until time.Time,
-) (appgovernance.Leased, bool, error) {
+) (appgovernance.Leased, appgovernance.LeaseRenewal, error) {
 	var (
 		l                 appgovernance.Leased
 		did, wid, eventID [16]byte
@@ -136,10 +138,11 @@ func (s *Deliveries) RenewLease(ctx context.Context, delivery governance.Deliver
 		delivery.Bytes(), token.Bytes(), now, until).
 		Scan(&did, &wid, &eventID, &l.Delivery.Type, &l.Delivery.Body, &attempts, &l.URL, &sealed, &previous)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return l, false, nil
+		renewal, whyErr := s.unrenewed(ctx, delivery)
+		return l, renewal, whyErr
 	}
 	if err != nil {
-		return l, false, fmt.Errorf("renewing the lease on a webhook delivery: %w", err)
+		return l, appgovernance.LeaseNotHeld, fmt.Errorf("renewing the lease on a webhook delivery: %w", err)
 	}
 	l.Delivery.ID, l.Delivery.Webhook, l.Delivery.Event = id.FromBytes[governance.Delivery](did),
 		id.FromBytes[governance.Webhook](wid), id.FromBytes[governance.Event](eventID)
@@ -148,7 +151,28 @@ func (s *Deliveries) RenewLease(ctx context.Context, delivery governance.Deliver
 	if previous != nil {
 		l.SealedSecrets = append(l.SealedSecrets, *previous)
 	}
-	return l, true, nil
+	return l, appgovernance.LeaseRenewed, nil
+}
+
+// unrenewed tells why a lease on delivery was not renewed: a delivery still
+// pending for an enabled subscription is to be attempted, so its lease went;
+// any other is no longer to be attempted. It reads after the renewal, so a
+// change in between can tell it either way; it decides only what is counted.
+func (s *Deliveries) unrenewed(ctx context.Context, delivery governance.DeliveryID) (appgovernance.LeaseRenewal, error) {
+	var due bool
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT d.status = 'pending' AND s.enabled
+		FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id = d.subscription_id
+		WHERE d.id = $1`, delivery.Bytes()).Scan(&due)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return appgovernance.LeaseNotNeeded, nil
+	case err != nil:
+		return appgovernance.LeaseNotHeld, fmt.Errorf("reading why a webhook delivery's lease was not renewed: %w", err)
+	case due:
+		return appgovernance.LeaseNotHeld, nil
+	}
+	return appgovernance.LeaseNotNeeded, nil
 }
 
 // LockWebhook locks the subscription's row for the unit of work ctx

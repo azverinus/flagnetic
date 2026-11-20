@@ -5,6 +5,9 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
@@ -97,5 +100,93 @@ func TestAnEntryTheLogRefusesFailsTheWrite(t *testing.T) {
 	}
 	if _, err := pggovernance.NewAuditLog(pool).Entry(t.Context(), e.Project, e.ID); !errors.Is(err, appgovernance.ErrNotFound) {
 		t.Errorf("Entry = %v; want nothing kept of the failed write", err)
+	}
+}
+
+// listening has hub told of every announcement made on ChangesChannel, as a
+// replica's listener does, until the test ends.
+func listening(t *testing.T, pool *pgxpool.Pool, hub *pggovernance.ChangeHub) {
+	t.Helper()
+	conn, err := pool.Acquire(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Exec(t.Context(), "LISTEN "+pggovernance.ChangesChannel); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			n, err := conn.Conn().WaitForNotification(ctx)
+			if err != nil {
+				return
+			}
+			hub.Received(n.Payload)
+		}
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+		conn.Release()
+	})
+}
+
+// An entry recorded in a write that rolls back is announced to no stream,
+// while the same entry in a write that commits is.
+func TestARolledBackWriteAnnouncesNothingToTheChangeStream(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	log := pggovernance.NewAuditLog(pool)
+	hub := pggovernance.NewChangeHub(log, nil)
+	t.Cleanup(hub.Close)
+	listening(t, pool, hub)
+	ids := testkit.IDs(testkit.Clock())
+	record := appgovernance.NewRecord(log, pggovernance.NewChangeRequests(pool), appflags.NewSegmentReferrers(pgflags.NewStore(pool)), ids,
+		appgovernance.WithChangeStream(log))
+	rolledBack, committed := entry(t, ids), entry(t, ids)
+	committed.Project = rolledBack.Project
+	follower := hub.Follow(rolledBack.Project)
+	t.Cleanup(follower.Close)
+	// The hub is told the replica listens, as its listener does once it is up.
+	// A stream followed before it listened is owed one refetch.
+	hub.Listening(true)
+	select {
+	case <-follower.Changed():
+		if _, refetch := follower.Take(); !refetch {
+			t.Fatal("a stream started before the replica listened is not told to refetch")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stream was not told to refetch once the replica listened")
+	}
+
+	err := postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
+		if err := record.Record(ctx, rolledBack); err != nil {
+			return err
+		}
+		return errors.New("the write failed after its entry was recorded")
+	})
+	if err == nil {
+		t.Fatal("Within = nil; want the write's failure")
+	}
+	select {
+	case <-follower.Changed():
+		notices, refetch := follower.Take()
+		t.Fatalf("a rolled-back write announced %d notices (refetch %v)", len(notices), refetch)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	if err = postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
+		return record.Record(ctx, committed)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-follower.Changed():
+		if notices, _ := follower.Take(); len(notices) != 1 || notices[0].Entry != committed.ID {
+			t.Errorf("notices after the committed write = %+v, want its entry alone", notices)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a committed write announced nothing")
 	}
 }

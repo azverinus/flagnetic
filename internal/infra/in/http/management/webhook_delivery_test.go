@@ -575,3 +575,36 @@ func TestDeliveryOutcomesAreCounted(t *testing.T) {
 		}
 	}
 }
+
+// A replica leases no more deliveries than it attempts at once, so the
+// deliveries of a project whose receivers hold every attempt are not all
+// leased to the one replica: another replica takes the rest.
+func TestAReplicaDoesNotLeaseMoreDeliveriesThanItAttempts(t *testing.T) {
+	first, second := testkit.StartServer(t, reachable), testkit.StartServer(t, reachable)
+	admin := testkit.Client(t, first, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	release := make(chan struct{})
+	// The first replica's four attempts are held by the receiver; every
+	// other call is answered at once.
+	r := testkit.StartReceiver(t,
+		testkit.Reply{Release: release}, testkit.Reply{Release: release}, testkit.Reply{Release: release},
+		testkit.Reply{Release: release}, testkit.Reply{})
+	const subscriptions = 24
+	for range subscriptions {
+		ping(t, admin, p.Key, receiving(t, admin, p.Key, r).Id)
+	}
+
+	var firstRound sync.WaitGroup
+	firstRound.Go(func() { deliver(t, first) })
+	for range 4 {
+		r.AwaitCall(t)
+	}
+	// The first replica waits on four attempts and holds the leases of the
+	// few more it claimed; deliveries are left for the second to take.
+	deliver(t, second)
+	if n := len(r.Calls()); n <= 4 {
+		t.Errorf("the receiver was called %d times, want the second replica to have attempted deliveries too", n)
+	}
+	close(release)
+	firstRound.Wait()
+}

@@ -93,15 +93,16 @@ func (w Webhook) RotateSecret(sealed string, now time.Time, overlap time.Duratio
 }
 
 // WebhookDisabledEvent returns the event telling a project's other
-// subscriptions that the platform disabled w at at, after last failed. It
-// names the subscription and why its last attempt failed, never its target,
+// subscriptions that the platform disabled w at at, after last failed, as the
+// audit entry names. It names the subscription and why its last attempt failed, never its target,
 // which may carry a credential and is not theirs to see.
-func WebhookDisabledEvent(eventID EventID, w Webhook, projectKey string, last DeliveryAttempt, at time.Time) Event {
+func WebhookDisabledEvent(eventID EventID, entry EntryID, w Webhook, projectKey string, last DeliveryAttempt, at time.Time) Event {
 	actor := WebhookPolicyActor
 	return Event{
 		ID: eventID, Type: EventWebhookDisabled, Project: w.Project, ProjectKey: projectKey, OccurredAt: at,
 		Actor: &actor, Entity: &Entity{Kind: "webhook", ID: w.ID.String(), Key: w.Name},
-		Data: map[string]any{"subscription_id": w.ID.String(), "name": w.Name, "last_error": attemptError(last)},
+		Data:       map[string]any{"subscription_id": w.ID.String(), "name": w.Name, "last_error": attemptError(last)},
+		AuditEntry: entry,
 	}
 }
 

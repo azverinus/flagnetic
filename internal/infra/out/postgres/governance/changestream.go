@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -85,14 +87,23 @@ func (l *AuditLog) Notices(ctx context.Context, project workspace.ProjectID, ent
 	return notices, nil
 }
 
-// NoticesAfter returns the notices of project's entries after the one with
-// after, oldest first, at most limit; ok is false when project holds no
-// entry with after or more than limit follow it.
+// replayLookback bounds how long a write may hold an audit entry
+// uncommitted: an entry is identified when it is recorded and becomes
+// visible only when its transaction commits, so one recorded earlier than an
+// entry a client heard can commit after it.
+const replayLookback = time.Minute
+
+// NoticesAfter returns the notices of project's entries a client that heard
+// the one with after may have missed, oldest first, at most limit; ok is
+// false when project holds no entry with after or more than limit qualify.
 //
 // Identifiers order entries by when they were recorded, not committed, so
-// an entry committed after after's with an earlier identifier is not
-// replayed: it reached the stream the client held, unless that one had
-// dropped already, and a client reconnecting refetches what it shows then.
+// an entry recorded before after's may commit after it, while the client
+// was away, and a replay of identifiers past after's alone would skip it.
+// The replay therefore starts replayLookback before after's identifier, and
+// repeats entries the client already heard: a notice only tells the client to
+// refetch an entity, so hearing it twice costs one refetch. An entry
+// committed later than the lookback after it was recorded is not replayed.
 func (l *AuditLog) NoticesAfter(ctx context.Context, project workspace.ProjectID, after governance.EntryID, limit int) ([]governance.ChangeNotice, bool, error) {
 	q := pgxtx.Querier(ctx, l.pool)
 	var known bool
@@ -104,7 +115,7 @@ func (l *AuditLog) NoticesAfter(ctx context.Context, project workspace.ProjectID
 		return nil, false, nil
 	}
 	rows, err := q.Query(ctx, `SELECT `+noticeColumns+`
-		WHERE a.project_id = $1 AND a.id > $2 ORDER BY a.id LIMIT $3`, project.Bytes(), after.Bytes(), limit+1)
+		WHERE a.project_id = $1 AND a.id > $2 ORDER BY a.id LIMIT $3`, project.Bytes(), lookbackStart(after), limit+1)
 	if err != nil {
 		return nil, false, fmt.Errorf("replaying change notices: %w", err)
 	}
@@ -267,11 +278,17 @@ func (h *ChangeHub) fanOut(ctx context.Context, project workspace.ProjectID, t *
 				"project", project.String(), "error", err.Error())
 		}
 
+		// Offered outside the mutex, from a snapshot: each follower has a
+		// mutex of its own, and offering to every stream of a project while
+		// holding the hub's would stall every project's announcements, Follow
+		// and Close behind the slowest. A stream that closed since is offered
+		// notices nobody takes.
 		h.mu.Lock()
-		for f := range t.followers {
+		followers := slices.Collect(maps.Keys(t.followers))
+		h.mu.Unlock()
+		for _, f := range followers {
 			f.offer(notices, err != nil)
 		}
-		h.mu.Unlock()
 	}
 }
 
@@ -356,4 +373,15 @@ func (f *follower) listening(up bool) {
 	if up && missed {
 		f.offer(nil, true)
 	}
+}
+
+// lookbackStart returns the smallest identifier minted replayLookback before
+// e: its time prefix with every other bit zero.
+func lookbackStart(e governance.EntryID) [16]byte {
+	ms := max(e.Time().Add(-replayLookback).UnixMilli(), 0)
+	var b [16]byte
+	for i := range 6 {
+		b[i] = byte(ms >> (8 * (5 - i))) //nolint:gosec // the low byte of each 8-bit group
+	}
+	return b
 }

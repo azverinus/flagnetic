@@ -197,16 +197,21 @@ func reasonOf(w governance.Webhook) any {
 }
 
 // UpdateWebhook stores what an edit changes of w, which its caller read
-// under the project's lock. Its secrets, creator and
-// delivery counters are left to the operations that change them.
+// under the project's lock. Its secrets and creator are left to the
+// operations that change them, and so are its delivery counters, except when
+// the edit enabled it (EnabledAt is then UpdatedAt) and clears its streak of
+// failures as the enable operation does: a subscription not enabled has no
+// attempts to count, so nothing is lost by writing them.
 func (s *Webhooks) UpdateWebhook(ctx context.Context, w governance.Webhook) error {
 	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE webhook_subscriptions
 		SET name = $3, url = $4, events = $5, environments = $6, enabled = $7, disabled_reason = $8, enabled_at = $9,
-		    updated_at = $10, version = $11
+		    updated_at = $10, version = $11,
+		    consecutive_failures = CASE WHEN $12 THEN $13 ELSE consecutive_failures END,
+		    failing_since = CASE WHEN $12 THEN $14 ELSE failing_since END
 		WHERE `+ofScope("project_id")+` AND id = $2`,
 		optional(w.Project), w.ID.Bytes(), w.Name, w.URL, w.Events, w.Environments, w.Enabled, reasonOf(w), w.EnabledAt,
-		w.UpdatedAt, w.Version)
+		w.UpdatedAt, w.Version, w.Enabled && w.EnabledAt.Equal(w.UpdatedAt), w.ConsecutiveFailures, w.FailingSince)
 	if err != nil {
 		return fmt.Errorf("updating a webhook subscription: %w", err)
 	}

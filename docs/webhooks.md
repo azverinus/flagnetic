@@ -34,7 +34,7 @@ The answer carries `secret`, 32 random bytes in base64url, which signs every cal
 
 ### When a subscription keeps failing
 
-The platform disables a subscription whose receiver is dead: once 25 attempts in a row have failed and the first of them was 24 hours ago or more, with no success between. A short outage is retried, however long the subscription had gone without an event before it: a busy receiver fails 25 attempts in minutes and a quiet one is not judged by the days it had no event; a day of failures is what disables. The subscription's `enabled` turns false with `disabled_reason: persistent_failure`, its pending deliveries are `dropped` and never sent, and the change is audited as `webhook.disabled` by the system. The project's other subscriptions naming `webhook.disabled` (or `*`) are sent it, with `audit_entry_id` null and `data` naming the subscription and why its last attempt failed, never its target:
+The platform disables a subscription whose receiver is dead: once 25 attempts in a row have failed and the first of them was 24 hours ago or more, with no success between. A short outage is retried, however long the subscription had gone without an event before it: a busy receiver fails 25 attempts in minutes and a quiet one is not judged by the days it had no event; a day of failures is what disables. The subscription's `enabled` turns false with `disabled_reason: persistent_failure`, its pending deliveries are `dropped` and never sent, and the change is audited as `webhook.disabled` by the system. The project's other subscriptions naming `webhook.disabled` (or `*`) are sent it, with `audit_entry_id` naming the `webhook.disabled` entry the disabling wrote, and `data` naming the subscription and why its last attempt failed, never its target:
 
 ```json
 {"subscription_id": "0192…", "name": "Security channel", "last_error": "the receiver answered 503"}
@@ -42,7 +42,7 @@ The platform disables a subscription whose receiver is dead: once 25 attempts in
 
 When the instance has an SMTP server and `FLAGNETIC_BASE_URL` (see [Mail](mail.md)), the disabling is also mailed, once it has been stored: to every active member holding `webhook.manage` in the subscription's project (instance admins hold it everywhere), or to every active instance admin for an instance subscription. The mail names the subscription and its project, says it failed persistently, and links to the subscription's page in the console; it never carries the receiver's address, its last error or any secret. It is written in each recipient's language. Nothing is mailed without an SMTP server, and a mail that fails to leave never undoes the disabling: the subscription stays disabled and the failure is logged and counted in `flagnetic_mail_sent_total`.
 
-A `PATCH` setting `enabled: true` on such a subscription is refused `409 webhook_disabled`. `POST …/webhooks/{webhook}/enable` enables it: `disabled_reason` cleared, `consecutive_failures` reset to 0 and the day of failures counted again from the next one, audited as `webhook.enabled`. Events are queued for it from then on; the deliveries dropped stay dropped, and a delivery in the log can be redelivered. It enables a subscription a member disabled too, answers an enabled one as it is, takes no `If-Match` and needs `webhook.manage`.
+A `PATCH` setting `enabled: true` on such a subscription is refused `409 webhook_disabled`. `POST …/webhooks/{webhook}/enable` enables it: `disabled_reason` cleared, `consecutive_failures` reset to 0 and the day of failures counted again from the next one, audited as `webhook.enabled`. Events are queued for it from then on; the deliveries dropped stay dropped, and a delivery in the log can be redelivered. It enables a subscription a member disabled too (as does a `PATCH` setting `enabled: true` on one, which starts its failures afresh the same way), answers an enabled one as it is, takes no `If-Match` and needs `webhook.manage`.
 
 A subscription is refused with 422 and one of these codes:
 
@@ -107,7 +107,7 @@ One write can cause several of these: it shares one `audit_entry_id`. A revert i
 | `experiment.started` | an experiment started |
 | `experiment.stopped` | an experiment stopped |
 | `experiment.archived` | an experiment was archived |
-| `experiment.traffic_allocation_changed` | a running experiment's traffic allocation changed |
+| `experiment.traffic_allocation_changed` | a running experiment's traffic allocation grew |
 | `experiment.srm_detected` | the [sample ratio check](sample-ratio-check.md) raised an alert for the experiment in an environment |
 | `experiment.srm_cleared` | the sample ratio check cleared its alert |
 | `experiment.no_exposures` | a running experiment saw no exposures in an environment for a day |

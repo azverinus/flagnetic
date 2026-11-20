@@ -398,13 +398,6 @@ func AddressUnreachable(a netip.Addr) bool {
 	return !a.IsValid() || a.IsUnspecified() || a.IsMulticast()
 }
 
-// AddressPrivateOrLoopback reports whether a is on the deployment's own host
-// or private network, where a cluster's own services live.
-func AddressPrivateOrLoopback(a netip.Addr) bool {
-	a = a.Unmap()
-	return a.IsLoopback() || a.IsPrivate()
-}
-
 // AddressLinkLocal reports whether a is where cloud metadata services answer:
 // a link-local address, EC2's IPv6 metadata address, or a NAT64 or 6to4
 // address embedding a link-local IPv4 one.

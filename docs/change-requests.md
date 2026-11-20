@@ -7,7 +7,7 @@ description: "Proposing a flag's configuration for review, its diff and its stat
 
 A change request proposes a change for someone to review before it is made: one [flag](flags.md)'s configuration in one environment, a flag's or a [segment](segments.md)'s definition in every environment, or an [experiment](experiments.md)'s start, stop or traffic allocation growth in every environment holding its rule; what it would be, and the diff from what it is now. Proposing changes nothing any SDK receives; a member who is not the author approves it, and applying it makes the change.
 
-Proposing and applying need the `change_request.propose` permission (token scope `flags:write`, developer and above); approving and rejecting need `change_request.approve` (maintainer and above, members only); reads need `project.read`. A project token proposes like a member of its role: it is the author of its change requests and acts on its own only, and it never decides one.
+Proposing and applying need the `change_request.propose` permission (token scope `flags:write`, developer and above); for an experiment's transition (kind `experiment`) they need `experiment.edit` as well (token scope `experiments:write`), since the transition runs the experiment as a direct call would, and creating, copying or applying one without it is refused `403 forbidden` (a scheduled application is the system's and does not ask again); approving and rejecting need `change_request.approve` (maintainer and above, members only); reads need `project.read`. A project token proposes like a member of its role: it is the author of its change requests and acts on its own only, and it never decides one.
 
 ## Protected environments
 
@@ -73,7 +73,7 @@ Each of these is a `POST` to `/projects/{project}/change-requests/{id}/…`, or 
 | `/rebase` | `draft` | Bases the change request on the configuration, flag, segment or experiment as it is now: `base_version` moves, `diff` is recomputed, `proposed` stays; a revert's is filled again from `revert_to`. |
 | `/open` | `draft` | Offers it for review. Refused with `409 base_moved` when what it is based on was written since `base_version`, or, for an experiment, when other environments hold its rule now, until it is rebased: a reviewer reads the diff against what is served now. |
 | `/cancel` | `draft`, `open`, `approved` | Abandons it. |
-| `/copy` | any | Copies any change request, whoever wrote it, into a new draft of the caller's with its title, description and proposal, based on its configuration, flag, segment or experiment as it is now and checked again; it is not scheduled. Needs no `If-Match`. |
+| `/copy` | any | Copies any change request, whoever wrote it, into a new draft of the caller's with its title, description and proposed document, based on its configuration, flag, segment or experiment as it is now and checked again; it is not scheduled. Needs no `If-Match`. |
 
 ## Approving and applying
 

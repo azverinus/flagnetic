@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
@@ -72,7 +73,7 @@ func TestBootstrapIsAuditedAsTheCommandLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := pggovernance.NewAuditLog(pool).Latest(t.Context(), 10)
+	entries, err := pggovernance.NewAuditLog(pool).Entries(t.Context(), appgovernance.AuditFilter{}, governance.EntryID{}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -459,7 +459,7 @@ func TestTheSchedulerAppliesExperimentTransitions(t *testing.T) {
 func TestExperimentChangeRequestsAreListedAndAuthoredByAProjectToken(t *testing.T) {
 	f := heldInProduction(t)
 	key := f.project.Key
-	ci := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite)
+	ci := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite, management.ScopeExperimentsWrite)
 	other := createChangeRequest(t, f.developer.ClientWithResponses, key, experimentRequest(startTransition))
 	res := approveChangeRequest(t, ci, key, other, nil)
 	assertProblem(t, "a token approving", res.StatusCode(), res.Body, http.StatusForbidden, "token_cannot_approve")
@@ -527,4 +527,137 @@ func TestAnExperimentChangeRequestNamesItsExperimentAlone(t *testing.T) {
 	body.Experiment = ptr("checkout_v2")
 	res := do(f.developer.CreateChangeRequestWithResponse(t.Context(), key, body))
 	assertProblem(t, "a configuration naming an experiment", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_change_request")
+}
+
+// A draft change request follows its experiment to another flag when it is
+// rebased, so a write to the new flag's rules supersedes it as it would
+// any other request to the experiment.
+func TestARebasedExperimentChangeRequestFollowsItsExperimentToAnotherFlag(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	key := p.Key
+	stringFlag(t, admin, key, "checkout_title")
+	stringFlag(t, admin, key, "checkout_banner")
+	e := createExperiment(t, admin, key, startableExperiment("checkout_v2"))
+	setProtected(t, admin, key, "production", true)
+	developer, _ := grantedSession(t, srv, p, access.RoleDeveloper)
+	maintainer, _ := grantedSession(t, srv, p, access.RoleMaintainer)
+
+	body := experimentRequest(startTransition)
+	body.Open = ptr(false)
+	draft := createChangeRequest(t, developer.ClientWithResponses, key, body)
+	if valueOr(draft.Flag) != "checkout_title" {
+		t.Fatalf("draft flag = %q, want checkout_title", valueOr(draft.Flag))
+	}
+
+	// The experiment moves to another flag, which a rule now serves it on.
+	if res := patchExperiment(t, admin, key, "checkout_v2", e.Version, management.ExperimentPatch{Flag: ptr("checkout_banner")}); res.JSON200 == nil {
+		t.Fatalf("move the experiment = %d: %s", res.StatusCode(), res.Body)
+	}
+	for _, env := range []string{"staging", "production"} {
+		setProtected(t, admin, key, env, false)
+		mustPut(t, admin, key, "checkout_banner", env, 1, holding("checkout_v2"))
+	}
+	setProtected(t, admin, key, "production", true)
+
+	opened := openChangeRequest(t, developer.ClientWithResponses, key, draft)
+	assertProblem(t, "opening after the move", opened.StatusCode(), opened.Body, http.StatusConflict, "base_moved")
+	rebased := rebaseChangeRequest(t, developer.ClientWithResponses, key, draft)
+	if rebased.JSON200 == nil {
+		t.Fatalf("rebase = %d: %s", rebased.StatusCode(), rebased.Body)
+	}
+	if got := valueOr(rebased.JSON200.Flag); got != "checkout_banner" {
+		t.Errorf("rebased flag = %q, want checkout_banner", got)
+	}
+	if opened = openChangeRequest(t, developer.ClientWithResponses, key, *rebased.JSON200); opened.JSON200 == nil {
+		t.Fatalf("open after the rebase = %d: %s", opened.StatusCode(), opened.Body)
+	}
+	approved := mustApprove(t, maintainer.ClientWithResponses, key, *opened.JSON200)
+
+	staging := getConfiguration(t, admin, key, "checkout_banner", "staging")
+	wider := holding("checkout_v2")
+	wider.Fallthrough = "b"
+	mustPut(t, admin, key, "checkout_banner", "staging", staging.Version, wider)
+	if got := getChangeRequest(t, admin, key, approved); got.State != management.ChangeRequestStateSuperseded {
+		t.Errorf("after a write to the new flag's staging rules: %s, want superseded", got.State)
+	}
+}
+
+// Proposing and applying a change to an experiment needs the permission to
+// run experiments as well as to propose, so a token allowed to write rules
+// and not to run experiments cannot move one through a change request.
+func TestAnExperimentChangeRequestNeedsThePermissionToRunExperiments(t *testing.T) {
+	f := heldInProduction(t)
+	key := f.project.Key
+	rulesOnly := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite)
+	res := do(rulesOnly.CreateChangeRequestWithResponse(t.Context(), key, experimentRequest(startTransition)))
+	pr := assertProblem(t, "a token without the experiments scope proposing", res.StatusCode(), res.Body, http.StatusForbidden, "forbidden")
+	if valueOr(pr.Permission) != "experiment.edit" {
+		t.Errorf("refused for %v, want experiment.edit", valueOr(pr.Permission))
+	}
+	// Another's change request is not copied into a draft of theirs either.
+	proposed := createChangeRequest(t, f.developer.ClientWithResponses, key, experimentRequest(startTransition))
+	copied := do(rulesOnly.CopyChangeRequestWithResponse(t.Context(), key, proposed.Id))
+	assertProblem(t, "copying", copied.StatusCode(), copied.Body, http.StatusForbidden, "forbidden")
+	// A change request to a flag's configuration is unaffected.
+	configuration := configurationRequest("Elsewhere", proposedOn())
+	configuration.Environment = ptr("development")
+	createChangeRequest(t, rulesOnly, key, configuration)
+
+	both := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite, management.ScopeExperimentsWrite)
+	mine := createChangeRequest(t, both, key, experimentRequest(startTransition))
+	approved := mustApprove(t, f.maintainer.ClientWithResponses, key, mine)
+	res2 := do(rulesOnly.ApplyChangeRequestWithResponse(t.Context(), key, approved.Id, &management.ApplyChangeRequestParams{IfMatch: ifMatch(approved.Version)}))
+	assertProblem(t, "applying", res2.StatusCode(), res2.Body, http.StatusForbidden, "forbidden")
+}
+
+// A draft is checked against its experiment when it is rebased or opened, as
+// when it was created: a start proposed for an experiment started directly
+// meanwhile is refused then, not found empty at review and failing at
+// application.
+func TestADraftStartOfAnExperimentStartedMeanwhileIsRefusedAtRebaseAndOpen(t *testing.T) {
+	f := heldInProduction(t)
+	key := f.project.Key
+	body := experimentRequest(startTransition)
+	body.Open = ptr(false)
+	draft := createChangeRequest(t, f.developer.ClientWithResponses, key, body)
+
+	setProtected(t, f.admin, key, "production", false)
+	mustStart(t, f.admin, key, "checkout_v2", f.experiment.Version)
+	setProtected(t, f.admin, key, "production", true)
+
+	rebased := rebaseChangeRequest(t, f.developer.ClientWithResponses, key, draft)
+	assertProblem(t, "rebasing", rebased.StatusCode(), rebased.Body, http.StatusConflict, "not_draft")
+	opened := openChangeRequest(t, f.developer.ClientWithResponses, key, draft)
+	if opened.StatusCode() != http.StatusConflict {
+		t.Errorf("opening = %d %s, want a refusal", opened.StatusCode(), opened.Body)
+	}
+	if got := getChangeRequest(t, f.admin, key, draft); got.State != management.ChangeRequestStateDraft {
+		t.Errorf("state = %s, want still a draft", got.State)
+	}
+}
+
+// The approval covers the environments protected when it was given: an
+// experiment whose rule an environment holds that was protected since is not
+// started by applying the change request, which is superseded instead.
+func TestAnExperimentIsNotStartedOverAHoldingEnvironmentProtectedSinceItsApproval(t *testing.T) {
+	f := heldInProduction(t)
+	key := f.project.Key
+	approved := mustApprove(t, f.maintainer.ClientWithResponses, key,
+		createChangeRequest(t, f.developer.ClientWithResponses, key, experimentRequest(startTransition)))
+	setProtected(t, f.admin, key, "staging", true)
+	versions := rulesetVersions(t, f.project)
+
+	res := applyChangeRequest(t, f.developer.ClientWithResponses, key, approved)
+	assertProblem(t, "applying once staging is protected", res.StatusCode(), res.Body, http.StatusConflict, "base_moved")
+	if got := getChangeRequest(t, f.admin, key, approved); got.State != management.ChangeRequestStateSuperseded {
+		t.Errorf("state = %s, want superseded", got.State)
+	}
+	if got := getExperiment(t, f.admin, key, "checkout_v2"); got.Status != management.ExperimentStatusDraft {
+		t.Errorf("experiment = %s, want still a draft", got.Status)
+	}
+	if moved := bumped(t, "the refusal", versions, rulesetVersions(t, f.project)); len(moved) != 0 {
+		t.Errorf("rulesets moved = %v, want none", moved)
+	}
 }

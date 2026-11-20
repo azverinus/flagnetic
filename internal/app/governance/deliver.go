@@ -44,10 +44,11 @@ type DeliveryStore interface {
 	// leased.
 	ClaimDeliveries(ctx context.Context, token LeaseToken, now, until time.Time, limit int) ([]ClaimedDelivery, error)
 	// RenewLease pushes the lease token holds on delivery to until and
-	// returns the delivery as its attempt needs it; false when the lease ran
-	// out by now or is another's, the delivery settled or its subscription
-	// is no longer enabled.
-	RenewLease(ctx context.Context, delivery governance.DeliveryID, token LeaseToken, now, until time.Time) (Leased, bool, error)
+	// returns the delivery as its attempt needs it, with LeaseRenewed; it
+	// answers LeaseNotHeld when the lease ran out by now or is another's,
+	// and LeaseNotNeeded when the delivery settled or its subscription is no
+	// longer enabled.
+	RenewLease(ctx context.Context, delivery governance.DeliveryID, token LeaseToken, now, until time.Time) (Leased, LeaseRenewal, error)
 	// LockWebhook locks the subscription's row for the unit of work ctx
 	// carries, before any of its deliveries, as the claim does.
 	LockWebhook(ctx context.Context, webhook governance.WebhookID) error
@@ -99,11 +100,6 @@ type Sender interface {
 type Opener interface {
 	Open(purpose secret.Purpose, sealed string, binding secret.Binding) ([]byte, error)
 }
-
-// deliveryBatch bounds the deliveries one claim leases. A round claims
-// again once it has attempted them, so it bounds the transaction, not the
-// round.
-const deliveryBatch = 100
 
 // leaseSlack is how far past an attempt's timeout a lease runs, so that no
 // second replica takes a delivery while the first still waits for its
@@ -175,26 +171,52 @@ type Claim struct {
 
 func (h *Deliver) now() time.Time { return h.d.Clock.Now().UTC().Truncate(time.Microsecond) }
 
-// leaseUntil is when a lease taken at now runs out.
-func leaseUntil(now time.Time) time.Time { return now.Add(governance.DeliveryTimeout + leaseSlack) }
+// LeaseFor is how long a lease runs from the claim or the last renewal. A
+// replica claims no more deliveries at once than it can attempt within it,
+// else the leases of those that wait run out, the delivery counts as in
+// flight to no one, and no other replica can take it.
+const LeaseFor = governance.DeliveryTimeout + leaseSlack
 
-// Claim leases a batch of the deliveries due, empty when none is.
-func (h *Deliver) Claim(ctx context.Context) (Claim, error) {
+// leaseUntil is when a lease taken at now runs out.
+func leaseUntil(now time.Time) time.Time { return now.Add(LeaseFor) }
+
+// Claim leases at most limit of the deliveries due, empty when none is.
+func (h *Deliver) Claim(ctx context.Context, limit int) (Claim, error) {
 	c := Claim{Token: id.New[Lease](h.d.IDs)}
 	now := h.now()
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var err error
-		c.Deliveries, err = h.d.Store.ClaimDeliveries(ctx, c.Token, now, leaseUntil(now), deliveryBatch)
+		c.Deliveries, err = h.d.Store.ClaimDeliveries(ctx, c.Token, now, leaseUntil(now), max(limit, 1))
 		return err
 	})
 	return c, err
 }
 
+// LeaseRenewal is what renewing a delivery's lease came to.
+type LeaseRenewal int
+
+const (
+	// LeaseRenewed is a lease renewed: the delivery is to be attempted.
+	LeaseRenewed LeaseRenewal = iota
+	// LeaseNotHeld is a lease that ran out before the attempt came to it, or
+	// that another replica took meanwhile.
+	LeaseNotHeld
+	// LeaseNotNeeded is a delivery no longer to be attempted: it settled, or
+	// its subscription was disabled or deleted meanwhile.
+	LeaseNotNeeded
+)
+
 // Attempted is what became of one attempt.
 type Attempted struct {
 	// Status is what the delivery stands at after it; empty when there was
-	// no attempt, the lease having gone before it.
+	// no attempt.
 	Status governance.DeliveryStatus
+	// Skipped is set when there was no attempt because the lease had gone
+	// before it: the replica claimed more than it attempted in time, which
+	// whoever runs the attempts counts. A delivery that settled, or whose
+	// subscription was disabled or deleted meanwhile, is not attempted
+	// either, and is not skipped.
+	Skipped bool
 	// Disabled is set when the attempt was the failure that made the
 	// platform disable the subscription.
 	Disabled bool
@@ -210,9 +232,12 @@ type Attempted struct {
 // answers ErrLeaseLost.
 func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery governance.DeliveryID) (Attempted, error) {
 	now := h.now()
-	l, held, err := h.d.Store.RenewLease(ctx, delivery, token, now, leaseUntil(now))
-	if err != nil || !held {
+	l, renewal, err := h.d.Store.RenewLease(ctx, delivery, token, now, leaseUntil(now))
+	if err != nil {
 		return Attempted{}, err
+	}
+	if renewal != LeaseRenewed {
+		return Attempted{Skipped: renewal == LeaseNotHeld}, nil
 	}
 	secrets := make([]string, len(l.SealedSecrets))
 	for i, sealed := range l.SealedSecrets {
@@ -382,7 +407,7 @@ func (h *Deliver) disable(ctx context.Context, before governance.Webhook, a gove
 	if err != nil {
 		return after, err
 	}
-	e, err := governance.WebhookDisabledEvent(id.New[governance.Event](h.d.IDs), after, projectKey, a, now).Queue()
+	e, err := governance.WebhookDisabledEvent(id.New[governance.Event](h.d.IDs), entry.ID, after, projectKey, a, now).Queue()
 	if err != nil {
 		return after, err
 	}

@@ -149,8 +149,8 @@ func TestOtherSubscriptionsAreToldWhyOneWasDisabledButNotWhere(t *testing.T) {
 		{"no answer", governance.DeliveryAttempt{N: 3, At: at, Error: new("context deadline exceeded")}, "context deadline exceeded"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			got := governance.WebhookDisabledEvent(someEvent, w, "shop", c.last, at).Envelope()
-			if got["type"] != "webhook.disabled" || got["audit_entry_id"] != nil || got["environment"] != nil {
+			got := governance.WebhookDisabledEvent(someEvent, someEntry, w, "shop", c.last, at).Envelope()
+			if got["type"] != "webhook.disabled" || got["audit_entry_id"] != someEntry.String() || got["environment"] != nil {
 				t.Errorf("envelope %v", got)
 			}
 			if a, _ := got["actor"].(map[string]any); a["kind"] != "system" {

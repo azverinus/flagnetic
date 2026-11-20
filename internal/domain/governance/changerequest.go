@@ -51,12 +51,6 @@ const (
 	StateSuperseded ChangeRequestState = "superseded"
 )
 
-// ChangeRequestStates returns every state, in the order of a change
-// request's life.
-func ChangeRequestStates() []ChangeRequestState {
-	return []ChangeRequestState{StateDraft, StateOpen, StateApproved, StateRejected, StateApplied, StateCancelled, StateSuperseded}
-}
-
 // The limits of what an author writes about a change request.
 const (
 	MaxChangeRequestTitle       = 200
@@ -257,10 +251,10 @@ func checkApplyAt(at, now time.Time, minLead time.Duration) (time.Time, *apperro
 	return at, nil
 }
 
-// Proposal is what an author writes of a change request: its title and
+// Authored is what an author writes of a change request: its title and
 // description, and the document proposed, already checked by the context
 // owning the entity.
-type Proposal struct {
+type Authored struct {
 	Title       string
 	Description string
 	Proposed    Document
@@ -271,7 +265,7 @@ type NewChangeRequestInput struct {
 	ID      ChangeRequestID
 	Project workspace.ProjectID
 	Subject Subject
-	Proposal
+	Authored
 	// RevertTo is the version a revert returns to, Proposed filled from
 	// it; nil for any other change request.
 	RevertTo *int64
@@ -289,7 +283,7 @@ type NewChangeRequestInput struct {
 // NewChangeRequest returns the change request in describes, drafted or
 // opened, at version 1; or invalid_change_request naming every field to fix.
 func NewChangeRequest(in NewChangeRequestInput) (ChangeRequest, error) {
-	title, description, err := checkProposal(in.Proposal)
+	title, description, err := checkAuthored(in.Authored)
 	var applyAt *time.Time
 	if in.ApplyAt != nil {
 		at, violation := checkApplyAt(*in.ApplyAt, in.Now, in.MinLead)
@@ -311,9 +305,9 @@ func NewChangeRequest(in NewChangeRequestInput) (ChangeRequest, error) {
 	}, nil
 }
 
-// checkProposal returns p's title and description trimmed, or
+// checkAuthored returns p's title and description trimmed, or
 // invalid_change_request with every one to fix.
-func checkProposal(p Proposal) (string, string, error) {
+func checkAuthored(p Authored) (string, string, error) {
 	var violations []apperrors.Violation
 	title := strings.TrimSpace(p.Title)
 	switch n := utf8.RuneCountInString(title); {
@@ -421,7 +415,7 @@ var transitions = map[Transition]struct {
 
 // The refusals of a transition.
 var (
-	ErrNotAuthor = apperrors.Forbidden("not_author", "only the author of the change request may do this")
+	errNotAuthor = apperrors.Forbidden("not_author", "only the author of the change request may do this")
 	errNotYours  = apperrors.Forbidden("not_author",
 		"only the author of the change request, or whoever may approve change requests, may do this")
 	errAuthorCannotApprove = apperrors.Forbidden("author_cannot_approve", "the author of a change request cannot decide it")
@@ -458,7 +452,7 @@ func (w who) allows(cr ChangeRequest, by Taker) error {
 	switch w {
 	case byAuthor:
 		if !isAuthor {
-			return ErrNotAuthor
+			return errNotAuthor
 		}
 	case byAuthorOrDecider:
 		if !isAuthor && (by.System || !by.MayDecide) {
@@ -518,7 +512,7 @@ func (cr ChangeRequest) Edit(by Taker, e Edit, now time.Time) (ChangeRequest, bo
 	if cr.RevertTo != nil && e.Proposed != nil {
 		return cr, false, errRevertProposed
 	}
-	p := Proposal{Title: cr.Title, Description: cr.Description, Proposed: cr.Proposed}
+	p := Authored{Title: cr.Title, Description: cr.Description, Proposed: cr.Proposed}
 	if e.Title != nil {
 		p.Title = *e.Title
 	}
@@ -528,7 +522,7 @@ func (cr ChangeRequest) Edit(by Taker, e Edit, now time.Time) (ChangeRequest, bo
 	if e.Proposed != nil {
 		p.Proposed = e.Proposed
 	}
-	title, description, err := checkProposal(p)
+	title, description, err := checkAuthored(p)
 	out := cr
 	if e.Schedule != nil {
 		out.ApplyAt = nil
@@ -562,6 +556,13 @@ func (cr ChangeRequest) Rebase(by Taker, current Subject, now time.Time) (Change
 	out := cr
 	out.Base, out.BaseVersion = current.Base, current.BaseVersion
 	out.BaseReferrers, out.BaseHolders = current.BaseReferrers, current.BaseHolders
+	// An experiment moves between flags while its draft waits, and what
+	// supersedes a request is matched by the flag it names, so the flag
+	// follows the entity; the other subjects' references cannot move.
+	if current.Flag != nil {
+		flag := *current.Flag
+		out.Flag = &flag
+	}
 	out.Diff = diffOf(cr.Kind, current.Base, cr.Proposed)
 	return cr.changedTo(out, now)
 }
@@ -787,7 +788,8 @@ func (cr ChangeRequest) moved(state ChangeRequestState, now time.Time) ChangeReq
 // anything changed; cr itself when nothing did.
 func (cr ChangeRequest) changedTo(out ChangeRequest, now time.Time) (ChangeRequest, bool, error) {
 	sameSchedule := (out.ApplyAt == nil) == (cr.ApplyAt == nil) && (out.ApplyAt == nil || out.ApplyAt.Equal(*cr.ApplyAt))
-	if sameSchedule && out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
+	sameFlag := (out.Flag == nil) == (cr.Flag == nil) && (out.Flag == nil || *out.Flag == *cr.Flag)
+	if sameSchedule && sameFlag && out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
 		reflect.DeepEqual(out.Proposed, cr.Proposed) && reflect.DeepEqual(out.Base, cr.Base) &&
 		slices.Equal(out.BaseReferrers, cr.BaseReferrers) && slices.Equal(out.BaseHolders, cr.BaseHolders) {
 		return cr, false, nil

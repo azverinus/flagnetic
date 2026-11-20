@@ -41,31 +41,45 @@ func (n ChangeNotice) identity() noticeIdentity {
 // holds nothing.
 type PendingNotices struct {
 	notices []ChangeNotice
+	// waiting are the identities of notices, so that one of an entity not
+	// waiting costs no search.
+	waiting map[noticeIdentity]struct{}
 	refetch bool
 }
 
-// Offer adds notices behind those waiting.
+// Offer adds notices behind those waiting. Once more than MaxPendingNotices
+// wait it stops and tells the client to refetch, which covers the notices
+// not yet read too, so a change recording thousands of entries costs one
+// pass over them, not a comparison with each notice waiting.
 func (p *PendingNotices) Offer(notices ...ChangeNotice) {
 	for _, n := range notices {
 		identity := n.identity()
-		p.notices = slices.DeleteFunc(p.notices, func(w ChangeNotice) bool { return w.identity() == identity })
+		if _, ok := p.waiting[identity]; ok {
+			p.notices = slices.DeleteFunc(p.notices, func(w ChangeNotice) bool { return w.identity() == identity })
+		} else {
+			if p.waiting == nil {
+				p.waiting = map[noticeIdentity]struct{}{}
+			}
+			p.waiting[identity] = struct{}{}
+		}
 		p.notices = append(p.notices, n)
-	}
-	if len(p.notices) > MaxPendingNotices {
-		p.Refetch()
+		if len(p.notices) > MaxPendingNotices {
+			p.Refetch()
+			return
+		}
 	}
 }
 
 // Refetch replaces whatever waits with telling the client to refetch, as
 // when a notice may have been missed; notices offered afterwards follow it.
 func (p *PendingNotices) Refetch() {
-	p.notices, p.refetch = nil, true
+	p.notices, p.waiting, p.refetch = nil, nil, true
 }
 
 // Take returns what waits, oldest first, and whether the client must
 // refetch first, and leaves nothing waiting.
 func (p *PendingNotices) Take() (notices []ChangeNotice, refetch bool) {
 	notices, refetch = p.notices, p.refetch
-	p.notices, p.refetch = nil, false
+	p.notices, p.waiting, p.refetch = nil, nil, false
 	return notices, refetch
 }

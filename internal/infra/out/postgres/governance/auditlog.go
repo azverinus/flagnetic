@@ -1,5 +1,6 @@
 // Package governance is the PostgreSQL repository of the governance context:
-// the audit log.
+// the audit log, change requests, webhook subscriptions with their outbox
+// and deliveries, the change stream and stale-flag digests.
 package governance
 
 import (
@@ -64,12 +65,6 @@ func optional[T any](v id.Of[T]) any {
 		return nil
 	}
 	return v.Bytes()
-}
-
-// Latest returns the newest limit entries of the whole instance, newest
-// first.
-func (l *AuditLog) Latest(ctx context.Context, limit int) ([]governance.Entry, error) {
-	return l.Entries(ctx, appgovernance.AuditFilter{}, governance.EntryID{}, limit)
 }
 
 func scanEntry(row pgx.Row) (governance.Entry, error) {
