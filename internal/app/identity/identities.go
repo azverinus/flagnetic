@@ -202,7 +202,7 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		// why the admins come before the member's lock. The identity is
 		// looked for before anything is held, to know its provider, and again
 		// once the member is held.
-		unlinking, held, err := h.heldIdentity(ctx, cmd.Member, identityID)
+		unlinking, _, err := h.heldIdentity(ctx, cmd.Member, identityID)
 		if err != nil {
 			return err
 		}
@@ -219,7 +219,8 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		if !found {
 			return errMemberNotFound
 		}
-		if unlinking, held, err = h.heldIdentity(ctx, cmd.Member, identityID); err != nil {
+		unlinking, held, err := h.heldIdentity(ctx, cmd.Member, identityID)
+		if err != nil {
 			return err
 		}
 		if m.Provider != "" && m.Provider == unlinking.ProviderSlug {
