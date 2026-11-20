@@ -1,5 +1,7 @@
-# Coverage floors per layer, checked in CI and by `task cover`. Each package of
-# a layer must reach its layer's floor; the floors rise as slices land.
+# Coverage floors per layer, checked in CI and by `task cover`. Each file and
+# each package of a layer must reach its layer's floor (the override rules
+# apply to both). The floors are fixed: 90 for the domain, 80 for the
+# other layers.
 profile: coverage.out
 
 override:
