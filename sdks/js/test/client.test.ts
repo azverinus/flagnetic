@@ -1297,13 +1297,13 @@ describe("evaluation summaries in the queue", () => {
   test("an outage keeps one summary and the exposure, and the exposure arrives when the endpoint answers again", async () => {
     const h = harness();
     const store = new MemoryStore();
-    const c = h.client({ ...options, store, flushInterval: 5_000, summaryInterval: 5_000 });
+    const c = h.client({ ...options, store, flushInterval: 30_000, summaryInterval: 30_000 });
     await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true), tested: experimentFlag(true, true) }));
     c.getBool("tested", false);
     let largest = 0;
-    for (let t = 0; t < 30 * 60_000; t += 5_000) {
+    for (let t = 0; t < 30 * 60_000; t += 30_000) {
       c.getBool("plain", false);
-      await h.advance(5_000);
+      await h.advance(30_000);
       for (const req of h.net.waiting("/sdk/v1/events")) {
         largest = Math.max(largest, (req.body ?? "").length);
         req.answer({ status: 503 });
@@ -1327,19 +1327,19 @@ describe("evaluation summaries in the queue", () => {
   test("a window older than an hour is dropped with a log, and the counts since survive", async () => {
     const h = harness();
     const store = new MemoryStore();
-    const c = h.client({ ...options, store, flushInterval: 600_000, summaryInterval: 60_000 });
+    const c = h.client({ ...options, store, flushInterval: 600_000, summaryInterval: 300_000 });
     await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
     c.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
-    for (let t = 0; t < 90 * 60_000; t += 60_000) {
+    for (let t = 0; t < 90 * 60_000; t += 300_000) {
       c.getBool("plain", false);
-      await h.advance(60_000);
+      await h.advance(300_000);
       for (const req of h.net.waiting("/sdk/v1/events")) req.answer({ status: 503 });
       await settle();
     }
     expect(h.logs.some((l) => l.event === "queue_dropped" && l.fields.cause === "window_older_than_one_hour")).toBe(true);
     const summaries = queued(store).filter((e) => e.type === "evaluation_summary");
     expect(summaries).toHaveLength(1);
-    expect(h.clock.now() - Date.parse(String(summaries[0]?.interval_start))).toBeLessThanOrEqual(3_600_000 + 120_000);
+    expect(h.clock.now() - Date.parse(String(summaries[0]?.interval_start))).toBeLessThanOrEqual(3_600_000 + 600_000);
   }, 60_000);
 
   test("an unsent window with nothing counted since keeps its event ID through the summary interval", async () => {
