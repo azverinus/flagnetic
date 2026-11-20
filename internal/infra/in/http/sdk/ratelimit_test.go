@@ -142,11 +142,11 @@ func TestAServerKeysEvaluateAndEventsAreLimitedPerKeyWhateverTheClientIP(t *test
 
 	// Evaluate's budget does not draw on events', which is its own.
 	for i, ip := range []string{"203.0.113.1", "203.0.113.2", "203.0.113.3"} {
-		a := events(value, ip)
-		if a.status != http.StatusAccepted {
-			t.Fatalf("events %d = %d: %s", i+1, a.status, a.body)
+		got := events(value, ip)
+		if got.status != http.StatusAccepted {
+			t.Fatalf("events %d = %d: %s", i+1, got.status, got.body)
 		}
-		budget(t, "events "+strconv.Itoa(i+1), a.header, 3, 2-i)
+		budget(t, "events "+strconv.Itoa(i+1), got.header, 3, 2-i)
 	}
 	a = events(value, "203.0.113.4")
 	rateLimited(t, "the fourth events batch, from a fourth IP", a.status, a.header, a.body, 3)
