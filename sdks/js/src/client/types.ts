@@ -197,7 +197,11 @@ export interface ClientOptions {
   readonly pollInterval?: number;
   /** Milliseconds a remote evaluation or an events request may take: 5 000 by default. */
   readonly requestTimeout?: number;
-  /** Milliseconds between event flushes while the tab is visible: 5 000 by default. */
+  /**
+   * Milliseconds between event flushes while the tab is visible, of a queue
+   * that holds an exposure or an alias: 5 000 by default. A queue holding
+   * only an evaluation summary waits for the summary interval.
+   */
   readonly flushInterval?: number;
   /**
    * Milliseconds between evaluation summaries while the tab is visible: 60 000

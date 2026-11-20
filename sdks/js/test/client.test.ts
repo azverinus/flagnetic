@@ -1342,6 +1342,39 @@ describe("evaluation summaries in the queue", () => {
     expect(h.clock.now() - Date.parse(String(summaries[0]?.interval_start))).toBeLessThanOrEqual(3_600_000 + 120_000);
   }, 60_000);
 
+  test("an unsent window with nothing counted since keeps its event ID through the summary interval", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ ...options, store, flushInterval: 600_000, summaryInterval: 60_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
+    c.getBool("plain", false);
+    await h.advance(60_000);
+    for (const req of h.net.waiting("/sdk/v1/events")) req.answer({ status: 503 });
+    await settle();
+    const before = queued(store).filter((e) => e.type === "evaluation_summary").map((e) => e.event_id);
+    expect(before).toHaveLength(1);
+    for (let i = 0; i < 3; i++) {
+      await h.advance(60_000);
+      for (const req of h.net.waiting("/sdk/v1/events")) req.answer({ status: 503 });
+      await settle();
+    }
+    expect(queued(store).filter((e) => e.type === "evaluation_summary").map((e) => e.event_id)).toStrictEqual(before);
+  });
+
+  test("a stored window whose start cannot be read is dropped, not merged", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const broken = { type: "evaluation_summary", event_id: "s-1", interval_start: "not a time", interval_end: "2026-01-01T00:01:00.000Z", ruleset_version: 1, counts: [{ flag: "plain", variation: "on", reason: "fallthrough", count: 5 }] };
+    store.setItem(keys.events, JSON.stringify([broken]));
+    const c = h.client({ ...options, store, flushInterval: 600_000, summaryInterval: 60_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { plain: boolFlag(true) }));
+    c.getBool("plain", false);
+    await h.advance(60_000);
+    const summaries = queued(store).filter((e) => e.type === "evaluation_summary");
+    expect(summaries.map((e) => e.event_id)).not.toContain("s-1");
+    expect(JSON.stringify(summaries)).not.toContain('"count":5');
+  });
+
   test("a full queue drops its summaries before an exposure or an alias", async () => {
     const h = harness();
     const store = new MemoryStore();

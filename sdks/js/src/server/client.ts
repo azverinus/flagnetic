@@ -500,8 +500,6 @@ export class FlagneticServer {
     return this.evaluate(key, flagTypeOf(defaultValue), defaultValue, context);
   }
 
-  // The API boundary every getter goes through: it never throws, and an
-  // offline client counts what it served.
   /** A promise resolving after ms on the client's clock. */
   private deadline(ms: number): Promise<void> {
     return new Promise<void>((resolve) => {
@@ -509,6 +507,8 @@ export class FlagneticServer {
     });
   }
 
+  // The API boundary every getter goes through: it never throws, and an
+  // offline client counts what it served.
   private evaluate<T extends JsonValue>(key: string, type: FlagType, def: T, context: Context): Detail<T> {
     let served: Served<T>;
     try {

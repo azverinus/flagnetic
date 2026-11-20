@@ -40,7 +40,7 @@ export interface IngestConfig {
   readonly queueKey: string;
   /** The queue length at which a recorded event flushes at once, and the most events one beacon carries. */
   readonly batchSize: number;
-  /** Milliseconds between flushes while the tab is visible. */
+  /** Milliseconds between flushes while the tab is visible, of a queue that holds an exposure or an alias. */
   readonly flushInterval: number;
   /** Milliseconds between evaluation summaries while the tab is visible. */
   readonly summaryInterval: number;
@@ -285,9 +285,15 @@ export class Ingest {
     if (waitForFlight && queue.some((e) => e.type === "evaluation_summary" && this.inFlight.has(e.event_id))) return;
     const counted = this.summary.size > 0 ? this.summary.take() : undefined;
     const kept = queue.filter((e) => e.type === "evaluation_summary" && !this.inFlight.has(e.event_id));
-    if (!counted && kept.length === 0) return;
     const now = this.config.now();
     const end = counted?.intervalEnd ?? now;
+    // Infinity without a window, so nothing is aged; NaN for a malformed
+    // start, which cannot be placed and is dropped as aged.
+    const began = Math.min(...kept.map((e) => Date.parse(String(e.interval_start))));
+    const aged = !(end - began <= this.config.maxWindowAge);
+    // Nothing counted and nothing to drop: the unsent window stays as it is,
+    // under the event IDs it was stored with.
+    if (!counted && !aged) return;
     let start = counted?.intervalStart ?? end;
     const byKey = new Map<string, SummaryRow<Reason>>();
     const add = (row: SummaryRow<Reason>): void => {
@@ -297,9 +303,8 @@ export class Ingest {
     };
     for (const row of counted?.counts ?? []) add(row);
     if (kept.length > 0) {
-      const began = Math.min(...kept.map((e) => Date.parse(String(e.interval_start))));
       const rows = kept.flatMap((e) => (Array.isArray(e.counts) ? (e.counts as SummaryRow<Reason>[]) : []));
-      if (end - began > this.config.maxWindowAge) {
+      if (aged) {
         this.log("warn", "queue_dropped", { kind: "evaluation_summary", cause: "window_older_than_one_hour", rows: rows.length, age_ms: end - began });
       } else {
         if (began < start) start = began;
