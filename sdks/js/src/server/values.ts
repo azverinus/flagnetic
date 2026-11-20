@@ -10,6 +10,12 @@
 // prerequisite served a value, and a private segment's membership stays
 // here. A flag a private segment decides still carries its value: the
 // browser would have been served the same one.
+//
+// An override is told apart from targeting only where an exposure needs it:
+// the reason override and override_influenced survive on a result whose
+// experiment block an override reached, and anywhere else the result reads
+// as targeting would have served it, because a page that showed which units
+// have an override would leak the list.
 import type { Context, Result, Ruleset } from "../evaluator/evaluate.js";
 import { SCHEMA_VERSION, type FlagDocument, type JsonValue } from "../evaluator/ruleset.js";
 
@@ -20,7 +26,7 @@ import { SCHEMA_VERSION, type FlagDocument, type JsonValue } from "../evaluator/
  */
 const targetingMatch = "targeting_match";
 
-const masked: ReadonlySet<string> = new Set(["rule", "rollout", "fallthrough", "prerequisite_failed"]);
+const masked: ReadonlySet<string> = new Set(["rule", "rollout", "fallthrough", "prerequisite_failed", "override"]);
 
 /** One flag of a values document, exactly as remote evaluation serves a client key. */
 export interface ServedFlagDocument {
@@ -119,10 +125,10 @@ function servedFlag(flag: FlagDocument, r: Result): ServedFlagDocument {
     type: flag.type,
     ...(Object.hasOwn(r, "value") && { value: r.value }),
     ...(r.variation !== undefined && { variation: r.variation }),
-    reason: masked.has(r.reason) ? targetingMatch : r.reason,
+    reason: masked.has(r.reason) && !(r.reason === "override" && r.experiment) ? targetingMatch : r.reason,
     ...(r.error_code !== undefined && { error_code: r.error_code }),
     automatic_exposure: flag.automatic_exposure,
-    override_influenced: r.override_influenced,
+    override_influenced: r.experiment ? r.override_influenced : false,
     ...(r.experiment && { experiment: { ...r.experiment } }),
   };
 }

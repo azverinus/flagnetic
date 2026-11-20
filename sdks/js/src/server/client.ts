@@ -433,8 +433,9 @@ export class FlagneticServer {
    * serialised into the page it rendered and handed to `createClient`'s
    * `bootstrap`, so the browser hydrates with the values the page was
    * rendered from. The document is masked: where targeting decided a value
-   * its reason is `targeting_match` and no rule is named, because a page
-   * is public. Read the true reason from `getDetail`.
+   * its reason is `targeting_match` and no rule is named, and an
+   * override reads as targeting too unless it led the unit into a running
+   * experiment, because a page is public. Read the true reason from `getDetail`.
    *
    * Undefined at stage `built_in`: there is nothing to render from, the page
    * serves built-in defaults, and the browser that hydrates it does the same

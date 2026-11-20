@@ -60,7 +60,7 @@ flagnetic.overrides.set("new_checkout", true); // reads as reason "local_overrid
 
 ### Rendering on the server
 
-`flagnetic.values(context, { flags? })` evaluates the flags for a context into the document a browser client takes as its `bootstrap`. It is masked as a client key's answer is: where targeting decided a value the reason is `targeting_match` and no rule is named, because the document is written into a page anyone can read.
+`flagnetic.values(context, { flags? })` evaluates the flags for a context into the document a browser client takes as its `bootstrap`. It is masked as a client key's answer is: where targeting decided a value the reason is `targeting_match` and no rule is named, and an override reads as targeting too unless it led the unit into a running experiment, because the document is written into a page anyone can read.
 
 Write it into the page with `serializeBootstrap(doc)`, never with a bare `JSON.stringify`: a flag value is text, and one holding `</script>` or `<!--` would end the inline script and inject markup. `serializeBootstrap` writes `<`, `>`, `&`, U+2028 and U+2029 as `\u` escapes, which `JSON.parse` reads back to the same document.
 
