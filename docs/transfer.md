@@ -305,7 +305,7 @@ Every environment whose ruleset changed is bumped once, at the end of the import
 | What | Limit or answer |
 |---|---|
 | Import body | 32 MiB, else `413 request_too_large`. |
-| Entities | At most as many as a direct write allows: 5,000 flags, 1,000 segments and 20 environments, counting what the project holds that the document does not name (a merge) and judged before anything is written, else `422 invalid_document` with `too_many` at the section. |
+| Entities | At most as many as a direct write allows: 5,000 flags and 1,000 segments, counting what the project holds that the document does not name (a merge) and judged before anything is written, else `422 invalid_document` with `too_many` at the section. |
 | Media type | `application/json` or `application/yaml`, else `415 unsupported_media_type`. |
 | Malformed JSON or YAML | `400 invalid_request`. |
 | A document breaking a rule | `422 invalid_document`, every fault with its pointer. |

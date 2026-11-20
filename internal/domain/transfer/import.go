@@ -224,8 +224,6 @@ func (f *faults) limits(d, current Document) {
 				map[string]any{"max": limit, "count": total})
 		}
 	}
-	check("environments", workspace.MaxEnvironments, mapKeys(current.Environments, func(e Environment) string { return e.Key }),
-		mapKeys(d.Environments, func(e Environment) string { return e.Key }))
 	check("segments", flags.MaxSegments, mapKeys(current.Segments, func(s Segment) string { return s.Key }),
 		mapKeys(d.Segments, func(s Segment) string { return s.Key }))
 	check("flags", flags.MaxFlags, mapKeys(current.Flags, func(fl Flag) string { return fl.Key }),
