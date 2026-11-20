@@ -80,7 +80,7 @@ export function webhookApi(scope: WebhookScope) {
       unwrap(
         project ? createWebhook({ path: { project }, body }) : createInstanceWebhook({ body }),
       ),
-    update: (webhook: Webhook, body: WebhookPatch) =>
+    update: (webhook: { id: string; version: number }, body: WebhookPatch) =>
       unwrap(
         project
           ? updateWebhook({
@@ -387,6 +387,17 @@ export function patchOf(webhook: Webhook, values: WebhookForm): WebhookPatch {
     patch.environments = body.environments;
   if (body.enabled !== undefined && body.enabled !== webhook.enabled) patch.enabled = body.enabled;
   return patch;
+}
+
+/** The names of the fields that differ between two versions of a subscription, for the conflict banner. */
+export function changedFieldNames(i18n: I18n, before: Webhook, after: Webhook): string[] {
+  const names: string[] = [];
+  if (before.name !== after.name) names.push(i18n._(msg`Name`));
+  if (before.url !== after.url) names.push(i18n._(msg`URL`));
+  if (!sameSet(before.events, after.events)) names.push(i18n._(msg`Event types`));
+  if (!sameSet(before.environments, after.environments)) names.push(i18n._(msg`Environments`));
+  if (before.enabled !== after.enabled) names.push(i18n._(msg`Enabled`));
+  return names;
 }
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {

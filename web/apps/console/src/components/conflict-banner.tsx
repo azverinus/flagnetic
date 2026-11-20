@@ -115,3 +115,53 @@ export function NamedConflictBanner({
     />
   );
 }
+
+export type FieldsConflictBannerProps = {
+  /** The newer version the form met, and the entry that made it, when it can be named. */
+  entry: AuditEntry | undefined;
+  /** The names of the fields the newer version changed. */
+  names: string[];
+  /** Whether a save is under way, which keeping one's edits starts. */
+  pending: boolean;
+  /** Fills the form from the newer version, dropping the member's edits. */
+  onReload: () => void;
+  /** Saves the fields the member changed onto the newer version. */
+  onKeep: () => void;
+};
+
+/**
+ * The conflict banner of a form with many fields: who saved and when,
+ * which fields their version changed, and the same two ways out every
+ * form offers.
+ */
+export function FieldsConflictBanner({
+  entry,
+  names,
+  pending,
+  onReload,
+  onKeep,
+}: FieldsConflictBannerProps) {
+  return (
+    <ConflictBanner
+      subject="form"
+      entry={entry}
+      diff={
+        <ul className="list-disc pl-5">
+          {names.map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+      }
+      actions={
+        <>
+          <Button type="button" variant="outline" disabled={pending} onClick={onReload}>
+            <Trans>Reload and lose my edits</Trans>
+          </Button>
+          <Button type="button" disabled={pending} onClick={onKeep}>
+            <Trans>Keep my edits</Trans>
+          </Button>
+        </>
+      }
+    />
+  );
+}

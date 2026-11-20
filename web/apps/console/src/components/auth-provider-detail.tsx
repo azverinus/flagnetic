@@ -227,22 +227,20 @@ function AuthProviderPage({
       <Card aria-labelledby="settings">
         <CardHeader titleId="settings" title={<Trans>Settings</Trans>} />
         <CardContent>
-          {/* A new version starts the form over from what was saved. */}
+          {/* A newer version reaches the form through its own conflict check. */}
           {provider.kind === "oidc" ? (
             <AuthProviderForm
-              key={provider.version}
+              key={provider.id}
               provider={provider}
               layout="page"
               onSaved={settingsSaved}
-              onReload={onReload}
             />
           ) : (
             <SamlProviderForm
-              key={provider.version}
+              key={provider.id}
               provider={provider}
               layout="page"
               onSaved={settingsSaved}
-              onReload={onReload}
             />
           )}
         </CardContent>

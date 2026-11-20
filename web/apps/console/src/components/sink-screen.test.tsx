@@ -102,6 +102,36 @@ const enabled: Sink = {
   ],
 };
 
+describe("a sink's form beside its header", () => {
+  it("keeps unsaved edits when a rotation makes a newer version, and offers the conflict", async () => {
+    let current: Sink = webhookSink;
+    fakeServer({
+      ...common,
+      [`GET ${base(webhookSink.id)}`]: () => ({ status: 200, body: current }),
+      [`POST ${base(webhookSink.id)}/rotate-secret`]: () => {
+        current = { ...webhookSink, version: webhookSink.version + 1 };
+        return { status: 200, body: { ...current, secret: "rotated-s3cret" } };
+      },
+    });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={webhookSink.id} />);
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Edited pipeline");
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rotate secret" }));
+    const confirm = await screen.findByRole("dialog", { name: "Rotate the secret of Pipeline" });
+    await user.click(within(confirm).getByRole("button", { name: "Rotate secret" }));
+    const reveal = await screen.findByRole("dialog", { name: "The sink's signing secret" });
+    await user.click(within(reveal).getByLabelText("I have stored it somewhere safe"));
+    await user.click(within(reveal).getByRole("button", { name: "Close" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("Name")).toHaveValue("Edited pipeline");
+  });
+});
+
 describe("a sink's detail", () => {
   it("shows health, lag, at risk and each stream's last delivery and failure", async () => {
     fakeServer({

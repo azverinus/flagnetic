@@ -1,6 +1,6 @@
 import type { AuditEntry } from "@flagnetic/api";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ApiError } from "./errors";
 import { entityEntriesQuery } from "./queries";
@@ -9,7 +9,11 @@ import { entityEntriesQuery } from "./queries";
 export type FormConflict<Entity> = { current: Entity; entry: AuditEntry | undefined };
 
 export type FormConflictOptions<Entity, Initial> = {
-  project: string;
+  /**
+   * The project whose audit log names who made a newer version; none for
+   * an entity of the instance, whose banner then names no one.
+   */
+  project: string | undefined;
   /** The audit log's name for the entity's kind, such as `environment`. */
   kind: string;
   /**
@@ -58,6 +62,17 @@ export function useFormConflict<
     setUnread(false);
   };
 
+  /** The entry that made the version just read: none for an entity outside a project. */
+  const entryOf = async (current: Entity) => {
+    if (project === undefined) return undefined;
+    // The newest entry of the entity made the version just read: these
+    // entries record no version to match it by.
+    const entries = await queryClient
+      .fetchQuery({ ...entityEntriesQuery(project, kind, current.id, 1), staleTime: 0 })
+      .catch(() => [] as AuditEntry[]);
+    return entries[0];
+  };
+
   /** Reads what the banner shows, when the refusal is a version mismatch. */
   const meet = async (error: unknown) => {
     if (!(error instanceof ApiError) || error.code !== "version_mismatch") return;
@@ -69,12 +84,8 @@ export function useFormConflict<
       if (at === generation.current) setUnread(true);
       return;
     }
-    // The newest entry of the entity made the version just read: these
-    // entries record no version to match it by.
-    const entries = await queryClient
-      .fetchQuery({ ...entityEntriesQuery(project, kind, current.id, 1), staleTime: 0 })
-      .catch(() => [] as AuditEntry[]);
-    if (at === generation.current) setConflict({ current, entry: entries[0] });
+    const entry = await entryOf(current);
+    if (at === generation.current) setConflict({ current, entry });
   };
 
   /**
@@ -95,12 +106,22 @@ export function useFormConflict<
       return;
     }
     if (!stillNewer(current.version)) return;
-    const entries = await queryClient
-      .fetchQuery({ ...entityEntriesQuery(project, kind, current.id, 1), staleTime: 0 })
-      .catch(() => [] as AuditEntry[]);
+    const entry = await entryOf(current);
     if (at === generation.current && stillNewer(current.version)) {
-      setConflict({ current, entry: entries[0] });
+      setConflict({ current, entry });
     }
+  };
+
+  /**
+   * Shows the banner for a newer version the screen already holds (a
+   * refetch or a write elsewhere on the screen answered it), without
+   * reading it again. A form that moved on meanwhile shows nothing.
+   */
+  const offer = async (current: Entity) => {
+    if (conflict && conflict.current.version >= current.version) return;
+    const at = generation.current;
+    const entry = await entryOf(current);
+    if (at === generation.current) setConflict({ current, entry });
   };
 
   /** Starts the form over from an entity: one just saved, or the newer version. */
@@ -135,9 +156,36 @@ export function useFormConflict<
     conflict,
     meet,
     meetNewer,
+    offer,
     clear,
     restart,
     keep,
     refusal,
   };
+}
+
+/**
+ * Hands a form the newer version of its entity that the screen came to
+ * hold (the query refetched, or a write elsewhere on the screen answered
+ * it): a clean form starts over from it, a form with unsaved edits is
+ * offered the conflict instead of losing them. A form is keyed by its
+ * entity's id, never by its version, so this is the only way a newer
+ * version reaches it.
+ */
+export function useNewerArrival<Entity extends { version: number }>(
+  current: Entity | undefined,
+  state: { version: number | undefined; dirty: boolean; saving?: boolean },
+  on: { clean: (current: Entity) => void; dirty: (current: Entity) => void },
+) {
+  const latest = useRef({ state, on });
+  useEffect(() => {
+    latest.current = { state, on };
+  });
+  useEffect(() => {
+    const { state: held, on: handlers } = latest.current;
+    if (!current || held.version === undefined || held.saving) return;
+    if (current.version <= held.version) return;
+    if (held.dirty) handlers.dirty(current);
+    else handlers.clean(current);
+  }, [current]);
 }

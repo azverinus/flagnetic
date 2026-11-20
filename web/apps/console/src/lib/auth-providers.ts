@@ -41,8 +41,9 @@ export function authProviderQuery(slug: string) {
 
 /** The operations on auth providers, through the generated client. */
 export const authProviderApi = {
+  get: (slug: string) => unwrap(getAuthProvider({ path: { provider: slug } })),
   create: (body: AuthProviderCreateWritable) => unwrap(createAuthProvider({ body })),
-  update: (provider: AuthProvider, body: AuthProviderPatchWritable) =>
+  update: (provider: Pick<AuthProvider, "slug" | "version">, body: AuthProviderPatchWritable) =>
     unwrap(
       updateAuthProvider({
         path: { provider: provider.slug },
@@ -146,6 +147,35 @@ export function bodyOf(values: OidcProviderForm): AuthProviderCreateWritable {
     },
     require_verified_email: values.require_verified_email,
   };
+}
+
+/** The names of the fields that differ between two versions of a provider, for the conflict banner. */
+export function changedFieldNames(i18n: I18n, before: AuthProvider, after: AuthProvider): string[] {
+  const differs = (a: unknown, b: unknown) =>
+    JSON.stringify(a ?? null) !== JSON.stringify(b ?? null);
+  const fields: [boolean, string][] = [
+    [differs(before.display_name, after.display_name), i18n._(msg`Name`)],
+    [differs(before.issuer, after.issuer), i18n._(msg`Issuer`)],
+    [differs(before.client_id, after.client_id), i18n._(msg`Client ID`)],
+    [before.client_secret_set !== after.client_secret_set, i18n._(msg`Client secret`)],
+    [differs(before.scopes, after.scopes), i18n._(msg`Scopes`)],
+    [differs(before.claims, after.claims), i18n._(msg`Claims`)],
+    [
+      differs(before.idp_metadata_url, after.idp_metadata_url) ||
+        differs(before.sign_requests, after.sign_requests) ||
+        differs(before.name_id_format, after.name_id_format),
+      i18n._(msg`Metadata and requests`),
+    ],
+    [differs(before.domains, after.domains), i18n._(msg`Email domains`)],
+    [before.link_by_email !== after.link_by_email, i18n._(msg`Link members by email`)],
+    [before.auto_provision !== after.auto_provision, i18n._(msg`Create members on first sign-in`)],
+    [
+      before.require_verified_email !== after.require_verified_email,
+      i18n._(msg`Require a verified email`),
+    ],
+    [before.enabled !== after.enabled, i18n._(msg`Enabled`)],
+  ];
+  return fields.filter(([changed]) => changed).map(([, name]) => name);
 }
 
 export function sameList(a: readonly string[], b: readonly string[]): boolean {

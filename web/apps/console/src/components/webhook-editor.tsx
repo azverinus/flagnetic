@@ -1,11 +1,12 @@
 import type { Webhook, WebhookEventTypeInfo, WebhookWithSecret } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { FieldsConflictBanner } from "@/components/conflict-banner";
 import { QueryError } from "@/components/query-error";
 import { EnvironmentName } from "@/components/protected-mark";
 import { DialogForm } from "@/components/ui/dialog-form";
@@ -20,9 +21,11 @@ import { nameSchema } from "@/lib/forms";
 import { useListMutation } from "@/lib/mutations";
 import { problemMessage } from "@/lib/problem-messages";
 import { environmentsQuery } from "@/lib/queries";
+import { useFormConflict, useNewerArrival } from "@/lib/use-form-conflict";
 import {
   auditEntryType,
   bodyOf,
+  changedFieldNames,
   eventGroupName,
   eventGroups,
   everyType,
@@ -97,27 +100,84 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
           enabled: true,
         },
   });
+  const queryClient = useQueryClient();
+  const conflicts = useFormConflict({
+    project: instance ? undefined : scope.project,
+    kind: "webhook",
+    initial: webhook,
+    read: () => api.get(webhook?.id ?? ""),
+  });
+  const { base, conflict } = conflicts;
   const save = useListMutation(
-    (values: WebhookForm) =>
-      webhook ? api.update(webhook, patchOf(webhook, values)) : api.create(bodyOf(values)),
+    ({ values, at }: { values: WebhookForm; at?: number }) =>
+      base && webhook
+        ? api.update(
+            { id: webhook.id, version: at ?? conflicts.version ?? webhook.version },
+            patchOf(base, values),
+          )
+        : api.create(bodyOf(values)),
     webhooksKey(scope),
     // A save makes a new version, which starts the form over: the screen
     // that is told must not be the one the answer replaces.
-    onSaved,
+    (saved) => {
+      if (webhook) {
+        form.reset(formOf(saved as Webhook));
+        conflicts.restart(saved as Webhook);
+      }
+      onSaved(saved);
+    },
     // Creating answers the secret.
     { secret: webhook === undefined },
+  );
+  // A newer version of the subscription the screen came to hold (a
+  // rotated secret, someone's save) starts a clean form over from it, and
+  // is offered as a conflict to one with edits.
+  useNewerArrival(
+    webhook,
+    { version: conflicts.version, dirty: form.formState.isDirty, saving: save.isPending },
+    {
+      clean: (fresh) => {
+        form.reset(formOf(fresh));
+        conflicts.restart(fresh);
+        save.reset();
+      },
+      dirty: (fresh) => void conflicts.offer(fresh),
+    },
   );
   const { errors } = form.formState;
   const refusedField = save.error instanceof ApiError ? fieldOfRefusal(save.error.code) : undefined;
   const refusalHere = refusedField ? problemMessage(i18n, save.error as ApiError) : undefined;
 
-  const submit = form.handleSubmit((values) => save.mutate(values));
+  const send = (at: number | undefined) =>
+    form.handleSubmit((values) => {
+      conflicts.clear();
+      save.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
+    });
+  const submit = send(conflicts.version);
   // The platform's disable is undone by enabling, not by this switch, which
   // the server refuses for such a subscription.
   const platformDisabled = webhook !== undefined && isPlatformDisabled(webhook);
 
+  const banner =
+    base && conflict ? (
+      <FieldsConflictBanner
+        entry={conflict.entry}
+        names={changedFieldNames(i18n, base, conflict.current)}
+        pending={save.isPending}
+        onReload={() => {
+          const { current } = conflict;
+          form.reset(formOf(current));
+          conflicts.restart(current);
+          save.reset();
+          void queryClient.invalidateQueries({ queryKey: webhooksKey(scope) });
+        }}
+        onKeep={() => void send(conflicts.keep(conflict.current))()}
+      />
+    ) : null;
+
   const fields = (
     <>
+      {banner}
       <Field
         label={<Trans>Name</Trans>}
         hint={<Trans>What receives the events, to tell the subscriptions apart</Trans>}
@@ -208,7 +268,7 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
   );
 
   // A refusal a field explains is left out of the form's own.
-  const refusal = refusedField ? undefined : save.error;
+  const refusal = refusedField ? undefined : conflicts.refusal(save.error);
   return layout === "dialog" ? (
     <DialogForm
       onSubmit={submit}

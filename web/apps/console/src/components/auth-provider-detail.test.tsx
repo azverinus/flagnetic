@@ -149,6 +149,28 @@ describe("an auth provider's page", () => {
     expect(server.requests.some((r) => r.url.endsWith("/acme/enable"))).toBe(true);
   });
 
+  it("keeps unsaved edits when the header's toggle makes a newer version, and offers the conflict", async () => {
+    let current = acme;
+    serve({
+      ...mappingReads,
+      "GET /instance/auth-providers/acme": () => ({ status: 200, body: current }),
+      "POST /instance/auth-providers/acme/disable": () => {
+        current = { ...acme, enabled: false, version: acme.version + 1 };
+        return { status: 200, body: current };
+      },
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Acme renamed");
+    await user.click(screen.getByRole("button", { name: "Disable" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("Name")).toHaveValue("Acme renamed");
+  });
+
   it("deletes the provider and goes to the list, never saying it was not found", async () => {
     let deleted = false;
     let notFound = 0;

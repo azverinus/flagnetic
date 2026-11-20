@@ -1,8 +1,10 @@
 import type { AuthProvider } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 
+import { FieldsConflictBanner } from "@/components/conflict-banner";
 import { DialogForm } from "@/components/ui/dialog-form";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
@@ -12,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   authProviderApi,
   authProvidersKey,
+  changedFieldNames,
   bodyOf,
   fieldsExplain,
   fieldViolation,
@@ -22,7 +25,7 @@ import {
 } from "@/lib/auth-providers";
 import { ApiError } from "@/lib/errors";
 import { useListMutation } from "@/lib/mutations";
-import { Button } from "@/components/ui/button";
+import { useFormConflict, useNewerArrival } from "@/lib/use-form-conflict";
 
 export type AuthProviderFormProps = {
   /** The provider being edited; none for a new one. */
@@ -34,8 +37,6 @@ export type AuthProviderFormProps = {
   onCancel?: () => void;
   /** The provider as it is now. */
   onSaved: (saved: AuthProvider) => void;
-  /** Reads the provider again after someone else saved first. */
-  onReload?: () => void;
 };
 
 /**
@@ -51,26 +52,63 @@ export function AuthProviderForm({
   autoFocus = true,
   onCancel,
   onSaved,
-  onReload,
 }: AuthProviderFormProps) {
   const { i18n, t } = useLingui();
   const creating = provider === undefined;
+  const queryClient = useQueryClient();
+  const conflicts = useFormConflict({
+    project: undefined,
+    kind: "auth_provider",
+    initial: provider,
+    read: () => authProviderApi.get(provider?.slug ?? ""),
+  });
+  const { base, conflict } = conflicts;
   const form = useForm<OidcProviderForm>({
-    resolver: zodResolver(oidcFormSchema(i18n, { creating, stored: provider })),
+    resolver: zodResolver(oidcFormSchema(i18n, { creating, stored: base })),
     defaultValues: formOf(provider),
   });
   const save = useListMutation(
-    (values: OidcProviderForm) =>
-      provider
-        ? authProviderApi.update(provider, patchOf(provider, values))
+    ({ values, at }: { values: OidcProviderForm; at?: number }) =>
+      base && provider
+        ? authProviderApi.update(
+            { slug: provider.slug, version: at ?? conflicts.version ?? provider.version },
+            patchOf(base, values),
+          )
         : authProviderApi.create(bodyOf(values)),
     authProvidersKey,
-    onSaved,
+    (saved) => {
+      // A save makes a new version, which the form starts over from.
+      if (provider) {
+        form.reset(formOf(saved));
+        conflicts.restart(saved);
+      }
+      onSaved(saved);
+    },
     // The variables carry the client secret.
     { secret: true },
   );
+  // A newer version of the provider the screen came to hold (the header's
+  // toggle, someone's save) starts a clean form over from it, and is
+  // offered as a conflict to one with edits.
+  useNewerArrival(
+    provider,
+    { version: conflicts.version, dirty: form.formState.isDirty, saving: save.isPending },
+    {
+      clean: (fresh) => {
+        form.reset(formOf(fresh));
+        conflicts.restart(fresh);
+        save.reset();
+      },
+      dirty: (fresh) => void conflicts.offer(fresh),
+    },
+  );
   const { errors } = form.formState;
-  const submit = form.handleSubmit((values) => save.mutate(values));
+  const send = (at: number | undefined) =>
+    form.handleSubmit((values) => {
+      conflicts.clear();
+      save.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
+    });
+  const submit = send(conflicts.version);
   const refusal = save.error instanceof ApiError ? save.error : undefined;
   // A slug already taken has no violation to point at: say it under the slug.
   const taken = refusal?.code === "already_exists";
@@ -78,6 +116,21 @@ export function AuthProviderForm({
 
   const fields = (
     <>
+      {base && conflict ? (
+        <FieldsConflictBanner
+          entry={conflict.entry}
+          names={changedFieldNames(i18n, base, conflict.current)}
+          pending={save.isPending}
+          onReload={() => {
+            const { current } = conflict;
+            form.reset(formOf(current));
+            conflicts.restart(current);
+            save.reset();
+            void queryClient.invalidateQueries({ queryKey: authProvidersKey });
+          }}
+          onKeep={() => void send(conflicts.keep(conflict.current))()}
+        />
+      ) : null}
       <Field
         label={<Trans>Name</Trans>}
         hint={<Trans>What the sign-in button says: “Sign in with …”</Trans>}
@@ -293,18 +346,11 @@ export function AuthProviderForm({
           )}
         />
       ) : null}
-      {refusal?.code === "version_mismatch" && onReload ? (
-        <div>
-          <Button type="button" variant="outline" onClick={onReload}>
-            <Trans>Load their version</Trans>
-          </Button>
-        </div>
-      ) : null}
     </>
   );
 
   // A violation a field says under itself is left out of the form's own.
-  const formLevel = fieldsExplain(refusal) || taken ? undefined : save.error;
+  const formLevel = fieldsExplain(refusal) || taken ? undefined : conflicts.refusal(save.error);
   return layout === "dialog" ? (
     <DialogForm
       onSubmit={submit}

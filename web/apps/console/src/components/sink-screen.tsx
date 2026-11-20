@@ -253,9 +253,9 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
                 <div className="measure-form">
                   <Card>
                     <CardContent>
-                      {/* A new version starts the form over from what was saved. */}
+                      {/* A newer version reaches the form through its own conflict check. */}
                       <SinkEditor
-                        key={sink.version}
+                        key={sink.id}
                         project={project}
                         sink={sink}
                         onSaved={(saved) => {
