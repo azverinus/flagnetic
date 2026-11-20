@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -122,63 +121,32 @@ func TestAnUnknownEmailLocksIdenticallyToAKnownOne(t *testing.T) {
 	}
 }
 
-func TestUnknownEmailAndWrongPasswordTakeComparableTimeUnderLockout(t *testing.T) {
-	srv := testkit.StartServer(t, trustLoopback())
-	b := fromAddress(t, srv, someAddress())
-	const samples = 12
-	var known, unknown []time.Duration
-	for range samples {
-		// A fresh email each time, so neither lockout nor throttle answers
-		// first.
-		m := testkit.NewMember(t, testkit.Pool(t))
-		for _, email := range []string{m.Email, "nobody-" + m.Email} {
-			start := time.Now()
-			if status, _, _ := signInAs(t, b, email, wrongPassword); status != 401 {
-				t.Fatalf("status = %d, want 401", status)
+// An unknown email must cost what a wrong password costs, or the time of the
+// answer tells a known email from an unknown one. The work is what is
+// compared, one verification of a password on each path, not the time it took:
+// a loaded runner moves the time of either path, and the work is what a
+// sign-in that skipped the hash would change.
+func TestUnknownEmailAndKnownMemberVerifyOnePasswordEach(t *testing.T) {
+	for name, attempt := range map[string]string{
+		"a wrong password":     wrongPassword,
+		"an overlong password": strings.Repeat("x", 129),
+	} {
+		t.Run(name, func(t *testing.T) {
+			var counter testkit.HashCounter
+			srv := testkit.StartServer(t, trustLoopback(), testkit.WithHashCounter(&counter))
+			b := fromAddress(t, srv, someAddress())
+			m := testkit.NewMember(t, testkit.Pool(t))
+			for _, email := range []string{m.Email, "nobody-" + m.Email} {
+				before := counter.Verifications()
+				if status, _, _ := signInAs(t, b, email, attempt); status != 401 {
+					t.Fatalf("%s: status = %d, want 401", email, status)
+				}
+				if got := counter.Verifications() - before; got != 1 {
+					t.Errorf("%s: %d passwords verified, want 1: a path that skips the hash answers sooner and tells known from unknown", email, got)
+				}
 			}
-			if email == m.Email {
-				known = append(known, time.Since(start))
-			} else {
-				unknown = append(unknown, time.Since(start))
-			}
-		}
+		})
 	}
-	a, u := median(known), median(unknown)
-	if ratio := float64(max(a, u)) / float64(min(a, u)); ratio > 3 {
-		t.Errorf("median wrong password %v, unknown email %v: ratio %.1f, want at most 3", a, u, ratio)
-	}
-}
-
-func TestUnknownEmailAndKnownMemberTakeComparableTimeForAnOverlongPassword(t *testing.T) {
-	srv := testkit.StartServer(t, trustLoopback())
-	b := fromAddress(t, srv, someAddress())
-	overlong := strings.Repeat("x", 129)
-	const samples = 12
-	var known, unknown []time.Duration
-	for range samples {
-		m := testkit.NewMember(t, testkit.Pool(t))
-		for _, email := range []string{m.Email, "nobody-" + m.Email} {
-			start := time.Now()
-			if status, _, _ := signInAs(t, b, email, overlong); status != 401 {
-				t.Fatalf("status = %d, want 401", status)
-			}
-			if email == m.Email {
-				known = append(known, time.Since(start))
-			} else {
-				unknown = append(unknown, time.Since(start))
-			}
-		}
-	}
-	a, u := median(known), median(unknown)
-	if ratio := float64(max(a, u)) / float64(min(a, u)); ratio > 1.5 {
-		t.Errorf("median overlong password of a known member %v, of an unknown email %v: ratio %.2f, want at most 1.5", a, u, ratio)
-	}
-}
-
-func median(ds []time.Duration) time.Duration {
-	s := slices.Clone(ds)
-	slices.Sort(s)
-	return s[len(s)/2]
 }
 
 func TestAHundredFailuresFromOneAddressAreRateLimitedWhileAnotherPasses(t *testing.T) {

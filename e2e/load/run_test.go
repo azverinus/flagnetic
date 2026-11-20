@@ -3,6 +3,8 @@ package load
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -75,20 +77,70 @@ func TestSummarizeSortsAndConvertsToMilliseconds(t *testing.T) {
 	}
 }
 
-func TestRunSendsOnTheScheduleWithoutWaitingForAnswers(t *testing.T) {
-	// 20 requests at 100/s that each take 50ms: an open model finishes in
-	// about 0.25s, a closed one with a single worker would take a second.
-	begin := time.Now()
-	r := Run(context.Background(), Options{Scenario: "slow", Rate: 100, Duration: 200 * time.Millisecond},
-		func(context.Context, int) error { time.Sleep(50 * time.Millisecond); return nil })
-	if took := time.Since(begin); took > 600*time.Millisecond {
-		t.Errorf("the run took %v: requests waited for each other", took)
+// fakeTime is time as a run reads it, moved by the run's own waits and by
+// nothing else: a run on it takes no time, and what it measures is exact.
+type fakeTime struct {
+	mu       sync.Mutex
+	at       time.Time
+	nowCalls int
+}
+
+func newFakeTime() *fakeTime { return &fakeTime{at: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)} }
+
+// clock is a clock that wakes late after each scheduled time.
+func (f *fakeTime) clock(late time.Duration) clock {
+	return clock{
+		now: func() time.Time {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			f.nowCalls++
+			return f.at
+		},
+		until: func(_ context.Context, t time.Time) {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if t = t.Add(late); t.After(f.at) {
+				f.at = t
+			}
+		},
 	}
+}
+
+func (f *fakeTime) reads() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.nowCalls
+}
+
+// within fails the test unless cond holds before a deadline no loaded runner
+// reaches; a run that never gets there is stuck.
+func within(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); !cond(); time.Sleep(time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("%s never happened", what)
+		}
+	}
+}
+
+func TestRunSendsOnTheScheduleWithoutWaitingForAnswers(t *testing.T) {
+	// 20 requests whose answers wait until every one has been sent: an open
+	// model has all 20 in flight at once, a closed one with a single worker
+	// would never send the second.
+	var (
+		started atomic.Int32
+		release = make(chan struct{})
+		done    = make(chan Result, 1)
+	)
+	go func() {
+		done <- Run(context.Background(), Options{Scenario: "slow", Rate: 100, Duration: 200 * time.Millisecond, clock: newFakeTime().clock(0)},
+			func(context.Context, int) error { started.Add(1); <-release; return nil })
+	}()
+	within(t, "all 20 requests in flight at once", func() bool { return started.Load() == 20 })
+	close(release)
+	r := <-done
 	if r.Sent != 20 || r.Errors != 0 {
 		t.Errorf("sent %d with %d errors, want 20 and 0", r.Sent, r.Errors)
-	}
-	if r.P99 < 50 || r.P99 > 400 {
-		t.Errorf("p99 = %vms, want about 50", r.P99)
 	}
 }
 
@@ -97,11 +149,7 @@ func TestRunMeasuresFromTheScheduledTime(t *testing.T) {
 	// scheduled time) must show 40ms of latency though the request itself
 	// is instant: that is coordinated omission, and the reason to measure
 	// from the schedule.
-	late := realClock()
-	late.until = func(ctx context.Context, t time.Time) {
-		realClock().until(ctx, t.Add(40*time.Millisecond))
-	}
-	r := Run(context.Background(), Options{Scenario: "late", Rate: 50, Duration: 100 * time.Millisecond, clock: late},
+	r := Run(context.Background(), Options{Scenario: "late", Rate: 50, Duration: 100 * time.Millisecond, clock: newFakeTime().clock(40 * time.Millisecond)},
 		func(context.Context, int) error { return nil })
 	if r.P50 < 40 {
 		t.Errorf("p50 = %vms, want at least the 40ms the generator was late", r.P50)
@@ -109,7 +157,7 @@ func TestRunMeasuresFromTheScheduledTime(t *testing.T) {
 }
 
 func TestRunCountsErrorsAndKeepsTheFirst(t *testing.T) {
-	r := Run(context.Background(), Options{Scenario: "err", Rate: 100, Duration: 100 * time.Millisecond},
+	r := Run(context.Background(), Options{Scenario: "err", Rate: 100, Duration: 100 * time.Millisecond, clock: newFakeTime().clock(0)},
 		func(_ context.Context, i int) error {
 			if i%2 == 1 {
 				return errors.New("status 503")
@@ -122,13 +170,19 @@ func TestRunCountsErrorsAndKeepsTheFirst(t *testing.T) {
 }
 
 func TestRunRefusesRequestsOverTheInFlightBound(t *testing.T) {
-	release := make(chan struct{})
-	done := make(chan Result)
+	var (
+		tm      = newFakeTime()
+		release = make(chan struct{})
+		done    = make(chan Result, 1)
+	)
 	go func() {
-		done <- Run(context.Background(), Options{Scenario: "stuck", Rate: 1000, Duration: 20 * time.Millisecond, MaxInFlight: 5},
+		done <- Run(context.Background(), Options{Scenario: "stuck", Rate: 1000, Duration: 20 * time.Millisecond, MaxInFlight: 5, clock: tm.clock(0)},
 			func(context.Context, int) error { <-release; return nil })
 	}()
-	time.Sleep(100 * time.Millisecond)
+	// The run reads the time once at its start and once for each request it
+	// refuses: past 15 refusals every request has been scheduled, the five
+	// that fit still held.
+	within(t, "the 15 refusals", func() bool { return tm.reads() >= 16 })
 	close(release)
 	r := <-done
 	if r.Sent != 20 || r.Errors != 15 {
@@ -139,7 +193,7 @@ func TestRunRefusesRequestsOverTheInFlightBound(t *testing.T) {
 func TestRunStopsSchedulingWhenCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	r := Run(ctx, Options{Scenario: "cancelled", Rate: 100, Duration: time.Second}, func(context.Context, int) error { return nil })
+	r := Run(ctx, Options{Scenario: "cancelled", Rate: 100, Duration: time.Second, clock: newFakeTime().clock(0)}, func(context.Context, int) error { return nil })
 	if r.Sent > 1 {
 		t.Errorf("a cancelled run sent %d requests", r.Sent)
 	}

@@ -426,7 +426,7 @@ func TestARevokedKeysStreamIsClosedOnItsNextHeartbeat(t *testing.T) {
 	p.revoke(t, "production", k)
 	// The replica learns of the revocation by its notification; each
 	// heartbeat until then still finds the key.
-	if !eventually(2*time.Second, func() bool {
+	if !eventually(10*time.Second, func() bool {
 		c.Advance(15 * time.Second)
 		return s.ended(100 * time.Millisecond)
 	}) {
@@ -454,7 +454,7 @@ func TestAnOriginRemovedFromAKeyHasItsStreamClosedOnTheNextHeartbeat(t *testing.
 	}
 	// The replica learns of the change by its notification; each heartbeat
 	// until then still finds the old list.
-	if !eventually(2*time.Second, func() bool {
+	if !eventually(10*time.Second, func() bool {
 		c.Advance(15 * time.Second)
 		return s.ended(100 * time.Millisecond)
 	}) {
@@ -480,10 +480,21 @@ func TestAnOriginTheKeyStillListsKeepsItsStreamAcrossHeartbeats(t *testing.T) {
 	if res.JSON200 == nil {
 		t.Fatalf("PATCH …/sdk-keys = %d: %s", res.StatusCode(), res.Body)
 	}
-	// Heartbeats spread over longer than the replica takes to learn of
-	// the change, so the later ones judge the origin against the new list.
+	// The replica has learnt of the change once a stream of the origin the
+	// patch added is served; the heartbeats after that judge the origin of
+	// the open stream against the new list.
+	added := func(_ context.Context, req *http.Request) error {
+		req.Header.Set("Origin", "https://other.example.com")
+		return nil
+	}
+	if !eventually(10*time.Second, func() bool {
+		o := openStream(t, srv, &sdk.StreamRulesetParams{SdkKey: &value}, added)
+		defer func() { _ = o.res.Body.Close() }()
+		return o.res.StatusCode == http.StatusOK
+	}) {
+		t.Fatal("the replica never learnt of the origin the key was patched to list")
+	}
 	for range 8 {
-		time.Sleep(250 * time.Millisecond)
 		c.Advance(15 * time.Second)
 		heartbeat(t, s.next(t))
 	}

@@ -90,6 +90,10 @@ type Options struct {
 	// PasswordHashConcurrency bounds the password hashes and verifications
 	// the replica runs at once.
 	PasswordHashConcurrency int
+	// WrapPasswordHasher, when set, wraps the replica's password hasher, which
+	// lets a test count the hashes and verifications a sign-in does; nil
+	// in production.
+	WrapPasswordHasher func(appaccess.PasswordVerifier) appaccess.PasswordVerifier
 	// RulesetLoadFault lets a test stall the replica's ruleset
 	// materializations; nil in production.
 	RulesetLoadFault *pgdelivery.RulesetLoadFault
@@ -405,8 +409,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	webhookDisabledMail := disabledWebhookMail{appaccess.NewWebhookDisabledMailer(postman, smtpSettings, accessStore, publicURL)}
 	// One hasher serves every use case of the replica, so its bound is the
 	// replica's.
-	hasher := password.NewBoundedHasher(password.DefaultParams,
+	var hasher appaccess.PasswordVerifier = password.NewBoundedHasher(password.DefaultParams,
 		semaphore.NewWeighted(int64(o.PasswordHashConcurrency)), password.SlotWait)
+	if o.WrapPasswordHasher != nil {
+		hasher = o.WrapPasswordHasher(hasher)
+	}
 	// Token uses are gathered per replica and written in rounds, so no
 	// request waits on recording one.
 	tokenUses := appaccess.NewTokenUses(accessStore)
