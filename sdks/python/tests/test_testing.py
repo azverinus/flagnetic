@@ -212,3 +212,14 @@ def test_an_offline_client_makes_no_request_and_flush_and_close_return_at_once()
 
 def test_testing_clients_are_not_collected_as_tests() -> None:
     assert getattr(testing.TestClient, "__test__", True) is False
+
+
+def test_a_number_override_a_double_cannot_hold_is_refused() -> None:
+    client = testing.from_values({"n": 1.5}, allow_overrides=True)
+    try:
+        with pytest.raises(TypeError):
+            client.local_overrides.set("n", 10**400)
+        assert client.local_overrides.list() == {}
+        assert client.get_detail(flagnetic.Context(units={"user": "u"}), "n", 0.0).value == 1.5
+    finally:
+        client.close()

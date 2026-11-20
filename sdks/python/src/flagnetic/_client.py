@@ -14,7 +14,7 @@ import threading
 import time
 import weakref
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypeAlias
@@ -94,7 +94,8 @@ _DETAIL_MEMORY = 10_000
 class _Online:
     """What a client that talks to a server was built with, kept to restart its thread after a fork."""
 
-    sdk_key: str
+    # Out of the repr: error trackers that capture frame locals would record the key with it.
+    sdk_key: str = field(repr=False)
     base_url: str
     waits: Waits
     stream: bool
@@ -234,6 +235,12 @@ class Client:
         self._mismatched: set[str] = set()
         self._unsupported_logged: dict[str, int] = {}
         self._invalid_logged: dict[str, int] = {}
+        if platform is not None and (
+            not isinstance(platform, str) or not platform.isascii() or not platform.isprintable()
+        ):
+            # The platform goes into the User-Agent header, where a control character or a
+            # non-ASCII one makes every request fail.
+            raise ValueError("flagnetic: platform holds a character that cannot be part of an HTTP header")
         self._platform = platform if platform is not None else _system()
         self._app_version = app_version or ""
         self._send_summaries = send_summaries
@@ -498,6 +505,8 @@ class Client:
             self._mismatch(key, local.type, requested)
             return self._fallback(loaded, default, _ERROR_TYPE_MISMATCH)
         served = _served_value(flag_type, local.value)
+        if served is _INVALID:
+            return self._fallback(loaded, default, _ERROR_INCONSISTENT)
         if requested == _INT64:
             served = _as_int64(served)
             if served is _INVALID:

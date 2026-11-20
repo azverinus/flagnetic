@@ -754,6 +754,10 @@ class Delivery:
         self._host.log(level, _events.SSE_DROPPED, cause=cause, error=error, reconnect=True)
         now = time.monotonic()
         self._drop_stream_connection()
+        # The fetch scheduled while the stream was up may be a poll interval away; without the
+        # stream, a change is noticed only by fetching, so the safety poll takes over at once.
+        if self._next_fetch is not None and self._next_fetch > now + self._waits.down_poll:
+            self._next_fetch = now + self._waits.down_poll
         if self._stream_stable:
             self._stream_failures = 0
         if errored:

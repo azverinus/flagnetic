@@ -48,6 +48,12 @@ def type_of(value: Any) -> str:
 def fits(flag_type: str, value: Any) -> bool:
     if flag_type == "json":
         return True
+    if flag_type == "number" and type_of(value) == "number":
+        # A number is served as a double: an integer one cannot hold is not a number flag's value.
+        try:
+            float(value)
+        except OverflowError:
+            return False
     return type_of(value) == flag_type
 
 

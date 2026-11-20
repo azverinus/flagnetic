@@ -589,6 +589,30 @@ def test_stream_frames_split_across_writes_and_lines_ended_any_way_are_read(clie
     )
 
 
+def test_a_dropped_stream_brings_the_next_fetch_within_the_down_poll(clients: Any) -> None:
+    fetches: list[Request] = []
+    refuse_stream = threading.Event()
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            if refuse_stream.is_set():
+                return Response(503)
+            return Response(200, {"Content-Type": "text/event-stream"}, stream=True)
+        fetches.append(request)
+        return Response(200, JSON, RULESET)
+
+    server = MockServer(handler)
+    # The stream is up, so the next fetch is an hour out (36 s compressed); the down poll is 0.3 s.
+    client = clients(server, stream=True, poll_interval=3600, _time_divisor=100, _down_poll_interval=30)
+    assert client.ready(5) is flagnetic.Stage.FRESH
+    assert eventually(lambda: [] if fetches else ["no fetch"]) == []
+    server.stream_send(b": hb\n\n")
+    refuse_stream.set()
+    before = len(fetches)
+    server.stream_close()
+    assert eventually(lambda: [] if len(fetches) > before else ["no safety poll"], 5) == []
+
+
 def test_a_malformed_ruleset_event_drops_the_stream_and_it_reconnects(clients: Any) -> None:
     logs = Logs()
     streams: list[Request] = []
@@ -892,3 +916,15 @@ def test_a_new_ruleset_version_with_the_condition_is_logged_again(clients: Any) 
     served[0] = json.dumps({**INVALID, "version": 8}).encode()
     assert eventually(lambda: [] if logs.count("condition_invalid") == 2 * once else ["waiting"]) == []
     assert sorted({line["ruleset_version"] for line in logs.named("condition_invalid")}) == [7, 8]
+
+
+def test_the_sdk_key_is_in_no_repr(clients: Any) -> None:
+    client = clients(serving(RULESET))
+    assert SDK_KEY not in repr(client)
+    assert SDK_KEY not in repr(client._online)
+
+
+@pytest.mark.parametrize("platform", ["linux\n", "lin\x00ux", "linüx"])
+def test_a_platform_that_cannot_be_in_a_header_is_refused_at_construction(platform: str) -> None:
+    with pytest.raises(ValueError, match="platform"):
+        flagnetic.Client(SDK_KEY, "http://127.0.0.1:1", platform=platform, stream=False)
