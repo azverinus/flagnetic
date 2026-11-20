@@ -56,6 +56,8 @@ const defaults = {
   retryMax: 300_000,
   unauthorizedMax: 900_000,
   closeTimeout: 5_000,
+  /** The retries, after an answer below an announced version, before the poll takes over. */
+  catchUp: [1_000, 2_000, 4_000] as readonly number[],
   batchSize: 100,
   capacity: 1_000,
   storedUnitSets: 4,
@@ -180,6 +182,7 @@ export class FlagneticClient {
   private readonly backoff: Backoff;
   private unauthorized = false;
   private announced = 0;
+  private catchUpStep = 0;
   /**
    * The context whose values were last accepted. Values of another context
    * set no floor for the version: a replica a little behind may answer the
@@ -756,7 +759,34 @@ export class FlagneticClient {
   private onAnnounced(version: number): void {
     if (version <= (this.values?.rulesetVersion ?? -1) || version <= this.announced) return;
     this.announced = version;
+    this.catchUpStep = 0;
     this.refetch("stream");
+  }
+
+  // An evaluation answered below the version the stream announced: the
+  // answer came from a replica that has not loaded it yet, which a stream
+  // held on another replica cannot tell. Retried on 1, 2 and 4 seconds, as
+  // server mode does, instead of leaving the old value for a whole poll
+  // interval; once the sequence is spent the announcement is dropped, and
+  // the next event would start it again. Reports whether a retry is armed.
+  private catchUp(): boolean {
+    const held = this.values?.rulesetVersion ?? 0;
+    if (held >= this.announced) {
+      this.catchUpStep = 0;
+      return false;
+    }
+    const delay = this.timing.catchUp[this.catchUpStep];
+    if (delay === undefined) {
+      this.catchUpStep = 0;
+      this.announced = held;
+      return false;
+    }
+    this.catchUpStep++;
+    this.nextAttempt = this.clock.setTimeout(() => {
+      this.nextAttempt = undefined;
+      this.refetch("stream");
+    }, delay);
+    return true;
   }
 
   /** Runs start, which starts an evaluation, and resolves once an evaluation started no earlier than now has settled. */
@@ -817,7 +847,7 @@ export class FlagneticClient {
       return;
     }
     if (ok) {
-      this.armPoll();
+      if (!this.catchUp()) this.armPoll();
       return;
     }
     // A failed evaluation is retried by backoff alone; the poll waits.

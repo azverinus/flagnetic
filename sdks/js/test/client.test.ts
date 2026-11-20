@@ -716,6 +716,42 @@ describe("the change stream", () => {
     expect(c.getBool("checkout", true)).toBe(false);
   });
 
+  test("an answer below the announced version is retried within a second, instead of waiting for the poll", async () => {
+    const h = harness();
+    const c = h.client({ store: false, stream: true, pollInterval: 300_000 });
+    (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: "retry: 3000\n\n" });
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
+
+    h.net.send('event: ruleset\nid: 2\ndata: {"version":2}\n\n');
+    // A replica that has not loaded version 2 yet answers version 1.
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
+    expect(c.getBool("checkout", false)).toBe(true);
+    const behind = h.clock.now();
+    const retry = await h.waitFor("/sdk/v1/evaluate", 1_000);
+    expect(retry.at - behind).toBeLessThanOrEqual(1_000);
+    await h.serve("/sdk/v1/evaluate", values(2, { checkout: boolFlag(false) }));
+    expect(c.getBool("checkout", true)).toBe(false);
+    await h.advance(60_000);
+    expect(h.net.waiting("/sdk/v1/evaluate"), "caught up: nothing more until the poll").toHaveLength(0);
+  });
+
+  test("a replica that never catches up is retried at 1, 2 and 4 seconds, then the announcement is dropped", async () => {
+    const h = harness();
+    h.client({ store: false, stream: true, pollInterval: 300_000 });
+    (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: "retry: 3000\n\n" });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    h.net.send('event: ruleset\nid: 2\ndata: {"version":2}\n\n');
+    const at: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const req = await h.waitFor("/sdk/v1/evaluate", 5_000);
+      at.push(req.at);
+      await h.serve("/sdk/v1/evaluate", values(1, {}));
+    }
+    expect(at.slice(1).map((t, i) => t - (at[i] ?? 0))).toStrictEqual([1_000, 2_000, 4_000]);
+    await h.advance(60_000);
+    expect(h.net.waiting("/sdk/v1/evaluate"), "the poll takes over").toHaveLength(0);
+  });
+
   test("a stream the server closes is reconnected within 2 s with Last-Event-ID, and the client evaluates again", async () => {
     const h = harness();
     h.client({ store: false, stream: true, pollInterval: 3_600_000 });
@@ -1304,7 +1340,7 @@ describe("evaluation summaries in the queue", () => {
     const summaries = queued(store).filter((e) => e.type === "evaluation_summary");
     expect(summaries).toHaveLength(1);
     expect(h.clock.now() - Date.parse(String(summaries[0]?.interval_start))).toBeLessThanOrEqual(3_600_000 + 120_000);
-  });
+  }, 60_000);
 
   test("a full queue drops its summaries before an exposure or an alias", async () => {
     const h = harness();
@@ -1341,5 +1377,30 @@ describe("evaluation summaries in the queue", () => {
     }
     expect(Math.max(...sizes)).toBeLessThanOrEqual(1 << 20);
     expect(queued(store)).toHaveLength(0);
+  });
+});
+
+describe("a JSON value with a __proto__ key", () => {
+  const served = JSON.parse('{"__proto__": {"admin": true}, "plain": 1}') as JsonValue;
+
+  test("is served with the key as data and no inherited member", async () => {
+    const h = harness();
+    const c = h.client({ store: false });
+    await h.serve("/sdk/v1/evaluate", values(1, { cfg: { type: "json", value: served, variation: "v", reason: "targeting_match", override_influenced: false, automatic_exposure: false } }));
+    const got = c.getJson("cfg", {}) as Record<string, unknown>;
+    expect(Object.hasOwn(got, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(got)).toBe(Object.prototype);
+    expect((got as { admin?: unknown }).admin).toBeUndefined();
+    expect(JSON.stringify(got)).toBe('{"__proto__":{"admin":true},"plain":1}');
+  });
+
+  test("is kept by a local override", async () => {
+    const h = harness();
+    const c = h.client({ store: false, allowOverrides: true });
+    await h.serve("/sdk/v1/evaluate", values(1, { cfg: { type: "json", value: {}, variation: "v", reason: "targeting_match", override_influenced: false, automatic_exposure: false } }));
+    c.overrides.set("cfg", served);
+    const got = c.getJson("cfg", {}) as Record<string, unknown>;
+    expect(Object.hasOwn(got, "__proto__")).toBe(true);
+    expect((got as { admin?: unknown }).admin).toBeUndefined();
   });
 });

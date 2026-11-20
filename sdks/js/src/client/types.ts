@@ -228,7 +228,8 @@ export function copyJson<T extends JsonValue>(value: T): T {
   if (Array.isArray(value)) return (value as readonly JsonValue[]).map(copyJson) as unknown as T;
   if (typeof value === "object" && value !== null) {
     const out: Record<string, JsonValue> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = copyJson(v);
+    // defineProperty, so a "__proto__" key stays data.
+    for (const [k, v] of Object.entries(value)) Object.defineProperty(out, k, { value: copyJson(v), enumerable: true, writable: true, configurable: true });
     return out as T;
   }
   return value;
