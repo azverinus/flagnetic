@@ -45,6 +45,13 @@ func (f *summaryFixture) storedSummaries(t *testing.T) int {
 	return len(testkit.ExportedEvaluationSummaries(t, testkit.Pool(t), f.p.projectID(t), f.p.environmentID(t, "production")))
 }
 
+// storedAliasesWhileHeld counts the aliases stored while the test holds an
+// ingest open, which holds the event horizon back: the ones older than it.
+func (f *summaryFixture) storedAliasesWhileHeld(t *testing.T) int {
+	t.Helper()
+	return len(testkit.ExportedAliasesBelowHorizon(t, testkit.Pool(t), f.p.projectID(t), f.p.environmentID(t, "production")))
+}
+
 func (f *summaryFixture) storedAliases(t *testing.T) int {
 	t.Helper()
 	return len(testkit.ExportedAliases(t, testkit.Pool(t), f.p.projectID(t), f.p.environmentID(t, "production")))
@@ -161,7 +168,7 @@ func TestRetentionWaitsForATransactionStillWritingAPartition(t *testing.T) {
 		t.Error("retention dropped a partition a transaction still writes")
 	}
 	// The tables the transaction does not write still drop in the same round.
-	if n := f.storedAliases(t); n != 0 {
+	if n := f.storedAliasesWhileHeld(t); n != 0 {
 		t.Errorf("%d aliases stored after the round, want their partition dropped", n)
 	}
 	release()
