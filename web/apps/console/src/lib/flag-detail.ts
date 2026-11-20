@@ -11,6 +11,7 @@ import { msg } from "@lingui/core/macro";
 import { formatNumber } from "@/i18n/format";
 
 import { type DaysSearch, validateDaysSearch } from "./daily-counts";
+import { withinCodePoints } from "./forms";
 
 import { flagViolationMessage } from "./flags";
 import { fingerprint } from "./structural-diff";
@@ -161,7 +162,7 @@ export function overrideIssues(i18n: I18n, unitId: string, note: string): Overri
     const max = formatNumber(i18n, unitIdMaxBytes);
     issues.unitId = i18n._(msg`A unit ID has at most ${max} bytes.`);
   }
-  if (note.trim().length > overrideNoteMax) {
+  if (!withinCodePoints(note.trim(), overrideNoteMax)) {
     issues.note = configurationViolationMessage(i18n, {
       pointer: "/note",
       code: "too_long",

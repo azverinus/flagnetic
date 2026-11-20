@@ -73,17 +73,20 @@ export function NewSinkScreen({ project }: { project: string }) {
 /** One sink: its settings, with rotating a webhook sink's secret and deleting it. */
 export function SinkScreen({ project, sink: id }: { project: string; sink: string }) {
   const sink = useQuery(sinkQuery(project, id));
+  // A failed read of a sink already held keeps it on screen, with the
+  // edits in its form; only one that is gone, or never read, replaces it.
   if (sink.isError) {
     // An identifier that is no UUID is refused as a bad request: it names no sink either.
     const missing =
       sink.error instanceof ApiError && (sink.error.status === 404 || sink.error.status === 400);
-    return missing ? (
-      <SinkNotFound project={project} />
-    ) : (
-      <Page>
-        <QueryError error={sink.error} onRetry={() => void sink.refetch()} />
-      </Page>
-    );
+    if (missing) return <SinkNotFound project={project} />;
+    if (sink.data === undefined) {
+      return (
+        <Page>
+          <QueryError error={sink.error} onRetry={() => void sink.refetch()} />
+        </Page>
+      );
+    }
   }
   if (sink.data === undefined) {
     return (
@@ -253,9 +256,9 @@ function SinkPage({ project, sink }: { project: string; sink: Sink }) {
                 <div className="measure-form">
                   <Card>
                     <CardContent>
-                      {/* A new version starts the form over from what was saved. */}
+                      {/* A newer version reaches the form through its own conflict check. */}
                       <SinkEditor
-                        key={sink.version}
+                        key={sink.id}
                         project={project}
                         sink={sink}
                         onSaved={(saved) => {

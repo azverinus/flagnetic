@@ -10,6 +10,7 @@ import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
 import { flagViolationMessage } from "./flags";
+import { withinCodePoints } from "./forms";
 import {
   isJsonNumber,
   numberOf,
@@ -81,6 +82,9 @@ export function newVariation(current: readonly VariationDraft[]): VariationDraft
   while (taken.has(`v${n}`)) n += 1;
   return draft(`v${n}`);
 }
+
+/** The most bytes of compact JSON the server keeps of a variation's value: 64 KiB. */
+const maxValueBytes = 64 * 1024;
 
 type Parsed = { ok: true; value: unknown } | { ok: false };
 
@@ -180,7 +184,12 @@ export function variationIssues(
     if (!zVariationKey.safeParse(key).success) issue(index, "key", "invalid_key");
     else if (seen.has(key)) issue(index, "key", "duplicate");
     seen.add(key);
-    if (!parseValue(type, row.value).ok) {
+    const parsed = parseValue(type, row.value);
+    if (parsed.ok) {
+      // The request carries the value as compact JSON, which is what the server bounds.
+      const bytes = new TextEncoder().encode(stringifyLossless(parsed.value)).length;
+      if (bytes > maxValueBytes) issue(index, "value", "too_long", maxValueBytes);
+    } else {
       issues.push({
         path: [index, "value"],
         message:
@@ -194,7 +203,8 @@ export function variationIssues(
       ["description", zDescription.maxLength],
     ] as const;
     for (const [field, max] of bounds) {
-      if (max !== null && row[field].trim().length > max) issue(index, field, "too_long", max);
+      if (max !== null && !withinCodePoints(row[field].trim(), max))
+        issue(index, field, "too_long", max);
     }
   });
   return issues;

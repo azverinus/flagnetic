@@ -16,7 +16,7 @@ export type ExperimentChoices =
 export function useExperimentChoices(project: string): ExperimentChoices {
   const flags = useQuery(flagChoicesQuery(project));
   const unitTypes = useQuery(unitTypesQuery(project));
-  const failed = [flags, unitTypes].find((read) => read.isError);
+  const failed = [flags, unitTypes].find((read) => read.isError && read.data === undefined);
   if (failed) {
     const failure: ReadFailure = { error: failed.error, retry: () => void failed.refetch() };
     return { state: "failed", ...failure };

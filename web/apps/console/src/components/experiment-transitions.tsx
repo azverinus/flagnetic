@@ -50,7 +50,6 @@ import {
   growIssue,
   type HoldingRule,
   holdingRules,
-  maxNoteLength,
   noteIssue,
   startBlockers,
   type StopDraft,
@@ -759,7 +758,6 @@ function StopForm({
       >
         <Textarea
           rows={3}
-          maxLength={maxNoteLength}
           value={draft.note}
           onChange={(event) => setDraft({ ...draft, note: event.target.value })}
         />
@@ -1101,12 +1099,7 @@ function NoteForm({
       pending={pending}
     >
       <Field label={<Trans>Note</Trans>} hint={<Trans>Empty clears it</Trans>} error={issue}>
-        <Textarea
-          rows={4}
-          maxLength={maxNoteLength}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
+        <Textarea rows={4} value={text} onChange={(event) => setText(event.target.value)} />
       </Field>
       <ExperimentRefusal refusal={refusal} />
     </DialogForm>

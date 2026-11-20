@@ -50,7 +50,7 @@ import {
   type SinkForm,
   testBodyOf,
 } from "@/lib/sinks";
-import { useFormConflict } from "@/lib/use-form-conflict";
+import { useFormConflict, useNewerArrival } from "@/lib/use-form-conflict";
 
 export type SinkEditorProps = {
   project: string;
@@ -120,7 +120,6 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
     read: () => api.get(sink?.id ?? ""),
   });
   const { base, conflict } = conflicts;
-
   const save = useListMutation(
     ({ values, at }: { values: SinkForm; at?: number }) =>
       base && sink
@@ -130,10 +129,33 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
           )
         : api.create(bodyOf(values)),
     sinksKey(project),
-    onSaved,
+    (saved) => {
+      // A save makes a new version, which the form starts over from.
+      if (editing) {
+        form.reset(formOf(saved as Sink));
+        conflicts.restart(saved as Sink);
+      }
+      onSaved(saved);
+    },
     // Creating a webhook sink answers its secret.
     { secret: !editing },
   );
+  // A newer version of the sink the screen came to hold (the header's
+  // toggle, someone's save) starts a clean form over from it, and is
+  // offered as a conflict to one with edits.
+  useNewerArrival(
+    sink,
+    { version: conflicts.version, dirty: form.formState.isDirty, saving: save.isPending },
+    {
+      clean: (fresh) => {
+        form.reset(formOf(fresh));
+        conflicts.restart(fresh);
+        save.reset();
+      },
+      dirty: (fresh) => void conflicts.offer(fresh),
+    },
+  );
+
   // Testing stores nothing, so it never blocks saving: the form is only
   // checked for what a request cannot be made without.
   const test = useMutation({
@@ -361,7 +383,7 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
       {editing ? (
         <UnsavedChangesBar
           dirty={form.formState.isDirty}
-          onDiscard={() => form.reset(sink ? formOf(sink) : undefined)}
+          onDiscard={() => form.reset(base ? formOf(base) : undefined)}
           pending={save.isPending}
         />
       ) : null}

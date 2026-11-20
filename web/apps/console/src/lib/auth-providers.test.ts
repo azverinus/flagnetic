@@ -152,6 +152,24 @@ describe("the checks of the form before it asks the server", () => {
     }
   });
 
+  it("keeps the client secret as typed on create, as on edit, and refuses a blank one", () => {
+    const created = check({ slug: "acme-2", client_secret: " s3cret " });
+    expect(created.success && created.data.client_secret).toBe(" s3cret ");
+    expect(messages({ slug: "acme-2", client_secret: "   " })).toContain(
+      "Enter the client secret.",
+    );
+    const edited = oidcFormSchema(i18n, { creating: false, stored: provider }).safeParse({
+      ...formOf(provider),
+      client_secret: " s3cret ",
+    });
+    expect(edited.success && edited.data.client_secret).toBe(" s3cret ");
+  });
+
+  it("accepts a name of 200 characters outside the Basic Multilingual Plane", () => {
+    expect(check({ slug: "acme-2", display_name: "😀".repeat(200) }).success).toBe(true);
+    expect(check({ slug: "acme-2", display_name: "😀".repeat(201) }).success).toBe(false);
+  });
+
   it("accepts a complete provider", () => {
     expect(check({ slug: "acme-2" }).success).toBe(true);
   });

@@ -1,10 +1,19 @@
+import { client } from "@flagnetic/api";
 import { act, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { NamedConflictBanner } from "@/components/conflict-banner";
-import { activateForTests, renderWithProviders, testQueryClient } from "@/test/render";
+import { fakeServer, problem } from "@/test/fake-server";
+import {
+  activateForTests,
+  renderWithProviders,
+  signedInClient,
+  testQueryClient,
+} from "@/test/render";
 
+import { managementFetch } from "./http";
+import { onSessionEnded } from "./signed-in";
 import { ChangeStream, noticeNames, useNewerVersionNotice } from "./change-stream";
 import { useFormConflict } from "./use-form-conflict";
 
@@ -110,8 +119,9 @@ describe("the change stream", () => {
 describe("a stream the browser gave up on", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("is opened again, and the project read again in full once it is", () => {
+  it("is opened again, and the project read again in full once it is", async () => {
     vi.useFakeTimers();
+    fakeServer({ "GET /me": { status: 200, body: {} } });
     const queryClient = testQueryClient();
     queryClient.setQueryData(["projects", "shop", "tokens"], []);
     const sources: FakeSource[] = [];
@@ -129,17 +139,58 @@ describe("a stream the browser gave up on", () => {
     const [first] = sources;
     // A dropped connection the browser retries itself is left to it.
     act(() => first!.dispatchEvent(new Event("error")));
-    act(() => vi.advanceTimersByTime(120_000));
+    await act(() => vi.advanceTimersByTimeAsync(120_000));
     expect(sources).toHaveLength(1);
 
     first!.readyState = 2;
     act(() => first!.dispatchEvent(new Event("error")));
-    act(() => vi.advanceTimersByTime(1_000));
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
     expect(sources).toHaveLength(2);
     expect(queryClient.getQueryState(["projects", "shop", "tokens"])?.isInvalidated).toBe(false);
 
     act(() => sources[1]!.dispatchEvent(new Event("open")));
     expect(queryClient.getQueryState(["projects", "shop", "tokens"])?.isInvalidated).toBe(true);
+  });
+
+  it("reads the caller before opening again, and sends an ended session to sign-in", async () => {
+    vi.useFakeTimers();
+    const server = fakeServer({ "GET /me": problem(401, "unauthenticated") });
+    // The refusal is reported as the console reports it.
+    const queryClient = signedInClient();
+    const navigate = vi.fn();
+    client.setConfig({
+      ...client.getConfig(),
+      fetch: managementFetch({
+        fetch: client.getConfig().fetch,
+        onUnauthenticated: onSessionEnded(
+          queryClient,
+          () => ({ pathname: "/projects/shop", search: "", hash: "" }),
+          navigate,
+        ),
+      }),
+    });
+    const sources: FakeSource[] = [];
+    const open = () => {
+      const source = new FakeSource();
+      sources.push(source);
+      return source as unknown as EventSource;
+    };
+    renderWithProviders(
+      <ChangeStream project="shop" open={open}>
+        <p>page</p>
+      </ChangeStream>,
+      queryClient,
+    );
+
+    sources[0]!.readyState = 2;
+    act(() => sources[0]!.dispatchEvent(new Event("error")));
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+
+    expect(server.requests.some((request) => request.url.endsWith("/me"))).toBe(true);
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ ended: true }));
+    // The session ended: nothing reopens the stream.
+    await act(() => vi.advanceTimersByTimeAsync(120_000));
+    expect(sources).toHaveLength(1);
   });
 });
 
@@ -164,6 +215,9 @@ describe("the conflict banner on a notice", () => {
   const notice = { kind: "thing", key: "web", environment: null, version: 2 };
 
   it("shows at once for a form with unsaved edits when someone saved a newer version", async () => {
+    fakeServer({
+      "GET /projects/shop/audit": { status: 200, body: { items: [], next_cursor: null } },
+    });
     const { source, open } = stream();
     renderWithProviders(
       <ChangeStream project="shop" open={open}>

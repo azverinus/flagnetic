@@ -156,21 +156,42 @@ describe("the auth provider form", () => {
     expect(await sent.json()).toEqual({ auto_provision: true });
   });
 
-  it("offers to load the newer version when someone saved first", async () => {
-    fakeServer({
-      "PATCH /instance/auth-providers/acme": problem(412, "version_mismatch"),
+  it("offers the newer version when someone saved first, and keeps the edits on request", async () => {
+    const newer = {
+      ...provider,
+      version: provider.version + 1,
+      link_by_email: false,
+      domains: ["other.example"],
+    };
+    const server = fakeServer({
+      "PATCH /instance/auth-providers/acme": (() => {
+        let refused = false;
+        return () => {
+          if (!refused) {
+            refused = true;
+            return problem(412, "version_mismatch");
+          }
+          return {
+            status: 200,
+            body: { ...newer, version: newer.version + 1, link_by_email: true },
+          };
+        };
+      })(),
+      "GET /instance/auth-providers/acme": { status: 200, body: newer },
     });
-    const onReload = vi.fn();
-    renderWithProviders(
-      <AuthProviderForm layout="page" provider={provider} onSaved={vi.fn()} onReload={onReload} />,
-    );
+    const onSaved = vi.fn();
+    renderWithProviders(<AuthProviderForm layout="page" provider={provider} onSaved={onSaved} />);
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("switch", { name: "Link members by email" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Someone else changed this");
-    await user.click(screen.getByRole("button", { name: "Load their version" }));
-    expect(onReload).toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    await user.click(screen.getByRole("button", { name: "Keep my edits" }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const sent = server.requests.filter((r) => r.method === "PATCH");
+    expect(sent[1]!.headers.get("If-Match")).toBe(`"${newer.version}"`);
+    expect(await sent[1]!.json()).toEqual({ link_by_email: true });
   });
 });

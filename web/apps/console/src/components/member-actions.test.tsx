@@ -56,6 +56,28 @@ describe("what an instance admin does to a member", () => {
     );
   });
 
+  it("reads the projects and each project's access again when an admin demotes themselves", async () => {
+    fakeServer({
+      "PATCH /members/m1": { status: 200, body: member({ instance_admin: false }) },
+    });
+    const { queryClient } = renderWithProviders(
+      <MemberActions member={member({ instance_admin: true })} self />,
+    );
+    queryClient.setQueryData(["projects"], []);
+    queryClient.setQueryData(["projects", "checkout", "me"], { grants: [], permissions: [] });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Revoke instance admin" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Revoke instance admin from Grace Hopper",
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Revoke instance admin" }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(queryClient.getQueryState(["projects"])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(["projects", "checkout", "me"])?.isInvalidated).toBe(true);
+  });
+
   it("makes a member instance admin with the one field it changes", async () => {
     const server = fakeServer({
       "PATCH /members/m1": { status: 200, body: member({ instance_admin: true }) },

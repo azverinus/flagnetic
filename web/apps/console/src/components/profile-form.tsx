@@ -16,9 +16,10 @@ import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { languageName } from "@/i18n/format";
 import { locales } from "@/i18n/locale";
 import { unwrap } from "@/lib/errors";
+import { withinCodePoints } from "@/lib/forms";
 import { chosenLocale, followBrowser, followMemberLocale, localeChoice } from "@/lib/member-locale";
 import { violationMessage } from "@/lib/problem-messages";
-import { meQuery } from "@/lib/queries";
+import { isProjectMembersRead, meQuery } from "@/lib/queries";
 
 /** The server's bound on a display name, in characters. */
 const displayNameMax = 200;
@@ -38,8 +39,8 @@ export function ProfileForm({ member }: { member: ProfileMember }) {
       .string()
       .trim()
       .min(1, i18n._(msg`Enter a display name.`))
-      .max(
-        displayNameMax,
+      .refine(
+        (value) => withinCodePoints(value, displayNameMax),
         violationMessage(i18n, {
           pointer: "/display_name",
           code: "too_long",
@@ -67,6 +68,11 @@ export function ProfileForm({ member }: { member: ProfileMember }) {
     meta: { toast: false },
     onSuccess: async (saved: Me) => {
       queryClient.setQueryData(meQuery.queryKey, saved);
+      // The project member lists, and the names derived from them, carry
+      // the display name the member just changed.
+      void queryClient.invalidateQueries({
+        predicate: (query) => isProjectMembersRead(query.queryKey),
+      });
       if (saved.member) {
         form.reset({
           display_name: saved.member.display_name,

@@ -42,15 +42,18 @@ import { authMethodsQuery } from "@/lib/queries";
 /** One auth provider's page, or why there is none. */
 export function AuthProviderScreen({ slug }: { slug: string }) {
   const provider = useQuery(authProviderQuery(slug));
+  // A failed read of a provider already held keeps it on screen, with the
+  // edits in its form; only one that is gone, or never read, replaces it.
   if (provider.isError) {
     const missing = provider.error instanceof ApiError && provider.error.status === 404;
-    return missing ? (
-      <AuthProviderNotFound />
-    ) : (
-      <Page>
-        <QueryError error={provider.error} onRetry={() => void provider.refetch()} />
-      </Page>
-    );
+    if (missing) return <AuthProviderNotFound />;
+    if (provider.data === undefined) {
+      return (
+        <Page>
+          <QueryError error={provider.error} onRetry={() => void provider.refetch()} />
+        </Page>
+      );
+    }
   }
   if (provider.data === undefined) {
     return (
@@ -227,22 +230,20 @@ function AuthProviderPage({
       <Card aria-labelledby="settings">
         <CardHeader titleId="settings" title={<Trans>Settings</Trans>} />
         <CardContent>
-          {/* A new version starts the form over from what was saved. */}
+          {/* A newer version reaches the form through its own conflict check. */}
           {provider.kind === "oidc" ? (
             <AuthProviderForm
-              key={provider.version}
+              key={provider.id}
               provider={provider}
               layout="page"
               onSaved={settingsSaved}
-              onReload={onReload}
             />
           ) : (
             <SamlProviderForm
-              key={provider.version}
+              key={provider.id}
               provider={provider}
               layout="page"
               onSaved={settingsSaved}
-              onReload={onReload}
             />
           )}
         </CardContent>

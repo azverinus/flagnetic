@@ -1,8 +1,9 @@
 import type { Webhook } from "@flagnetic/api";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { webhookQuery } from "@/lib/webhooks";
 import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithRouter } from "@/test/render";
 
@@ -30,6 +31,7 @@ const base = `/projects/checkout/webhooks/${id}`;
 const common = {
   "GET /webhook-event-types": { status: 200, body: { items: [] } },
   "GET /projects/checkout/environments": { status: 200, body: { items: [] } },
+  "GET /projects/checkout/audit": { status: 200, body: { items: [], next_cursor: null } },
 };
 
 function renderScreen(onSearch = vi.fn()) {
@@ -149,6 +151,107 @@ describe("a webhook's screen", () => {
           .map((query) => query.state.data),
       ),
     ).not.toContain(secret);
+  });
+
+  async function rotate(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rotate secret" }));
+    const confirm = await screen.findByRole("dialog", { name: "Rotate the secret of Release bot" });
+    await user.click(within(confirm).getByRole("button", { name: "Rotate secret" }));
+    const reveal = await screen.findByRole("dialog", { name: "The webhook's signing secret" });
+    await user.click(within(reveal).getByLabelText("I have stored it somewhere safe"));
+    await user.click(within(reveal).getByRole("button", { name: "Close" }));
+  }
+  /** A subscription whose rotation makes version 2, which reads then answer too. */
+  function afterRotation(changes: Partial<Webhook> = {}) {
+    let current: Webhook = webhook;
+    return {
+      [`GET ${base}`]: () => ({ status: 200, body: current }),
+      [`POST ${base}/rotate-secret`]: () => {
+        current = { ...webhook, ...changes, version: 2 };
+        return { status: 200, body: { ...current, secret: "n3w-s3cret-zz99" } };
+      },
+    };
+  }
+
+  it("keeps unsaved edits when a rotation makes a newer version, and offers the conflict", async () => {
+    fakeServer({
+      ...common,
+      ...afterRotation(),
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    const url = await screen.findByLabelText("URL");
+    await user.clear(url);
+    await user.type(url, "https://hooks.example.com/edited");
+    await rotate(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("URL")).toHaveValue("https://hooks.example.com/edited");
+  });
+
+  it("starts a clean form over from a newer version", async () => {
+    fakeServer({
+      ...common,
+      ...afterRotation({ url: "https://hooks.example.com/moved" }),
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    expect(await screen.findByLabelText("URL")).toHaveValue(webhook.url);
+    await rotate(user);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("URL")).toHaveValue("https://hooks.example.com/moved"),
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps unsaved edits when a refetch brings a newer version, and offers the conflict", async () => {
+    let current: Webhook = webhook;
+    fakeServer({ ...common, [`GET ${base}`]: () => ({ status: 200, body: current }) });
+    const { queryClient } = await renderScreen();
+    const user = userEvent.setup();
+
+    const url = await screen.findByLabelText("URL");
+    await user.clear(url);
+    await user.type(url, "https://hooks.example.com/edited");
+    current = { ...webhook, name: "Renamed elsewhere", version: 2 };
+    await act(() =>
+      queryClient.refetchQueries({ queryKey: webhookQuery({ project: "checkout" }, id).queryKey }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("URL")).toHaveValue("https://hooks.example.com/edited");
+  });
+
+  it("keeps the form and its edits when a refetch fails after it held the subscription", async () => {
+    let failing = false;
+    fakeServer({
+      ...common,
+      [`GET ${base}`]: () => (failing ? problem(500, "internal") : { status: 200, body: webhook }),
+    });
+    const { queryClient } = await renderScreen();
+    const user = userEvent.setup();
+
+    const url = await screen.findByLabelText("URL");
+    await user.clear(url);
+    await user.type(url, "https://hooks.example.com/edited");
+    failing = true;
+    await act(() =>
+      queryClient.refetchQueries({ queryKey: webhookQuery({ project: "checkout" }, id).queryKey }),
+    );
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryState(webhookQuery({ project: "checkout" }, id).queryKey)?.status,
+      ).toBe("error"),
+    );
+    // Let the page render what the failed read left.
+    await act(async () => {});
+
+    expect(screen.getByLabelText("URL")).toHaveValue("https://hooks.example.com/edited");
+    expect(screen.getByRole("heading", { name: "Release bot", level: 1 })).toBeVisible();
   });
 
   it("offers to enable a subscription the platform disabled, and cannot send it a test", async () => {

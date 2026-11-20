@@ -19,13 +19,44 @@ export function keySchema(i18n: I18n) {
     .refine((value) => zKey.safeParse(value).success, message);
 }
 
+/**
+ * How long text is as the server counts it: in code points, not the
+ * UTF-16 units a string's `length` counts, so a name of 200 emoji is
+ * valid here as it is there.
+ */
+export function codePointLength(value: string): number {
+  return [...value].length;
+}
+
+/** Whether text has at most `max` code points; any text, when there is no bound. */
+export function withinCodePoints(value: string, max: number | null | undefined): boolean {
+  return max === null || max === undefined || codePointLength(value) <= max;
+}
+
+/**
+ * Whether text satisfies a generated string schema, its bounds counted in
+ * code points as the server counts them; the schema's other rules are
+ * checked as it says.
+ */
+export function fitsRule(rule: z.ZodString, value: string): boolean {
+  const length = codePointLength(value);
+  return length >= (rule.minLength ?? 0) && withinCodePoints(value, rule.maxLength);
+}
+
+/** The refusal of text longer than `max` code points, worded as the server's `too_long` is. */
+export function lengthIssue(i18n: I18n, value: string, max: number): string | undefined {
+  return withinCodePoints(value, max)
+    ? undefined
+    : violationMessage(i18n, { pointer: "", code: "too_long", detail: "", params: { max } });
+}
+
 export function nameSchema(i18n: I18n) {
   return z
     .string()
     .trim()
     .min(1, i18n._(msg`Enter a name.`))
     .refine(
-      (value) => zName.safeParse(value).success,
+      (value) => fitsRule(zName, value),
       violationMessage(i18n, {
         pointer: "/name",
         code: "too_long",
@@ -40,7 +71,7 @@ export function descriptionSchema(i18n: I18n) {
     .string()
     .trim()
     .refine(
-      (value) => zDescription.safeParse(value).success,
+      (value) => fitsRule(zDescription, value),
       violationMessage(i18n, {
         pointer: "/description",
         code: "too_long",

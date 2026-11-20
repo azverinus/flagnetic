@@ -61,19 +61,22 @@ export function WebhookScreen({
   onSearch: (search: WebhookSearch) => void;
 }) {
   const webhook = useQuery(webhookQuery(scope, id));
+  // A failed read of a subscription already held keeps it on screen, with
+  // the edits in its form; only one that is gone, or never read, replaces it.
   if (webhook.isError) {
     // An identifier that is no UUID is refused as a bad request: it names
     // no subscription either.
     const missing =
       webhook.error instanceof ApiError &&
       (webhook.error.status === 404 || webhook.error.status === 400);
-    return missing ? (
-      <WebhookNotFound scope={scope} />
-    ) : (
-      <Page>
-        <QueryError error={webhook.error} onRetry={() => void webhook.refetch()} />
-      </Page>
-    );
+    if (missing) return <WebhookNotFound scope={scope} />;
+    if (webhook.data === undefined) {
+      return (
+        <Page>
+          <QueryError error={webhook.error} onRetry={() => void webhook.refetch()} />
+        </Page>
+      );
+    }
   }
   if (webhook.data === undefined) {
     return (
@@ -260,9 +263,9 @@ function WebhookPage({
               <div className="measure-form">
                 <Card>
                   <CardContent>
-                    {/* A new version starts the form over from what was saved. */}
+                    {/* A newer version reaches the form through its own conflict check. */}
                     <WebhookEditor
-                      key={webhook.version}
+                      key={webhook.id}
                       scope={scope}
                       webhook={webhook}
                       layout="page"

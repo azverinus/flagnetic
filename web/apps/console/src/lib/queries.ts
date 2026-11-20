@@ -567,6 +567,11 @@ export function projectMembersQuery(project: string) {
   });
 }
 
+/** Whether a cached read is one project's members, whichever project it is. */
+export function isProjectMembersRead(queryKey: readonly unknown[]): boolean {
+  return queryKey[0] === "projects" && queryKey[2] === "members" && queryKey.length === 3;
+}
+
 /**
  * The members invited to a project with the role their invitation grants
  * there, by email; read only by whoever manages the project's grants.

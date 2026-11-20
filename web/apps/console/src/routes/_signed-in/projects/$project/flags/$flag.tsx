@@ -515,7 +515,8 @@ function EnvironmentPage(props: EnvironmentPageProps) {
   const flags = useQuery(flagChoicesQuery(project));
   const experiments = useQuery(flagExperimentsQuery(project, flag.key));
   const reads = [attributes, segments, flags, experiments];
-  const failed = reads.find((read) => read.isError);
+  // A refetch that failed keeps the data it held, and with it the editor.
+  const failed = reads.find((read) => read.isError && read.data === undefined);
 
   const switches = <FlagOnOff {...props} frozen={frozen !== undefined} />;
   const evaluations = (

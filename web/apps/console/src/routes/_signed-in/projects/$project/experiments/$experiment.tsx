@@ -39,7 +39,7 @@ import { experimentQuery, experimentsQueryKey } from "@/lib/queries";
 import { diffExperiments } from "@/lib/structural-diff";
 import { useExperimentChoices } from "@/lib/use-experiment-choices";
 import { useNewerVersionNotice } from "@/lib/change-stream";
-import { useFormConflict } from "@/lib/use-form-conflict";
+import { useFormConflict, useNewerArrival } from "@/lib/use-form-conflict";
 import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/experiments/$experiment")({
@@ -60,11 +60,13 @@ function ExperimentDetail() {
   ) {
     return <ExperimentNotFound project={project} />;
   }
-  const failed = experiment.isError
-    ? { error: experiment.error, retry: () => void experiment.refetch() }
-    : choices.state === "failed"
-      ? choices
-      : undefined;
+  // A refetch that failed keeps the data it held, and with it the editor.
+  const failed =
+    experiment.isError && experiment.data === undefined
+      ? { error: experiment.error, retry: () => void experiment.refetch() }
+      : choices.state === "failed"
+        ? choices
+        : undefined;
   if (failed) {
     return (
       <Page>
@@ -197,6 +199,14 @@ function ExperimentPage({
     { kind: "experiment", key: experiment.key },
     { dirty, version: conflicts.version },
     conflicts.meetNewer,
+  );
+  // A newer version the query answered (another member started the
+  // experiment, a refetch after a notice) starts a clean form over from
+  // it; one with edits meets it at the notice, or at its save.
+  useNewerArrival(
+    experiment,
+    { version: conflicts.version, dirty, saving: save.isPending },
+    { clean: restart, dirty: () => undefined },
   );
   const refusal = conflicts.refusal(save.error);
   const shownAtFields =

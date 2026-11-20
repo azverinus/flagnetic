@@ -80,7 +80,7 @@ export function webhookApi(scope: WebhookScope) {
       unwrap(
         project ? createWebhook({ path: { project }, body }) : createInstanceWebhook({ body }),
       ),
-    update: (webhook: Webhook, body: WebhookPatch) =>
+    update: (webhook: { id: string; version: number }, body: WebhookPatch) =>
       unwrap(
         project
           ? updateWebhook({
@@ -387,6 +387,41 @@ export function patchOf(webhook: Webhook, values: WebhookForm): WebhookPatch {
     patch.environments = body.environments;
   if (body.enabled !== undefined && body.enabled !== webhook.enabled) patch.enabled = body.enabled;
   return patch;
+}
+
+/** The names of the fields that differ between two versions of a subscription, for the conflict banner. */
+export function changedFieldNames(i18n: I18n, before: Webhook, after: Webhook): string[] {
+  const names: string[] = [];
+  if (before.name !== after.name) names.push(i18n._(msg`Name`));
+  if (before.url !== after.url) names.push(i18n._(msg`URL`));
+  if (!sameSet(before.events, after.events)) names.push(i18n._(msg`Event types`));
+  if (!sameSet(before.environments, after.environments)) names.push(i18n._(msg`Environments`));
+  if (before.enabled !== after.enabled) names.push(i18n._(msg`Enabled`));
+  return names;
+}
+
+/**
+ * What the server would refuse in a subscription's target before it is
+ * asked: it must be an absolute http or https URL, without credentials
+ * (`user@`, even empty) or a fragment. A value already trimmed.
+ */
+export function webhookUrlIssue(i18n: I18n, value: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return i18n._(msg`Enter an absolute URL, such as https://example.com/flagnetic.`);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return i18n._(msg`Enter an absolute URL, such as https://example.com/flagnetic.`);
+  }
+  const credentials =
+    url.username !== "" || url.password !== "" || /^[^/]*\/\/[^/?#]*@/.test(value);
+  // An empty fragment (a bare "#") is no fragment to the server either.
+  if (credentials || url.hash !== "") {
+    return i18n._(msg`Enter a URL without credentials or a fragment.`);
+  }
+  return undefined;
 }
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {

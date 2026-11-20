@@ -1,8 +1,10 @@
 import { client } from "@flagnetic/api";
-import { useQueryClient } from "@tanstack/react-query";
+import { CancelledError, useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 
 import { applyNotice, applyRefetch, type ChangeNotice, parseNotice } from "./change-notices";
+import { ApiError } from "./errors";
+import { meQuery } from "./queries";
 
 type Listener = (notice: ChangeNotice) => void;
 type Subscribe = (listener: Listener) => () => void;
@@ -57,6 +59,7 @@ export function ChangeStream({
     // A stream opened again after the browser gave up names no last
     // notice, so whatever changed meanwhile is read again in full.
     let missed = false;
+    let stopped = false;
     const connect = () => {
       source = open(changeStreamUrl(project));
       source.addEventListener("open", () => {
@@ -78,16 +81,34 @@ export function ChangeStream({
       // gives up for good when an attempt is answered with anything but a
       // stream (too many streams, a proxy's error page while the server
       // restarts): then the stream is opened again, ever more slowly.
+      // A stream refused because the session ended would otherwise be
+      // reopened for ever, the page showing nothing of it: the caller is
+      // read once before each attempt, and a refusal as not signed in
+      // sends the console to sign-in instead of reopening.
       source.addEventListener("error", () => {
         if (source.readyState !== closed) return;
         source.close();
         missed = true;
-        retry = setTimeout(connect, delay);
+        retry = setTimeout(() => {
+          void queryClient
+            .fetchQuery({ ...meQuery, staleTime: 0 })
+            .then(
+              () => true,
+              (error: unknown) =>
+                // Ending the session clears the cache, which cancels this read.
+                !(error instanceof CancelledError) &&
+                !(error instanceof ApiError && error.status === 401),
+            )
+            .then((reopen) => {
+              if (reopen && !stopped) connect();
+            });
+        }, delay);
         delay = Math.min(delay * 2, lastDelay);
       });
     };
     connect();
     return () => {
+      stopped = true;
       clearTimeout(retry);
       source.close();
     };

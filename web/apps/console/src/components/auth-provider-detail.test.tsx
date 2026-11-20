@@ -1,8 +1,9 @@
 import type { AuthProvider } from "@flagnetic/api";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { authProviderQuery } from "@/lib/auth-providers";
 import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithRouter } from "@/test/render";
 
@@ -148,6 +149,71 @@ describe("an auth provider's page", () => {
 
     expect(await screen.findByRole("button", { name: "Disable" })).toBeInTheDocument();
     expect(server.requests.some((r) => r.url.endsWith("/acme/enable"))).toBe(true);
+  });
+
+  it("keeps unsaved edits when the header's toggle makes a newer version, and offers the conflict", async () => {
+    let current = acme;
+    serve({
+      ...mappingReads,
+      "GET /instance/auth-providers/acme": () => ({ status: 200, body: current }),
+      "POST /instance/auth-providers/acme/disable": () => {
+        current = { ...acme, enabled: false, version: acme.version + 1 };
+        return { status: 200, body: current };
+      },
+    });
+    await renderScreen();
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Acme renamed");
+    await user.click(screen.getByRole("button", { name: "Disable" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("Name")).toHaveValue("Acme renamed");
+  });
+
+  it("keeps unsaved edits when a refetch brings a newer version, and offers the conflict", async () => {
+    let current = acme;
+    serve({
+      ...mappingReads,
+      "GET /instance/auth-providers/acme": () => ({ status: 200, body: current }),
+    });
+    const { queryClient } = await renderScreen();
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Acme renamed");
+    current = { ...acme, version: acme.version + 1 };
+    await act(() => queryClient.refetchQueries({ queryKey: authProviderQuery("acme").queryKey }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("Name")).toHaveValue("Acme renamed");
+  });
+
+  it("keeps the form and its edits when a refetch fails after it held the provider", async () => {
+    let failing = false;
+    serve({
+      ...mappingReads,
+      "GET /instance/auth-providers/acme": () =>
+        failing ? problem(500, "internal") : { status: 200, body: acme },
+    });
+    const { queryClient } = await renderScreen();
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Acme renamed");
+    failing = true;
+    await act(() => queryClient.refetchQueries({ queryKey: authProviderQuery("acme").queryKey }));
+    await waitFor(() =>
+      expect(queryClient.getQueryState(authProviderQuery("acme").queryKey)?.status).toBe("error"),
+    );
+    // Let the page render what the failed read left.
+    await act(async () => {});
+
+    expect(screen.getByLabelText("Name")).toHaveValue("Acme renamed");
   });
 
   it("deletes the provider and goes to the list, never saying it was not found", async () => {

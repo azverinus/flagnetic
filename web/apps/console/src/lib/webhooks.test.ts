@@ -13,6 +13,7 @@ import {
   isPlatformDisabled,
   patchOf,
   validateWebhookSearch,
+  webhookUrlIssue,
 } from "./webhooks";
 
 const webhook: Webhook = {
@@ -138,5 +139,30 @@ describe("the delivery log's address", () => {
   it("counts any filter, and nothing else, as filtering", () => {
     expect(isDeliveryFiltered({})).toBe(false);
     expect(isDeliveryFiltered({ event_type: "ping" })).toBe(true);
+  });
+});
+
+describe("the check of a subscription's target", () => {
+  const issue = (value: string) => webhookUrlIssue(i18n, value);
+
+  it("accepts an absolute http or https URL with a path and a query", () => {
+    expect(issue("https://hooks.example.com/flagnetic?team=a")).toBeUndefined();
+    expect(issue("http://localhost:8080/hook")).toBeUndefined();
+  });
+
+  it("refuses a URL that is not absolute or not http", () => {
+    expect(issue("hooks.example.com")).toContain("absolute URL");
+    expect(issue("ftp://hooks.example.com")).toContain("absolute URL");
+  });
+
+  it("refuses credentials and a fragment, which the server refuses too", () => {
+    const message = "Enter a URL without credentials or a fragment.";
+    expect(issue("https://user@hooks.example.com/x")).toBe(message);
+    expect(issue("https://user:secret@hooks.example.com/x")).toBe(message);
+    expect(issue("https://hooks.example.com/x#x")).toBe(message);
+  });
+
+  it("takes an empty fragment, which the server takes as none", () => {
+    expect(issue("https://hooks.example.com/x#")).toBeUndefined();
   });
 });

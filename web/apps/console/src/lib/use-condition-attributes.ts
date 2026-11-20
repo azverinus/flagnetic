@@ -27,7 +27,7 @@ export function useConditionAttributes(
       ]) as AttributeTypes,
     };
   }, [attributes.data, unitTypes.data]);
-  const failed = [attributes, unitTypes].find((read) => read.isError);
+  const failed = [attributes, unitTypes].find((read) => read.isError && read.data === undefined);
   if (failed) return { state: "failed", error: failed.error, retry: () => void failed.refetch() };
   if (!ready) return { state: "loading" };
   return { state: "ready", ...ready };

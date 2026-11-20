@@ -69,6 +69,26 @@ describe("the profile form", () => {
     expect(await server.requests[0]!.json()).toEqual({ display_name: "Grace Brewster Hopper" });
   });
 
+  it("reads the project member lists again after a rename, which carry the old name", async () => {
+    fakeServer({ "PATCH /me": answered({ display_name: "Grace Brewster Hopper" }) });
+    const { queryClient } = await renderWithRouter(() => <ProfileForm member={member} />);
+    queryClient.setQueryData(["projects", "checkout", "members"], []);
+    queryClient.setQueryData(["projects", "checkout", "flags"], []);
+    const user = userEvent.setup();
+
+    const name = screen.getByLabelText("Display name");
+    await user.clear(name);
+    await user.type(name, "Grace Brewster Hopper");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(["projects", "checkout", "members"])?.isInvalidated).toBe(
+        true,
+      ),
+    );
+    expect(queryClient.getQueryState(["projects", "checkout", "flags"])?.isInvalidated).toBe(false);
+  });
+
   it("follows a language chosen elsewhere while it is open, and does not undo it on save", async () => {
     vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
     const server = fakeServer({

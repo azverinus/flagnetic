@@ -34,6 +34,7 @@ import { msg, plural } from "@lingui/core/macro";
 import { queryOptions } from "@tanstack/react-query";
 
 import { unwrap } from "./errors";
+import { fitsRule } from "./forms";
 import { ifMatch } from "./http";
 
 /** The query keys of a project's sinks, so a change invalidates by prefix. */
@@ -667,7 +668,7 @@ export function formProblems(
     if (value.trim() === "") out.push({ path, message: i18n._(msg`Required.`) });
   };
   if (values.name.trim() === "") out.push({ path: "name", message: i18n._(msg`Enter a name.`) });
-  else if (!zName.safeParse(values.name.trim()).success) {
+  else if (!fitsRule(zName, values.name.trim())) {
     out.push({ path: "name", message: i18n._(msg`Enter a name of 1 to 200 characters.`) });
   }
   switch (values.kind) {
