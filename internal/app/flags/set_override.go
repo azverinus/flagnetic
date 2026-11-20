@@ -17,7 +17,7 @@ type SetOverrideDeps struct {
 	Recorder     Recorder
 }
 
-// SetOverride pins a variation for one unit without replacing the rest of
+// SetOverride fixes a variation for one unit without replacing the rest of
 // a configuration.
 type SetOverride struct{ d SetOverrideDeps }
 

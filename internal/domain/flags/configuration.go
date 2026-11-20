@@ -49,7 +49,7 @@ type Prerequisite struct {
 	Flag, Variation string
 }
 
-// Override pins a variation for one unit.
+// Override fixes a variation for one unit.
 type Override struct {
 	UnitType, UnitID, Variation string
 	// Note says why, "" for nothing. It and AddedBy stay on the server: no

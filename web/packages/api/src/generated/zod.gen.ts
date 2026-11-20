@@ -1510,7 +1510,7 @@ export const zPrerequisite = z.object({
 });
 
 /**
- * A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+ * A variation fixed for one unit. Its note and author stay on the server; SDKs receive neither.
  */
 export const zOverride = z.object({
   unit_type: z.string(),

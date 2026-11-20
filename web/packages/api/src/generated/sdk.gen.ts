@@ -2821,7 +2821,7 @@ export const deleteOverride = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Pin a variation for one unit
+ * Fix a variation for one unit
  *
  * Sets one override without replacing the configuration, and needs
  * no `If-Match`; the configuration's version still moves on. An

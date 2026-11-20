@@ -52,7 +52,7 @@ A configuration holds:
 - `off_variation`: the **off variation**, served while the flag is off and when a prerequisite fails.
 - `fallthrough`: the **fallthrough variation**, served when the flag is on and no rule matches.
 - `prerequisites`: other flags that must serve a given variation for this one to be evaluated.
-- `overrides`: variations pinned for single units.
+- `overrides`: variations fixed for single units.
 - `rules`: ordered rules, each with conditions and what it serves.
 
 ### How a flag is evaluated
@@ -92,9 +92,9 @@ The server gives a new rollout a salt of 16 random characters. A write omits the
 
 ### Overrides
 
-An **override** pins a variation for one unit in one environment: `{unit_type, unit_id, variation, note}`. The unit type is one the project declares, the unit ID is 1 to 256 bytes, and the note, at most 200 characters once trimmed, says why. A configuration holds at most 200 overrides, one per unit type and unit ID. Each override records `added_by`, the member who last wrote it: an override a full write leaves as it was keeps its author, any other is the writer's.
+An **override** fixes a variation for one unit in one environment: `{unit_type, unit_id, variation, note}`. The unit type is one the project declares, the unit ID is 1 to 256 bytes, and the note, at most 200 characters once trimmed, says why. A configuration holds at most 200 overrides, one per unit type and unit ID. Each override records `added_by`, the member who last wrote it: an override a full write leaves as it was keeps its author, any other is the writer's.
 
-Besides a full write, one override is set with `PUT /flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}` (`{variation, note}`) and removed with `DELETE` on the same path (`404 not_found` when the unit has none). Neither needs `If-Match`, so pinning a tester's account never conflicts with someone editing the rules, and each still moves the configuration's version on.
+Besides a full write, one override is set with `PUT /flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}` (`{variation, note}`) and removed with `DELETE` on the same path (`404 not_found` when the unit has none). Neither needs `If-Match`, so fixing a tester's account never conflicts with someone editing the rules, and each still moves the configuration's version on.
 
 Override notes and authors stay on the server: SDKs receive the unit and the variation only.
 

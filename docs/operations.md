@@ -361,6 +361,8 @@ The deletion is one transaction. It locks the project's row, so no write in the 
 - its open and approved change requests end with it, recorded by `project.deleted` alone rather than one entry each;
 - every replica drops the project's SDK keys and rulesets on the notifications their deletion sends, as for a revoked key or a deleted environment (see [Notification listeners](#notification-listeners)), so its SDK keys are refused within about a second and its SDK streams close on their next heartbeat.
 
+The cascade of a project with millions of per-unit rows (first exposures, alias links) can take longer than a client waits. A client that disconnects cancels the request and PostgreSQL rolls the deletion back, so the project is still there. Call it again with a timeout long enough for the cascade (for example `curl --max-time 3600`, or a reverse proxy's read timeout raised for this path), and keep the session open until it answers.
+
 Rows that refer to a project without a foreign key, the event IDs kept to recognise retries, cannot go in the deletion's transaction. Every replica runs the project purge worker once an hour, which deletes the rows of projects that no longer exist 1,000 at a time, each batch in a transaction of its own; replicas running it at once take turns. The raw events of a deleted project stay until retention drops their partitions (see [Raw events](#raw-events)); the rollups never count them.
 
 ## Webhook targets
