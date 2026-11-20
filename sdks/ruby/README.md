@@ -48,6 +48,7 @@ client.ready(timeout: 5) # => :fresh, :last_good or :built_in
 context = { units: { user: "u-1001" }, attributes: { plan: "pro" } }
 client.bool("new_checkout", default: false, context: context)
 client.int("max_items", default: 10, context: context) # a number flag, whole numbers only
+client.int_detail("max_items", default: 10, context: context) # the same, with why it was served
 detail = client.detail("new_checkout", default: false, context: context)
 detail.value  # => true
 detail.reason # => :rule
@@ -102,7 +103,7 @@ client.flush(timeout: 5)
 - **Evaluation summaries.** Every evaluation is counted per flag, variation and reason (`fallback` and `local_override` included, never a unit ID or a value) and sent every `summary_interval` as one or more `evaluation_summary` events of at most 1,000 rows, with the version of the ruleset held at the interval's end. A report that fails merges into the next one; one older than an hour is dropped.
 - **Exposures.** Evaluating records nothing on its own. `exposure` sends the experiment block of the latest evaluation of that flag for that context, or nothing when it carried none (`exposure_skipped` at debug says why). A flag with automatic exposure sends one as it is evaluated. A repeat for the same experiment, unit and variation is sent once per `flush_interval`.
 - **Aliases.** `alias` links the unit ID used before sign-up to the one after it; it changes no context.
-- **Delivery.** Events go gzipped to `POST /sdk/v1/events` in batches of at most 500, each with a UUIDv7 event ID kept across retries, so the server drops a resend as a duplicate. An evaluation summary that is still unanswered when its flush ends is merged into the next window and sent under new IDs. A 429, a 5xx or a network error is retried with backoff (evaluation summaries wait for `Retry-After`, capped at five minutes); a 401 or 403 logs `key_revoked` and keeps the events; an event the server rejects is logged as `queue_dropped` and never sent again. The queue holds 10,000 events and drops the oldest beyond that. A string that is not valid UTF-8 (a unit ID taken from a cookie, say) is sent with each invalid byte replaced by U+FFFD; an event that still cannot be encoded is dropped alone, logged as `queue_dropped` with cause `not_serialisable` and the class of the error as `fault`, and costs no other event.
+- **Delivery.** Events go gzipped to `POST /sdk/v1/events` in batches of at most 500, each with a UUIDv7 event ID kept across retries, so the server drops a resend as a duplicate. An evaluation summary that is still unanswered when its flush ends is merged into the next window and sent under new IDs. A 429, a 5xx or a network error is retried with backoff (evaluation summaries wait for `Retry-After`, capped at five minutes); a 401 or 403 logs `key_revoked` and keeps the events; an event the server rejects is logged as `queue_dropped` and never sent again. The queue holds 10,000 events and drops the oldest beyond that. Drops beyond that are logged as one `queue_dropped` per flush with the count. A string that is not valid UTF-8 (a unit ID taken from a cookie, say) is sent with each invalid byte replaced by U+FFFD; an event that still cannot be encoded is dropped alone, logged as `queue_dropped` with cause `not_serialisable` and the class of the error as `fault`, and costs no other event.
 - `flush(timeout:)` sends what is queued and the current window and waits at most `timeout` seconds; `close(timeout:)` flushes first and then stops the background thread, both within the one `timeout`. A forked child starts with an empty queue and window.
 
 An offline client sends nothing: it hands every summary, exposure and alias to its `recorder`.
@@ -128,7 +129,7 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `listener_failed` | error | `cause` |
 | `store_failed` | error | `path`, `cause` |
 | `worker_failed` | error | `cause` |
-| `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`) |
+| `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`); once at warn with `cause` `closed` for an exposure or alias after `close` |
 | `exposures_disabled` | warn | |
 | `ingest_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
 | `client_not_configured` | warn | `rails_env`: the Rails integration found no SDK key and base URL outside production and serves built-in defaults |
