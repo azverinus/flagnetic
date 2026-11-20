@@ -23,7 +23,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Tooltip } from "@/components/ui/tooltip";
 import { unwrap } from "@/lib/errors";
 import { directoryOwns, type MemberAction, memberActions, memberName } from "@/lib/members";
-import { meQuery } from "@/lib/queries";
+import { meQuery, projectsQuery } from "@/lib/queries";
 import { forgetsSecret } from "@/lib/mutations";
 
 /** A change of a member confirmed in a dialog, by the action that asks for it. */
@@ -80,7 +80,12 @@ export function MemberActions({ member, self }: MemberActionsProps) {
     // all read under the members' key; an instance admin changing
     // themselves also changes what they may open.
     await queryClient.invalidateQueries({ queryKey: ["members"] });
-    if (self) await queryClient.invalidateQueries({ queryKey: meQuery.queryKey });
+    if (self) {
+      await queryClient.invalidateQueries({ queryKey: meQuery.queryKey });
+      // Which projects the switcher offers, and what each one lets them
+      // do, follow their access: every read under a project.
+      await queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey });
+    }
   };
 
   const edit = useMutation({

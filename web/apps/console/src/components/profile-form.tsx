@@ -18,7 +18,7 @@ import { locales } from "@/i18n/locale";
 import { unwrap } from "@/lib/errors";
 import { chosenLocale, followBrowser, followMemberLocale, localeChoice } from "@/lib/member-locale";
 import { violationMessage } from "@/lib/problem-messages";
-import { meQuery } from "@/lib/queries";
+import { isProjectMembersRead, meQuery } from "@/lib/queries";
 
 /** The server's bound on a display name, in characters. */
 const displayNameMax = 200;
@@ -67,6 +67,11 @@ export function ProfileForm({ member }: { member: ProfileMember }) {
     meta: { toast: false },
     onSuccess: async (saved: Me) => {
       queryClient.setQueryData(meQuery.queryKey, saved);
+      // The project member lists, and the names derived from them, carry
+      // the display name the member just changed.
+      void queryClient.invalidateQueries({
+        predicate: (query) => isProjectMembersRead(query.queryKey),
+      });
       if (saved.member) {
         form.reset({
           display_name: saved.member.display_name,
