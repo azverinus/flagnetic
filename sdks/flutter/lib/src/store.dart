@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flagnetic/flagnetic.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -46,6 +48,26 @@ final class FlutterStore implements FlagneticStore {
   Future<SharedPreferences>? _preferences;
   Future<FileStore?>? _backupFree;
 
+  /// The last operation on each key still in flight. A read that moves an
+  /// old entry writes it to the new directory after awaiting the old one; a
+  /// write of the same key between the two would otherwise be overwritten by
+  /// the old value, and the anonymous ID or the queued events lost.
+  final _pending = <String, Future<void>>{};
+
+  /// Runs [operation] after every earlier operation on [key] has finished.
+  Future<T> _inTurn<T>(String key, Future<T> Function() operation) {
+    final previous = _pending[key] ?? Future<void>.value();
+    final result = previous.then((_) => operation());
+    final done = result.then<void>((_) {}, onError: (Object _) {});
+    _pending[key] = done;
+    unawaited(
+      done.then((_) {
+        if (identical(_pending[key], done)) _pending.remove(key);
+      }),
+    );
+    return result;
+  }
+
   Future<SharedPreferences> get _prefs =>
       _preferences ??= SharedPreferences.getInstance();
 
@@ -79,7 +101,9 @@ final class FlutterStore implements FlagneticStore {
   }
 
   @override
-  Future<String?> get(String key) async {
+  Future<String?> get(String key) => _inTurn(key, () => _get(key));
+
+  Future<String?> _get(String key) async {
     final excluded = await _excluded;
     if (excluded == null) return _legacyGet(key);
     final held = await excluded.read(_entryName(key));
@@ -98,7 +122,10 @@ final class FlutterStore implements FlagneticStore {
   }
 
   @override
-  Future<void> set(String key, String value) async {
+  Future<void> set(String key, String value) =>
+      _inTurn(key, () => _set(key, value));
+
+  Future<void> _set(String key, String value) async {
     final excluded = await _excluded;
     if (excluded == null) {
       final name = _legacyFileName(key);
@@ -117,7 +144,9 @@ final class FlutterStore implements FlagneticStore {
   }
 
   @override
-  Future<void> remove(String key) async {
+  Future<void> remove(String key) => _inTurn(key, () => _remove(key));
+
+  Future<void> _remove(String key) async {
     final excluded = await _excluded;
     if (excluded != null) await excluded.delete(_entryName(key));
     await _legacyRemove(key);

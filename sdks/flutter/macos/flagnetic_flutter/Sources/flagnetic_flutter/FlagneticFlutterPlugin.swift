@@ -15,14 +15,21 @@ public class FlagneticFlutterPlugin: NSObject, FlutterPlugin {
     }
     // The anonymous unit ID belongs to one device: a restored backup, or
     // Quick Start, must not carry it to a new one. Application Support is
-    // backed up unless the directory says otherwise.
+    // backed up unless the directory says otherwise. Outside the sandbox
+    // Application Support is shared by every app of the user, so the
+    // directory goes under the bundle identifier, or every app built with
+    // the SDK on this Mac would share one anonymous ID and one event queue.
     do {
       var directory = try FileManager.default.url(
         for: .applicationSupportDirectory,
         in: .userDomainMask,
         appropriateFor: nil,
         create: true
-      ).appendingPathComponent("flagnetic-device", isDirectory: true)
+      )
+      if let bundle = Bundle.main.bundleIdentifier, !bundle.isEmpty {
+        directory.appendPathComponent(bundle, isDirectory: true)
+      }
+      directory.appendPathComponent("flagnetic-device", isDirectory: true)
       try FileManager.default.createDirectory(
         at: directory,
         withIntermediateDirectories: true

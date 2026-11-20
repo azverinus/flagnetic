@@ -85,6 +85,17 @@ void main() {
     expect(await anonymousUnitId(store, 'anonymous'), 'd-8f1c');
   });
 
+  test('a write while an old entry is being moved is not overwritten by '
+      'the old value', () async {
+    SharedPreferences.setMockInitialValues({clientKeys.events: '["old"]'});
+    final reading = store.get(clientKeys.events);
+    final writing = store.set(clientKeys.events, '["new"]');
+    expect(await reading, '["old"]');
+    await writing;
+    expect(await store.get(clientKeys.events), '["new"]');
+    expect(await preferenceKeys(), isEmpty);
+  });
+
   test(
     'last good values in the application support directory move too',
     () async {
