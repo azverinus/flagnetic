@@ -145,7 +145,7 @@ export function SinkEditor({ project, sink, initialKind, onSaved }: SinkEditorPr
   // offered as a conflict to one with edits.
   useNewerArrival(
     sink,
-    { version: conflicts.version, dirty: form.formState.isDirty },
+    { version: conflicts.version, dirty: form.formState.isDirty, saving: save.isPending },
     {
       clean: (fresh) => {
         form.reset(formOf(fresh));

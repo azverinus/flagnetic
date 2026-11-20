@@ -1,9 +1,10 @@
 import type { Webhook } from "@flagnetic/api";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { fakeServer } from "@/test/fake-server";
+import { webhookQuery } from "@/lib/webhooks";
+import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithRouter } from "@/test/render";
 
 import { WebhookScreen } from "./webhook-detail";
@@ -204,6 +205,52 @@ describe("a webhook's screen", () => {
       expect(screen.getByLabelText("URL")).toHaveValue("https://hooks.example.com/moved"),
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps unsaved edits when a refetch brings a newer version, and offers the conflict", async () => {
+    let current: Webhook = webhook;
+    fakeServer({ ...common, [`GET ${base}`]: () => ({ status: 200, body: current }) });
+    const { queryClient } = await renderScreen();
+    const user = userEvent.setup();
+
+    const url = await screen.findByLabelText("URL");
+    await user.clear(url);
+    await user.type(url, "https://hooks.example.com/edited");
+    current = { ...webhook, name: "Renamed elsewhere", version: 2 };
+    await act(() =>
+      queryClient.refetchQueries({ queryKey: webhookQuery({ project: "checkout" }, id).queryKey }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("URL")).toHaveValue("https://hooks.example.com/edited");
+  });
+
+  it("keeps the form and its edits when a refetch fails after it held the subscription", async () => {
+    let failing = false;
+    fakeServer({
+      ...common,
+      [`GET ${base}`]: () => (failing ? problem(500, "internal") : { status: 200, body: webhook }),
+    });
+    const { queryClient } = await renderScreen();
+    const user = userEvent.setup();
+
+    const url = await screen.findByLabelText("URL");
+    await user.clear(url);
+    await user.type(url, "https://hooks.example.com/edited");
+    failing = true;
+    await act(() =>
+      queryClient.refetchQueries({ queryKey: webhookQuery({ project: "checkout" }, id).queryKey }),
+    );
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryState(webhookQuery({ project: "checkout" }, id).queryKey)?.status,
+      ).toBe("error"),
+    );
+    // Let the page render what the failed read left.
+    await act(async () => {});
+
+    expect(screen.getByLabelText("URL")).toHaveValue("https://hooks.example.com/edited");
+    expect(screen.getByRole("heading", { name: "Release bot", level: 1 })).toBeVisible();
   });
 
   it("offers to enable a subscription the platform disabled, and cannot send it a test", async () => {

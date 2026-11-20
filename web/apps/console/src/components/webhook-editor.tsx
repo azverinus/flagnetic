@@ -111,8 +111,8 @@ export function WebhookEditor({ scope, webhook, layout, onCancel, onSaved }: Web
           )
         : api.create(bodyOf(values)),
     webhooksKey(scope),
-    // A save makes a new version, which starts the form over: the screen
-    // that is told must not be the one the answer replaces.
+    // A save makes a new version, which starts the form over from what the
+    // server kept, with no conflict: the newer version is the member's own.
     (saved) => {
       if (webhook) {
         form.reset(formOf(saved as Webhook));

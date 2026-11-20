@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { sinkQuery } from "@/lib/sinks";
 import { fakeServer, problem } from "@/test/fake-server";
 import { renderWithRouter } from "@/test/render";
 import { clickhouseSink, webhookSink } from "@/test/sinks";
@@ -128,6 +129,87 @@ describe("a sink's form beside its header", () => {
     await user.click(within(reveal).getByRole("button", { name: "Close" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("Name")).toHaveValue("Edited pipeline");
+  });
+});
+
+describe("a sink's form across reads", () => {
+  it("keeps unsaved edits when a refetch brings a newer version, and offers the conflict", async () => {
+    let current: Sink = webhookSink;
+    fakeServer({
+      ...common,
+      [`GET ${base(webhookSink.id)}`]: () => ({ status: 200, body: current }),
+    });
+    const { queryClient } = await renderWithRouter(() => (
+      <SinkScreen project="checkout" sink={webhookSink.id} />
+    ));
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Edited pipeline");
+    current = { ...webhookSink, version: webhookSink.version + 1 };
+    await act(() =>
+      queryClient.refetchQueries({ queryKey: sinkQuery("checkout", webhookSink.id).queryKey }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone saved a change");
+    expect(screen.getByLabelText("Name")).toHaveValue("Edited pipeline");
+  });
+
+  it("saves an edit with no conflict when the reads after the save bring the saved version", async () => {
+    let current: Sink = webhookSink;
+    fakeServer({
+      ...common,
+      [`GET ${base(webhookSink.id)}`]: () => ({ status: 200, body: current }),
+      [`PATCH ${base(webhookSink.id)}`]: () => {
+        current = { ...webhookSink, name: "Edited pipeline", version: webhookSink.version + 1 };
+        return { status: 200, body: current };
+      },
+    });
+    await renderWithRouter(() => <SinkScreen project="checkout" sink={webhookSink.id} />);
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Edited pipeline");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Edited pipeline", level: 1 })).toBeVisible(),
+    );
+    await act(async () => {});
+    expect(screen.queryByText(/Someone saved a change/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveValue("Edited pipeline");
+  });
+
+  it("keeps the form and its edits when a refetch fails after it held the sink", async () => {
+    let failing = false;
+    fakeServer({
+      ...common,
+      [`GET ${base(webhookSink.id)}`]: () =>
+        failing ? problem(500, "internal") : { status: 200, body: webhookSink },
+    });
+    const { queryClient } = await renderWithRouter(() => (
+      <SinkScreen project="checkout" sink={webhookSink.id} />
+    ));
+    const user = userEvent.setup();
+
+    const name = await screen.findByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Edited pipeline");
+    failing = true;
+    await act(() =>
+      queryClient.refetchQueries({ queryKey: sinkQuery("checkout", webhookSink.id).queryKey }),
+    );
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryState(sinkQuery("checkout", webhookSink.id).queryKey)?.status,
+      ).toBe("error"),
+    );
+    // Let the page render what the failed read left.
+    await act(async () => {});
+
     expect(screen.getByLabelText("Name")).toHaveValue("Edited pipeline");
   });
 });
