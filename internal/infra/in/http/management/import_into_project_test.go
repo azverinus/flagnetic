@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -697,11 +698,18 @@ func TestAMergeThatOnlyDeclaresAnAttributeOrAUnitTypeMovesEveryEnvironmentsRules
 	if got := bumped(t, "an attribute", before, after); len(got) != len(before) {
 		t.Errorf("environments moved on by a new attribute = %v, want every one", got)
 	}
+	if rs := rulesetOf(t, f.admin, k, "production", after["production"]); !slices.ContainsFunc(rs.Attributes, func(a eval.Attribute) bool { return a.Key == "region" }) {
+		t.Errorf("attributes of production's ruleset = %+v, want region declared", rs.Attributes)
+	}
 
 	doc["unit_types"] = append(doc["unit_types"].([]any), map[string]any{"key": "account", "name": "Account", "description": ""})
 	mustMerge(t, f.admin, k, doc)
-	if got := bumped(t, "a unit type", after, rulesetVersions(t, f.project)); len(got) != len(after) {
+	last := rulesetVersions(t, f.project)
+	if got := bumped(t, "a unit type", after, last); len(got) != len(after) {
 		t.Errorf("environments moved on by a new unit type = %v, want every one", got)
+	}
+	if rs := rulesetOf(t, f.admin, k, "production", last["production"]); !slices.Contains(rs.UnitTypes, "account") {
+		t.Errorf("unit types of production's ruleset = %v, want account declared", rs.UnitTypes)
 	}
 }
 

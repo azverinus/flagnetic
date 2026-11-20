@@ -20,17 +20,26 @@ func serveExperiment(key string) management.Serve {
 // it.
 func rulesOfFlag(t *testing.T, c *management.ClientWithResponses, project, environment, flag string, version int64) []eval.Rule {
 	t.Helper()
+	rs := rulesetOf(t, c, project, environment, version)
+	for _, f := range rs.Flags {
+		if f.Key == flag {
+			return f.Rules
+		}
+	}
+	t.Fatalf("the ruleset has no flag %s: %+v", flag, rs)
+	return nil
+}
+
+// rulesetOf returns the ruleset of project's environment as its server SDKs
+// receive it, waiting until it reaches version.
+func rulesetOf(t *testing.T, c *management.ClientWithResponses, project, environment string, version int64) eval.Ruleset {
+	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		res := do(c.GetEnvironmentRulesetWithResponse(t.Context(), project, environment))
 		var rs eval.Ruleset
 		if res.StatusCode() == http.StatusOK && json.Unmarshal(res.Body, &rs) == nil && rs.Version >= version {
-			for _, f := range rs.Flags {
-				if f.Key == flag {
-					return f.Rules
-				}
-			}
-			t.Fatalf("the ruleset has no flag %s: %s", flag, res.Body)
+			return rs
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("GET ruleset = %d %s, want version %d", res.StatusCode(), res.Body, version)

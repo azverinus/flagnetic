@@ -309,6 +309,11 @@ func TestAFirebaseImportKeepsTheRulesThatServeAnExperimentAfterTheTranslatedOnes
 			t.Errorf("rules = %s, want the experiment's rule only once", asJSON(t, prod.Rules))
 		}
 	}
+	// What production's server SDKs receive still serves the experiment.
+	served := rulesOfFlag(t, admin, k, "production", "banner_text", rulesetVersions(t, p)["production"])
+	if len(served) == 0 || served[len(served)-1].Serve.Kind != "experiment" || served[len(served)-1].Serve.Experiment != "banner_test" {
+		t.Errorf("rules in production's ruleset = %+v, want the experiment served last", served)
+	}
 }
 
 func TestAFirebaseImportOfAValueAnArchivedFlagLacksIsRefusedAtTheParameter(t *testing.T) {

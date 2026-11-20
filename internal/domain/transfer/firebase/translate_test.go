@@ -362,6 +362,23 @@ func TestRulesPastTheLimitAreSkippedAndTheOthersStay(t *testing.T) {
 	}
 }
 
+func TestTheRulesThatServeAnExperimentAreKeptLastAndTakeTheirShareOfTheLimit(t *testing.T) {
+	experiment := flags.Rule{ID: id.FromBytes[flags.Rule]([16]byte{15: 1}), Serve: flags.Serve{Kind: flags.ServeExperiment, Experiment: "banner_test"}}
+	current := project()
+	current.Flags = []firebase.ExistingFlag{existingFlag("p", flags.TypeString, experiment)}
+	tpl := decode(t, `{"conditions": [{"name": "c", "expression": `+asJSON(t, strings.Repeat("device.os == 'a' || ", 49)+"device.os == 'b'")+`}],
+		"parameters": {"p": {"defaultValue": {"value": "a"}, "conditionalValues": {"c": {"value": "b"}}}}}`)
+	r := translate(t, tpl, current)
+	got := flagOf(t, r, "p").Rules
+	if len(got) != flags.MaxRules || !reflect.DeepEqual(got[len(got)-1], experiment) {
+		t.Errorf("rules = %d, last %+v; want %d, the experiment's last", len(got), got[len(got)-1], flags.MaxRules)
+	}
+	if len(r.Warnings) != 1 || r.Warnings[0].Code != firebase.WarnRuleLimit || r.Warnings[0].Params["max"] != flags.MaxRules ||
+		!strings.HasSuffix(r.Warnings[0].Detail, "a configuration holds at most 50 rules, 1 of them the kept rules that serve an experiment") {
+		t.Errorf("warnings = %+v, want rule_limit naming the kept rule", r.Warnings)
+	}
+}
+
 func TestARulePastTheLimitDeclaresNothingAndWarnsOfNoRollout(t *testing.T) {
 	tpl := decode(t, `{"conditions": [
 			{"name": "many", "expression": `+asJSON(t, strings.Repeat("device.os == 'a' || ", flags.MaxRules-1)+"device.os == 'b'")+`},

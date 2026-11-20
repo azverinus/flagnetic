@@ -265,6 +265,9 @@ func (tr *translation) flag(p grouped, conditions []Condition) (Flag, []apperror
 			// rule left out declares no attribute and warns of no rollout.
 			if len(rules) >= maxRules {
 				reason := fmt.Sprintf("a configuration holds at most %d rules", flags.MaxRules)
+				if len(experimentRules) > 0 {
+					reason += fmt.Sprintf(", %d of them the kept rules that serve an experiment", len(experimentRules))
+				}
 				tr.warn(WarnRuleLimit, pointer, fmt.Sprintf("%s, condition %s: the rule for \"%s\" is skipped: %s",
 					p.key, c.Name, strings.Join(cl.terms, " && "), reason),
 					map[string]any{"parameter": p.key, "condition": c.Name, "max": flags.MaxRules})
