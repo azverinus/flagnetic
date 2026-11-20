@@ -202,23 +202,11 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		// why the admins come before the member's lock. The identity is
 		// looked for before anything is held, to know its provider, and again
 		// once the member is held.
-		held, err := h.d.Identities.MemberIdentities(ctx, cmd.Member)
+		unlinking, held, err := h.heldIdentity(ctx, cmd.Member, identityID)
 		if err != nil {
 			return err
 		}
-		slug := ""
-		for _, i := range held {
-			if i.ID == identityID {
-				slug = i.ProviderSlug
-			}
-		}
-		if slug == "" {
-			return errIdentityNotFound
-		}
-		if _, err = lockProvider(ctx, h.d.Providers, slug); err != nil {
-			if errors.Is(err, errProviderNotFound) {
-				return errIdentityNotFound
-			}
+		if _, err = lockProvider(ctx, h.d.Providers, unlinking.ProviderSlug); err != nil {
 			return err
 		}
 		if err = h.d.Members.LockInstanceAdmins(ctx); err != nil {
@@ -231,17 +219,8 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		if !found {
 			return errMemberNotFound
 		}
-		if held, err = h.d.Identities.MemberIdentities(ctx, cmd.Member); err != nil {
+		if unlinking, held, err = h.heldIdentity(ctx, cmd.Member, identityID); err != nil {
 			return err
-		}
-		var unlinking *LinkedIdentity
-		for i := range held {
-			if held[i].ID == identityID {
-				unlinking = &held[i]
-			}
-		}
-		if unlinking == nil {
-			return errIdentityNotFound
 		}
 		if m.Provider != "" && m.Provider == unlinking.ProviderSlug {
 			return errMemberProvisioned
@@ -279,6 +258,21 @@ func (h *UnlinkIdentity) Handle(ctx context.Context, cmd UnlinkCommand) error {
 		}
 		return h.d.Audit.Record(ctx, entry)
 	})
+}
+
+// heldIdentity is the identity the member holds with that id, with every
+// identity they hold; errIdentityNotFound when they hold none.
+func (h *UnlinkIdentity) heldIdentity(ctx context.Context, member identity.MemberID, identityID id.Of[identity.Identity]) (*LinkedIdentity, []LinkedIdentity, error) {
+	held, err := h.d.Identities.MemberIdentities(ctx, member)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range held {
+		if held[i].ID == identityID {
+			return &held[i], held, nil
+		}
+	}
+	return nil, nil, errIdentityNotFound
 }
 
 // takenBack is what unlinking an identity took back from the member: what
