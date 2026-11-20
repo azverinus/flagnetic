@@ -272,6 +272,45 @@ func TestAFirebaseImportLeavesTheExperimentsAlone(t *testing.T) {
 	assertJSON(t, "experiments of a Firebase-only project", exported(t, admin, empty.Key)["experiments"], `[]`)
 }
 
+func TestAFirebaseImportKeepsTheRulesThatServeAnExperimentAfterTheTranslatedOnes(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	k := p.Key
+	createFlag(t, admin, k, management.FlagCreate{Key: "banner_text", Type: management.FlagTypeString, Name: "Banner",
+		Variations: variations("a", `"Hello"`, "b", `"Other"`)})
+	e := startableExperiment("banner_test")
+	e.UnitType = "user"
+	e.Flag = "banner_text"
+	exp := createExperiment(t, admin, k, e)
+	cfg := getConfiguration(t, admin, k, "banner_text", "production")
+	held := holding("banner_test")
+	held.Fallthrough = "a"
+	mustPut(t, admin, k, "banner_text", "production", cfg.Version, held)
+	exp = mustStart(t, admin, k, "banner_test", exp.Version)
+	if exp.Status != management.ExperimentStatusRunning {
+		t.Fatalf("experiment status = %s, want running", exp.Status)
+	}
+
+	r := mustFirebaseImport(t, admin, k, "production", readFirebaseTemplate(t))
+	if !slices.Contains(keysOfUpdates(r.Changes.Flags.Updated), "banner_text") {
+		t.Errorf("flags updated = %v, want banner_text listed", keysOfUpdates(r.Changes.Flags.Updated))
+	}
+	prod := getConfiguration(t, admin, k, "banner_text", "production")
+	if len(prod.Rules) < 2 {
+		t.Fatalf("production rules = %s, want the translated rules and the experiment's", asJSON(t, prod.Rules))
+	}
+	last := prod.Rules[len(prod.Rules)-1].Serve
+	if last.Kind != "experiment" || last.Experiment == nil || *last.Experiment != "banner_test" {
+		t.Errorf("last rule serves %+v, want the experiment, after the translated rules", last)
+	}
+	for _, r := range prod.Rules[:len(prod.Rules)-1] {
+		if r.Serve.Kind == "experiment" {
+			t.Errorf("rules = %s, want the experiment's rule only once", asJSON(t, prod.Rules))
+		}
+	}
+}
+
 func TestAFirebaseImportRefusesWhatItCannotImportAndWritesNothing(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))

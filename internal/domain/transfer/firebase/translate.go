@@ -222,6 +222,19 @@ func (tr *translation) flag(p grouped, conditions []Condition) (Flag, []apperror
 	}
 	fallthroughKey := vs.key(value, "defaultValue")
 
+	// Firebase cannot express a rule serving an experiment, so the rules of
+	// the flag that do are kept as they are, after the translated ones, and
+	// take their share of the rule limit.
+	var experimentRules []flags.Rule
+	if existing != nil {
+		for _, r := range existing.Rules {
+			if r.Serve.Kind == flags.ServeExperiment {
+				experimentRules = append(experimentRules, r)
+			}
+		}
+	}
+	maxRules := flags.MaxRules - len(experimentRules)
+
 	rules := []flags.Rule{}
 	for _, c := range conditions {
 		v, ok := p.ConditionalValues[c.Name]
@@ -250,7 +263,7 @@ func (tr *translation) flag(p grouped, conditions []Condition) (Flag, []apperror
 		for _, cl := range e.alternatives {
 			// The limit is checked before the rule is translated, so that a
 			// rule left out declares no attribute and warns of no rollout.
-			if len(rules) == flags.MaxRules {
+			if len(rules) >= maxRules {
 				reason := fmt.Sprintf("a configuration holds at most %d rules", flags.MaxRules)
 				tr.warn(WarnRuleLimit, pointer, fmt.Sprintf("%s, condition %s: the rule for \"%s\" is skipped: %s",
 					p.key, c.Name, strings.Join(cl.terms, " && "), reason),
@@ -290,7 +303,7 @@ func (tr *translation) flag(p grouped, conditions []Condition) (Flag, []apperror
 	if p.group != "" && !slices.Contains(f.Tags, p.group) {
 		f.Tags = append(f.Tags, p.group)
 	}
-	f.Rules = keepIdentities(existing.Rules, rules)
+	f.Rules = append(keepIdentities(existing.Rules, rules), experimentRules...)
 	if existing.Flag.ArchivedAt != nil {
 		tr.warn(WarnArchivedFlag, p.pointer, p.key+": the flag is archived; the import configures it, and it stays archived",
 			map[string]any{"parameter": p.key})

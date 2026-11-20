@@ -373,7 +373,7 @@ Re-importing the same template changes nothing, so you can import again after ed
 
 A condition expression is expanded to disjunctive normal form: one rule per conjunction, at most 50 alternatives. A configuration holds at most 50 rules; further ones are dropped with `rule_limit`.
 
-A new flag is on in the target environment and off in the others. An existing flag (of the same type, else `type_immutable`) is switched on in the target environment, keeps its name, owner, other environments, prerequisites and overrides, gains missing variations, and has its description replaced only by a non-empty one. Rules equal to existing ones keep their ids and salts. An archived flag is configured and stays archived (`archived_flag`).
+A new flag is on in the target environment and off in the others. An existing flag (of the same type, else `type_immutable`) is switched on in the target environment, keeps its name, owner, other environments, prerequisites and overrides, gains missing variations, and has its description replaced only by a non-empty one. Rules equal to existing ones keep their ids and salts. A template cannot express a rule that serves an experiment, so the rules of the flag in the target environment that do are kept, after the translated rules, and count towards the limit of 50. An archived flag is configured and stays archived (`archived_flag`).
 
 ### Condition terms
 
