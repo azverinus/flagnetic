@@ -79,9 +79,7 @@ func TestStreamsGoOnAfterALogicalRestoreIntoAnotherCluster(t *testing.T) {
 
 	old := migrated(t, testkit.EmptyDatabase(t))
 	// The old cluster has begun a great many transactions.
-	if _, err := old.Exec(ctx, `UPDATE event_cluster SET xid_offset = 1 << 40`); err != nil {
-		t.Fatal(err)
-	}
+	testkit.RaiseEventTransactionOffset(t, old, 1<<40)
 	oldStore := pgevents.NewStore(old)
 	if err := oldStore.SaveAliases(ctx, []events.AliasRecord{alias(1), alias(2)}); err != nil {
 		t.Fatal(err)
@@ -224,17 +222,15 @@ func TestAdoptingTheClusterFailsWhereItCannotTellOrChange(t *testing.T) {
 	})
 	t.Run("the cluster was never recorded", func(t *testing.T) {
 		pool := migrated(t, testkit.EmptyDatabase(t))
-		if _, err := pool.Exec(t.Context(), `DROP TABLE event_cluster CASCADE`); err != nil {
-			t.Fatal(err)
-		}
+		testkit.DropClusterRecord(t, pool)
 		if _, err := postgres.AdoptCluster(t.Context(), pool); err == nil {
 			t.Error("adopting a database without the record of its cluster succeeded")
 		}
 	})
 	t.Run("the greatest stored ID cannot be read", func(t *testing.T) {
 		pool := migrated(t, testkit.EmptyDatabase(t))
-		if _, err := pool.Exec(t.Context(), `UPDATE event_cluster SET system_identifier = system_identifier + 1;
-			DROP FUNCTION event_xid_stored()`); err != nil {
+		testkit.ChangeClusterIdentity(t, pool)
+		if _, err := pool.Exec(t.Context(), `DROP FUNCTION event_xid_stored()`); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := postgres.AdoptCluster(t.Context(), pool); err == nil {

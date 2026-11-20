@@ -43,8 +43,9 @@ type noCache struct{}
 
 func (noCache) Forget() {}
 
-// staleSettings reads the settings as a replica that has not yet heard of a
-// change does: the ones in force when it was made.
+// staleSettings stands for a replica that has not yet heard of a change: it
+// overrides the one read and answers the settings in force when it was made,
+// an answer a database never gives once the change is committed.
 type staleSettings struct{ s access.AuthSettings }
 
 func (s staleSettings) AuthSettings(context.Context) (access.AuthSettings, error) { return s.s, nil }

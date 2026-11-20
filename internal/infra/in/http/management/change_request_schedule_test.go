@@ -249,18 +249,10 @@ func TestAScheduledChangeRequestOnAMovedBaseIsSupersededNotFailed(t *testing.T) 
 	}
 }
 
-// moveBehind moves the configuration cr is based on without superseding
-// cr, as a write committed while cr was being applied would: the test
-// writes the version straight into the table, there being no API path that
-// moves a configuration and leaves its change requests approved.
+// moveBehind moves the configuration cr is based on without superseding cr.
 func moveBehind(t *testing.T, cr management.ChangeRequest) {
 	t.Helper()
-	if _, err := testkit.Pool(t).Exec(t.Context(), `
-		UPDATE flag_configurations SET version = version + 1
-		WHERE flag_id = (SELECT flag_id FROM change_requests WHERE id = $1)
-		  AND environment_id = (SELECT environment_id FROM change_requests WHERE id = $1)`, cr.Id); err != nil {
-		t.Fatal(err)
-	}
+	testkit.MoveConfigurationBehindChangeRequest(t, testkit.Pool(t), cr.Id)
 }
 
 func TestTwoReplicasApplyAScheduledChangeRequestOnce(t *testing.T) {

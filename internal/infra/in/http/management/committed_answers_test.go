@@ -19,15 +19,22 @@ import (
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 )
 
-type failingWaiting struct{}
+// exhaustedPoolWaiting stands for a database whose connection pool is
+// exhausted when the answer counts the change requests waiting: no real
+// database fails there on demand. It overrides the one read and answers
+// the error.
+type exhaustedPoolWaiting struct{}
 
-func (failingWaiting) WaitingOn(context.Context, flags.FlagID, workspace.EnvironmentID) (governance.Waiting, error) {
+func (exhaustedPoolWaiting) WaitingOn(context.Context, flags.FlagID, workspace.EnvironmentID) (governance.Waiting, error) {
 	return governance.Waiting{}, errors.New("pool exhausted")
 }
 
-type failingSettings struct{}
+// timedOutSettings stands for a database whose query for the authentication
+// settings times out: no real database fails there on demand. It overrides
+// the one read and answers the error.
+type timedOutSettings struct{}
 
-func (failingSettings) AuthSettings(context.Context) (access.AuthSettings, error) {
+func (timedOutSettings) AuthSettings(context.Context) (access.AuthSettings, error) {
 	return access.AuthSettings{}, errors.New("query timed out")
 }
 
@@ -39,8 +46,8 @@ func TestAWriteThatCommittedIsAnsweredWhenWhatTheAnswerAddsCannotBeRead(t *testi
 	var logged bytes.Buffer
 	edge := flaghttp.New(flaghttp.Options{Logger: slog.New(slog.NewTextHandler(&logged, nil))})
 	a := newAPI(edge, Handlers{
-		CountWaiting:    appgovernance.NewCountWaitingChangeRequests(failingWaiting{}),
-		GetAuthSettings: appaccess.NewGetAuthSettings(failingSettings{}),
+		CountWaiting:    appgovernance.NewCountWaitingChangeRequests(exhaustedPoolWaiting{}),
+		GetAuthSettings: appaccess.NewGetAuthSettings(timedOutSettings{}),
 	}, newRefusals(prometheus.NewRegistry()), Options{})
 
 	ec := flags.EnvironmentConfiguration{Configuration: flags.Configuration{Version: 7, On: true}}

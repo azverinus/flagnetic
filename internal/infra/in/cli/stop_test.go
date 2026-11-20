@@ -76,8 +76,9 @@ func TestAReplicaStoppedWithAMailStuckOnASilentServerStillWritesItsCountsWithinT
 	}
 
 	proj := management.ProjectCreate{Key: "shop", Name: "Shop"}
-	if res, perr := admin.CreateProjectWithResponse(t.Context(), proj); perr != nil || res.JSON201 == nil {
-		t.Fatalf("create project: %v %v", perr, res)
+	created, perr := admin.CreateProjectWithResponse(t.Context(), proj)
+	if perr != nil || created.JSON201 == nil {
+		t.Fatalf("create project: %v %v", perr, created)
 	}
 	if res, ferr := admin.CreateFlagWithResponse(t.Context(), "shop", management.FlagCreate{Key: "checkout", Name: "Checkout", Type: "boolean"}); ferr != nil || res.JSON201 == nil {
 		t.Fatalf("create flag: %v %v", ferr, res)
@@ -136,14 +137,12 @@ func TestAReplicaStoppedWithAMailStuckOnASilentServerStillWritesItsCountsWithinT
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	rows, err := testkit.StoredEvaluationSummaries(t.Context(), pool, id.FromBytes[workspace.Environment](environment.JSON200.Id))
-	if err != nil {
-		t.Fatal(err)
-	}
+	rows := testkit.ExportedEvaluationSummaries(t, pool, id.FromBytes[workspace.Project](created.JSON201.Id),
+		id.FromBytes[workspace.Environment](environment.JSON200.Id))
 	var counted int
 	for _, row := range rows {
-		if row.Source == delivery.SourceRemoteEvaluation && row.Row.Flag == "checkout" {
-			counted += int(row.Row.Count)
+		if row.Source == string(delivery.SourceRemoteEvaluation) && row.FlagKey == "checkout" {
+			counted += int(row.Count)
 		}
 	}
 	if counted != 1 {

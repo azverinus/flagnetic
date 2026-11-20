@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
+	"github.com/azverinus/flagnetic/internal/domain/sinks"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
@@ -16,19 +17,16 @@ import (
 
 // remoteCounts returns the evaluation summary rows of production that the
 // server counted itself, by flag and SDK name.
-func remoteCounts(t *testing.T, p project) map[string]delivery.SummaryRecord {
+func remoteCounts(t *testing.T, p project) map[string]sinks.SummaryRow {
 	t.Helper()
-	rows, err := testkit.StoredEvaluationSummaries(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := map[string]delivery.SummaryRecord{}
+	rows := testkit.ExportedEvaluationSummaries(t, testkit.Pool(t), p.projectID(t), p.environmentID(t, "production"))
+	out := map[string]sinks.SummaryRow{}
 	for _, r := range rows {
-		if r.Source == delivery.SourceRemoteEvaluation {
-			if _, twice := out[r.Row.Flag+" "+r.SDK.Name]; twice {
-				t.Errorf("%s by %s counted in two rows", r.Row.Flag, r.SDK.Name)
+		if r.Source == string(delivery.SourceRemoteEvaluation) {
+			if _, twice := out[r.FlagKey+" "+r.SDKName]; twice {
+				t.Errorf("%s by %s counted in two rows", r.FlagKey, r.SDKName)
 			}
-			out[r.Row.Flag+" "+r.SDK.Name] = r
+			out[r.FlagKey+" "+r.SDKName] = r
 		}
 	}
 	return out
@@ -55,14 +53,14 @@ func TestRemoteEvaluationsAreCountedByTheirTrueReason(t *testing.T) {
 	}
 	got := remoteCounts(t, p)
 	ruled := got["ruled flagnetic-js"]
-	if ruled.Row.Reason != "rule" || ruled.Row.Variation != "b" || ruled.Row.Count != 2 || ruled.SDK.Version != "1.2.0" ||
-		ruled.SDK.Platform != "web" || ruled.AppVersion != "3.1.0" || ruled.RulesetVersion == 0 || !ruled.EventID.IsZero() {
+	if ruled.EvaluationReason != "rule" || ruled.VariationKey != "b" || ruled.Count != 2 || ruled.SDKVersion != "1.2.0" ||
+		ruled.Platform != "web" || ruled.AppVersion != "3.1.0" || ruled.RulesetVersion == 0 {
 		t.Errorf("ruled by flagnetic-js = %+v, want 2 of rule b", ruled)
 	}
-	if dark := got["dark flagnetic-js"]; dark.Row.Reason != "off" || dark.Row.Count != 2 {
+	if dark := got["dark flagnetic-js"]; dark.EvaluationReason != "off" || dark.Count != 2 {
 		t.Errorf("dark by flagnetic-js = %+v", dark)
 	}
-	if unknown := got["ruled unknown"]; unknown.Row.Count != 1 || unknown.SDK.Version != "" || unknown.SDK.Platform != "" {
+	if unknown := got["ruled unknown"]; unknown.Count != 1 || unknown.SDKVersion != "" || unknown.Platform != "" {
 		t.Errorf("ruled by a browser that is no SDK = %+v, want counted as unknown", unknown)
 	}
 	if len(got) != 4 {
@@ -91,10 +89,10 @@ func TestRemoteEvaluationOfAnAppVersionHoldingNULDoesNotHoldBackAnotherProjectsC
 	if err := srv.Tick(t, worker.RemoteEvaluationCountsName); err != nil {
 		t.Fatal(err)
 	}
-	if c := remoteCounts(t, other)["checkout flagnetic-js"]; c.Row.Count != 1 || c.AppVersion != "3.1.0" {
+	if c := remoteCounts(t, other)["checkout flagnetic-js"]; c.Count != 1 || c.AppVersion != "3.1.0" {
 		t.Errorf("the other project's count = %+v, want 1 of 3.1.0", c)
 	}
-	if c := remoteCounts(t, hostile)["checkout flagnetic-js"]; c.Row.Count != 1 || strings.ContainsRune(c.AppVersion, 0) {
+	if c := remoteCounts(t, hostile)["checkout flagnetic-js"]; c.Count != 1 || strings.ContainsRune(c.AppVersion, 0) {
 		t.Errorf("the hostile project's count = %+v, want 1 with no NUL in its app version", c)
 	}
 }
@@ -106,7 +104,7 @@ func TestRemoteEvaluationCountsAreWrittenWhenTheReplicaStops(t *testing.T) {
 	_, server := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	evaluationWith(t, srv, server, `{"context":{"units":{"user":"u-1"}}}`, "User-Agent", "flagnetic-go/1.4.0 (linux)")
 	srv.CloseBackground()
-	if c := remoteCounts(t, p)["checkout flagnetic-go"]; c.Row.Count != 1 || c.Row.Reason != "off" {
+	if c := remoteCounts(t, p)["checkout flagnetic-go"]; c.Count != 1 || c.EvaluationReason != "off" {
 		t.Errorf("checkout after the stop = %+v, want 1 of off", c)
 	}
 }

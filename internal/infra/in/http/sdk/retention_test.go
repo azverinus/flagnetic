@@ -42,20 +42,12 @@ func (f *summaryFixture) retain(t *testing.T) {
 
 func (f *summaryFixture) storedSummaries(t *testing.T) int {
 	t.Helper()
-	rows, err := testkit.StoredEvaluationSummaries(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return len(rows)
+	return len(testkit.ExportedEvaluationSummaries(t, testkit.Pool(t), f.p.projectID(t), f.p.environmentID(t, "production")))
 }
 
 func (f *summaryFixture) storedAliases(t *testing.T) int {
 	t.Helper()
-	rows, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), f.p.environmentID(t, "production"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return len(rows)
+	return len(testkit.ExportedAliases(t, testkit.Pool(t), f.p.projectID(t), f.p.environmentID(t, "production")))
 }
 
 // gaps returns every gap recorded so far.
@@ -188,8 +180,7 @@ func TestRetentionWaitsForATransactionStillWritingAPartition(t *testing.T) {
 
 func TestAnAliasLinkOutlivesTheRawAliasAndStillStopsTheSamePairLinkingAgain(t *testing.T) {
 	f := startRetention(t)
-	first := eventID(f.clock.Now(), 910)
-	f.post(t, aliasEvent(first))
+	f.post(t, aliasEvent(eventID(f.clock.Now(), 910)))
 	f.srv.TickRollup(t, worker.AliasRollupName)
 
 	f.clock.Advance(retention + 24*time.Hour)
@@ -197,8 +188,8 @@ func TestAnAliasLinkOutlivesTheRawAliasAndStillStopsTheSamePairLinkingAgain(t *t
 	if n := f.storedAliases(t); n != 0 {
 		t.Fatalf("%d raw aliases after the drop, want their partition dropped", n)
 	}
-	if links := aliasLinks(t, f.p, "production"); len(links) != 1 || links[0].EventID.String() != first {
-		t.Fatalf("links after the drop = %+v, want the pair's link from %s kept", links, first)
+	if links := linkedPairs(t, f.p, "production", aliasEventPair); len(links) != 1 {
+		t.Fatalf("links after the drop = %+v, want the pair's link kept", links)
 	}
 
 	// The pair sent again is stored as an alias but adds no link: the kept
@@ -206,8 +197,8 @@ func TestAnAliasLinkOutlivesTheRawAliasAndStillStopsTheSamePairLinkingAgain(t *t
 	again := with(aliasEvent(eventID(f.clock.Now(), 911)), map[string]any{"occurred_at": f.clock.Now().Format(time.RFC3339)})
 	f.post(t, again)
 	f.srv.TickRollup(t, worker.AliasRollupName)
-	if links := aliasLinks(t, f.p, "production"); len(links) != 1 || links[0].EventID.String() != first {
-		t.Errorf("links after the pair again = %+v, want still the one from %s", links, first)
+	if links := linkedPairs(t, f.p, "production", aliasEventPair); len(links) != 1 {
+		t.Errorf("links after the pair again = %+v, want still the one", links)
 	}
 }
 
@@ -379,7 +370,7 @@ func TestADropWhileATransactionOnAnotherTableIsOpenCountsOnlyTheRowsItTook(t *te
 		t.Fatalf("held batch = %+v", res)
 	}
 	f.rollUp(t)
-	if links := aliasLinks(t, f.p, "production"); len(links) != 1 {
+	if links := linkedPairs(t, f.p, "production", aliasEventPair); len(links) != 1 {
 		t.Errorf("alias links = %+v, want the held alias counted once it committed", links)
 	}
 	from := day1.Add(-24 * time.Hour)

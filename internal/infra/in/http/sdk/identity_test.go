@@ -41,10 +41,10 @@ func TestAnSDKThatCannotSetItsUserAgentIsNamedByWhatItPosts(t *testing.T) {
 	}
 
 	counted := remoteCounts(t, p)
-	if js := counted["checkout flagnetic-js"]; js.Row.Count != 1 || js.SDK.Version != "1.3.0" || js.SDK.Platform != "web" {
+	if js := counted["checkout flagnetic-js"]; js.Count != 1 || js.SDKVersion != "1.3.0" || js.Platform != "web" {
 		t.Errorf("checkout by flagnetic-js = %+v, want 1 counted under the context's SDK", js)
 	}
-	if swift := counted["checkout flagnetic-swift"]; swift.Row.Count != 1 || swift.SDK.Platform != "ios" {
+	if swift := counted["checkout flagnetic-swift"]; swift.Count != 1 || swift.Platform != "ios" {
 		t.Errorf("checkout by flagnetic-swift = %+v, want 1 counted under the User-Agent's SDK", swift)
 	}
 	if len(counted) != 2 {
@@ -82,7 +82,7 @@ func TestAContextWithoutAnSDKIsCountedAsUnknown(t *testing.T) {
 	if err := srv.Tick(t, worker.RemoteEvaluationCountsName); err != nil {
 		t.Fatal(err)
 	}
-	if u := remoteCounts(t, p)["checkout unknown"]; u.Row.Count != 1 || u.SDK.Version != "" || u.SDK.Platform != "" {
+	if u := remoteCounts(t, p)["checkout unknown"]; u.Count != 1 || u.SDKVersion != "" || u.Platform != "" {
 		t.Errorf("checkout by unknown = %+v, want 1 with neither version nor platform", u)
 	}
 }

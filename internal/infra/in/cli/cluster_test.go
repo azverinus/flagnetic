@@ -27,9 +27,7 @@ func TestServeAdoptsADatabaseFromAnotherCluster(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(t.Context(), `UPDATE event_cluster SET system_identifier = system_identifier + 1`); err != nil {
-		t.Fatal(err)
-	}
+	testkit.ChangeClusterIdentity(t, pool)
 	restored := serve(t, map[string]string{"DATABASE_URL": url})
 	if code, _ := restored.stop(); code != 0 || restored.findLog(msg) == nil {
 		t.Fatalf("a database of another cluster: exit %d, no record of adopting it:\n%s", code, restored.stderr)

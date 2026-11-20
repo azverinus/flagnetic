@@ -6,6 +6,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -19,14 +20,27 @@ func aliasOf(n int, at time.Time, fromType, fromID, toType, toID string) map[str
 	}
 }
 
-// aliasLinks reads the alias links of environment.
-func aliasLinks(t *testing.T, p project, environment string) []events.AliasLink {
+// linkedPairs returns which of pairs the events store reports linked in
+// environment, in the order given: what the store answers an ingest asking
+// whether a pair is new.
+func linkedPairs(t *testing.T, p project, environment string, pairs ...events.AliasPair) []events.AliasPair {
 	t.Helper()
-	links, err := testkit.StoredAliasLinks(t.Context(), testkit.Pool(t), p.environmentID(t, environment))
+	linked, err := pgevents.NewStore(testkit.Pool(t)).LinkedPairs(t.Context(), p.environmentID(t, environment), pairs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return links
+	var out []events.AliasPair
+	for _, pair := range pairs {
+		if linked[pair] {
+			out = append(out, pair)
+		}
+	}
+	return out
+}
+
+// pair is the pair of units an alias of anonymous fromID to user toID links.
+func pair(fromID, toID string) events.AliasPair {
+	return events.AliasPair{FromUnitType: "anonymous", FromUnitID: fromID, ToUnitType: "user", ToUnitID: toID}
 }
 
 func TestAClientKeyIsToldNoMoreOfAnUndeclaredUnitTypeThanThatTheAliasIsInvalid(t *testing.T) {
@@ -71,8 +85,9 @@ func TestAliasesAreCheckedAgainstTheDeclaredUnitTypes(t *testing.T) {
 			t.Errorf("detail of rejection %d = %q", r.Index, r.Detail)
 		}
 	}
-	links := aliasLinks(t, p, "production")
-	if len(links) != 1 || links[0].Alias.FromUnitID != "d-1" || links[0].Alias.ToUnitID != "u-1" {
+	links := linkedPairs(t, p, "production", pair("d-1", "u-1"), events.AliasPair{FromUnitType: "anonymous", FromUnitID: "d-1", ToUnitType: "device", ToUnitID: "u-1"},
+		events.AliasPair{FromUnitType: "anonymous", FromUnitID: "d-1", ToUnitType: "anonymous", ToUnitID: "d-2"})
+	if len(links) != 1 || links[0] != pair("d-1", "u-1") {
 		t.Errorf("links = %+v, want only the accepted alias's", links)
 	}
 }
@@ -105,26 +120,15 @@ func TestAnAliasLinksItsPairOnceKeepingTheEarliestTime(t *testing.T) {
 		t.Fatalf("staging alias = %+v", res)
 	}
 
-	aliases, err := testkit.StoredAliases(t.Context(), testkit.Pool(t), p.environmentID(t, "production"))
-	if err != nil || len(aliases) != 5 {
-		t.Fatalf("raw aliases = %d, %v, want every one of the 5 stored", len(aliases), err)
+	aliases := testkit.ExportedAliases(t, testkit.Pool(t), p.projectID(t), p.environmentID(t, "production"))
+	if len(aliases) != 5 {
+		t.Fatalf("raw aliases = %d, want every one of the 5 stored", len(aliases))
 	}
-	links := aliasLinks(t, p, "production")
-	if len(links) != 2 {
+	pairs := []events.AliasPair{pair("d-1", "u-1"), pair("d-1", "u-2")}
+	if links := linkedPairs(t, p, "production", pairs...); len(links) != 2 {
 		t.Fatalf("links = %+v, want one per pair", links)
 	}
-	byTo := map[string]events.AliasLink{}
-	for _, l := range links {
-		byTo[l.Alias.ToUnitID] = l
-	}
-	if l := byTo["u-1"]; !l.Alias.OccurredAt.Equal(earliest) || l.EventID.String() != eventID(protocolTime, 3) ||
-		l.Alias.FromUnitType != "anonymous" || l.Alias.FromUnitID != "d-1" || l.Alias.ToUnitType != "user" {
-		t.Errorf("link of d-1 and u-1 = %+v, want the earliest alias's", l)
-	}
-	if l := byTo["u-2"]; !l.Alias.OccurredAt.Equal(protocolTime) {
-		t.Errorf("link of d-1 and u-2 = %+v", l)
-	}
-	if links := aliasLinks(t, p, "staging"); len(links) != 1 || !links[0].Alias.OccurredAt.Equal(protocolTime) {
+	if links := linkedPairs(t, p, "staging", pairs...); len(links) != 1 || links[0] != pair("d-1", "u-1") {
 		t.Errorf("staging links = %+v, want its own", links)
 	}
 }
@@ -141,24 +145,17 @@ func TestAnEnvironmentAtItsLimitOfAliasLinksRefusesNewPairsOnly(t *testing.T) {
 	)); res.Accepted != 2 {
 		t.Fatalf("aliases up to the limit = %+v", res)
 	}
-	// The limit is reached: a pair already linked is still taken, with its
-	// earlier time, and a new one is refused, in the same batch.
-	earlier := protocolTime.Add(-time.Hour)
+	// The limit is reached: a pair already linked is still taken, and a new
+	// one is refused, in the same batch.
 	res := batchResult(t, srv, value, batch(
-		aliasOf(3, earlier, "anonymous", "d-1", "user", "u-1"),
+		aliasOf(3, protocolTime.Add(-time.Hour), "anonymous", "d-1", "user", "u-1"),
 		aliasOf(4, protocolTime, "anonymous", "d-3", "user", "u-3"),
 	))
 	if res.Accepted != 1 || len(res.Rejected) != 1 || res.Rejected[0].Index != 1 || res.Rejected[0].Code != "quota_exceeded" {
 		t.Fatalf("aliases at the limit = %+v, want the new pair refused quota_exceeded", res)
 	}
-	links := aliasLinks(t, p, "production")
-	if len(links) != 2 {
+	if links := linkedPairs(t, p, "production", pair("d-1", "u-1"), pair("d-2", "u-2"), pair("d-3", "u-3")); len(links) != 2 || links[0] != pair("d-1", "u-1") || links[1] != pair("d-2", "u-2") {
 		t.Fatalf("links = %+v, want the two within the limit", links)
-	}
-	for _, l := range links {
-		if l.Alias.ToUnitID == "u-1" && !l.Alias.OccurredAt.Equal(earlier) {
-			t.Errorf("link of u-1 = %+v, want the earlier alias's time", l)
-		}
 	}
 	// A refused alias's ID is not claimed: it is refused again, not
 	// counted as received.
@@ -188,7 +185,7 @@ func TestABatchOfNewPairsTakesOnlyWhatTheLimitLeaves(t *testing.T) {
 	if res.Accepted != 3 || len(res.Rejected) != 1 || res.Rejected[0].Index != 3 || res.Rejected[0].Code != "quota_exceeded" {
 		t.Fatalf("batch past the limit = %+v, want the third pair refused quota_exceeded", res)
 	}
-	if links := aliasLinks(t, p, "production"); len(links) != 2 {
+	if links := linkedPairs(t, p, "production", pair("d-1", "u-1"), pair("d-2", "u-2"), pair("d-3", "u-3")); len(links) != 2 {
 		t.Errorf("links = %+v, want the two within the limit", links)
 	}
 }
