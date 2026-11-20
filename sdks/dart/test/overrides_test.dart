@@ -141,6 +141,29 @@ void main() {
       expect(detail.variation, isNull);
     });
 
+    test('a number override must be finite', () {
+      final client = overrideClient(
+        flags: {
+          'max': {
+            'type': 'number',
+            'value': 1,
+            'variation': 'a',
+            'reason': 'targeting_match',
+          },
+        },
+      );
+      addTearDown(client.close);
+      expect(
+        () => client.overrides.set('max', double.nan),
+        throwsArgumentError,
+      );
+      expect(
+        () => client.overrides.set('max', double.infinity),
+        throwsArgumentError,
+      );
+      expect(client.overrides.list(), isEmpty);
+    });
+
     test('a key the held values do not carry takes the type of the value', () {
       final client = overrideClient();
       addTearDown(client.close);

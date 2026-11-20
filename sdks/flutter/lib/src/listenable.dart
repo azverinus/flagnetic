@@ -1,6 +1,8 @@
 import 'package:flagnetic/flagnetic.dart';
 import 'package:flutter/foundation.dart';
 
+import 'json_equals.dart';
+
 /// The value of one flag as a [ValueListenable], so a widget follows it
 /// without plumbing: it notifies whenever the client's values change or the
 /// fallback chain moves to another stage.
@@ -19,7 +21,7 @@ final class FlagListenable<T> extends ChangeNotifier
   FlagListenable(this.client, this.flagKey, this.defaultValue)
     : _detail = _serve(client, flagKey, defaultValue) {
     _removeChange = client.onChange((keys) {
-      if (keys.contains(flagKey)) _read();
+      if (keys.contains(flagKey)) _read(changed: true);
     });
     _removeStage = client.onStage((_) => _read());
   }
@@ -69,17 +71,38 @@ final class FlagListenable<T> extends ChangeNotifier
   /// and the stage of the fallback chain.
   Detail get detail => _detail;
 
-  void _read() {
+  /// Reads the flag again. [changed] says the client reported this key
+  /// changed: [detail] then follows the new answer even when only what the
+  /// widget does not show moved (the ruleset version, the received time, an
+  /// experiment's salts), so it never describes the previous answer. Only a
+  /// difference in what a builder shows notifies.
+  void _read({bool changed = false}) {
     final next = _serve(client, flagKey, defaultValue);
-    if (next.reason == _detail.reason &&
-        next.errorCode == _detail.errorCode &&
-        next.stage == _detail.stage &&
-        next.variation == _detail.variation &&
-        _jsonEquals(next.value, _detail.value)) {
-      return;
-    }
+    final shown = !_sameShown(next, _detail);
+    if (!shown && !changed) return;
     _detail = next;
-    notifyListeners();
+    if (shown) notifyListeners();
+  }
+
+  static bool _sameShown(Detail a, Detail b) =>
+      a.reason == b.reason &&
+      a.errorCode == b.errorCode &&
+      a.stage == b.stage &&
+      a.variation == b.variation &&
+      jsonEquals(a.value, b.value) &&
+      _sameExperiment(a.experiment, b.experiment);
+
+  static bool _sameExperiment(Experiment? a, Experiment? b) {
+    if (a == null || b == null) return a == b;
+    return a.key == b.key &&
+        a.variation == b.variation &&
+        a.unitType == b.unitType &&
+        a.unitId == b.unitId &&
+        a.inclusionSalt == b.inclusionSalt &&
+        a.variationSalt == b.variationSalt &&
+        a.inclusionBucket == b.inclusionBucket &&
+        a.variationBucket == b.variationBucket &&
+        a.override == b.override;
   }
 
   @override
@@ -121,26 +144,4 @@ final class StageListenable extends ChangeNotifier
     _remove();
     super.dispose();
   }
-}
-
-/// Deep equality of decoded JSON values, so a JSON flag whose new document
-/// equals the old one notifies nobody. Numbers compare by value: `1` equals
-/// `1.0`.
-bool _jsonEquals(Object? a, Object? b) {
-  if (a is num && b is num) return a == b;
-  if (a is List<Object?> && b is List<Object?>) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (!_jsonEquals(a[i], b[i])) return false;
-    }
-    return true;
-  }
-  if (a is Map<String, Object?> && b is Map<String, Object?>) {
-    if (a.length != b.length) return false;
-    for (final MapEntry(:key, :value) in a.entries) {
-      if (!b.containsKey(key) || !_jsonEquals(value, b[key])) return false;
-    }
-    return true;
-  }
-  return a == b;
 }

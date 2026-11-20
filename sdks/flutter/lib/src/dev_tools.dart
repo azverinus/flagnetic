@@ -150,7 +150,13 @@ final class FlagneticDevTools {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, Object?>) return;
       for (final MapEntry(:key, :value) in decoded.entries) {
-        local.set(key, value);
+        // Each on its own: a flag whose type changed since it was saved
+        // refuses its override, and the others still apply.
+        try {
+          local.set(key, value);
+        } on Object catch (e) {
+          _storeFailed('restore', e, key: key);
+        }
       }
     } on Object {
       // A torn entry is not worth keeping; the client still serves.
@@ -166,10 +172,12 @@ final class FlagneticDevTools {
     if (_local == null) return;
     final overrides = list();
     _hasOverrides.value = overrides.isNotEmpty;
-    final encoded = overrides.isEmpty ? null : jsonEncode(overrides);
-    if (encoded == _persisted) return;
-    _persisted = encoded;
     try {
+      // Inside the guard: a value the store cannot encode must not throw
+      // from the client's change listener on every later change.
+      final encoded = overrides.isEmpty ? null : jsonEncode(overrides);
+      if (encoded == _persisted) return;
+      _persisted = encoded;
       final write = encoded == null
           ? _store.remove(_keys.overrides)
           : _store.set(_keys.overrides, encoded);
@@ -183,10 +191,10 @@ final class FlagneticDevTools {
     }
   }
 
-  void _storeFailed(String operation, Object cause) => emitLog(
-    _logger,
-    LogLevel.warn,
-    LogEvents.storeFailed,
-    {'operation': operation, 'key': _keys.overrides, 'cause': '$cause'},
-  );
+  void _storeFailed(String operation, Object cause, {String? key}) =>
+      emitLog(_logger, LogLevel.warn, LogEvents.storeFailed, {
+        'operation': operation,
+        'key': key == null ? _keys.overrides : '${_keys.overrides}:$key',
+        'cause': '$cause',
+      });
 }

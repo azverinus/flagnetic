@@ -202,13 +202,18 @@ class _EditDialogState extends State<_EditDialog> {
     ],
   );
 
+  /// `num.parse` accepts `NaN` and `Infinity`, which no server serves and
+  /// the store cannot encode.
+  static num _finite(num value) =>
+      value.isFinite ? value : throw const FormatException('not finite');
+
   void _save() {
     final text = _controller.text;
     final Object? value;
     try {
       value = switch (widget.flag.type) {
         'string' => text,
-        'number' => num.parse(text),
+        'number' => _finite(num.parse(text)),
         'json' => jsonDecode(text),
         _ => text,
       };

@@ -246,6 +246,99 @@ void main() {
     await tester.pump();
     expect(find.text('green/fallthrough/null'), findsOne);
   });
+
+  testWidgets('detail follows an answer that changes only the experiment '
+      'block', (tester) async {
+    Map<String, Object?> document(String experiment, int version) => {
+      'schema_version': 1,
+      'ruleset_version': version,
+      'flags': {
+        'banner': {
+          'type': 'string',
+          'value': 'Try free',
+          'variation': 'short',
+          'reason': 'experiment',
+          'experiment': {
+            'key': experiment,
+            'variation': 'short',
+            'unit_type': 'anonymous',
+            'unit_id': 'd-8f1c',
+            'inclusion_salt': 's1',
+            'variation_salt': 's2',
+            'inclusion_bucket': 10,
+            'variation_bucket': 20,
+            'override': false,
+          },
+        },
+      },
+    };
+    var served = document('banner_a', 1);
+    final client = Flagnetic.client(
+      clientKey,
+      context: testContext,
+      options: ClientOptions(offline: OfflineSource.read(() => served)),
+    );
+    addTearDown(client.close);
+    var builds = 0;
+    late Detail seen;
+    await tester.pumpWidget(
+      FlagneticScope(
+        client: client,
+        child: FlagBuilder<String>(
+          flagKey: 'banner',
+          defaultValue: 'Built-in banner',
+          builder: (context, value, detail) {
+            builds++;
+            seen = detail;
+            return _text(value);
+          },
+        ),
+      ),
+    );
+    expect(seen.experiment!.key, 'banner_a');
+    final before = builds;
+
+    // A second experiment starts on the same value and variation.
+    served = document('banner_b', 2);
+    client.offline!.reload();
+    await tester.pump();
+    expect(builds, greaterThan(before), reason: 'the experiment is shown');
+    expect(seen.experiment!.key, 'banner_b');
+    expect(seen.rulesetVersion, 2);
+  });
+
+  testWidgets('an equal non-const JSON default does not rebuild the '
+      'listenable', (tester) async {
+    final client = offlineClient({
+      'theme': {'mode': 'light'},
+    });
+    addTearDown(client.close);
+    final summaryBefore = client.offline!.summary.length;
+    final setState = <void Function()>[];
+    await tester.pumpWidget(
+      FlagneticScope(
+        client: client,
+        child: StatefulBuilder(
+          builder: (context, update) {
+            setState.add(() => update(() {}));
+            return FlagBuilder<Map<String, Object?>>(
+              flagKey: 'theme',
+              // A new, equal map on every build of the parent.
+              defaultValue: <String, Object?>{'mode': 'dark'},
+              builder: (context, value, detail) => _text('${value['mode']}'),
+            );
+          },
+        ),
+      ),
+    );
+    for (var i = 0; i < 3; i++) {
+      setState.last();
+      await tester.pump();
+    }
+    expect(summaryBefore, 0);
+    final counted = client.offline!.summary.single.count;
+    expect(counted, 1, reason: 'the flag was evaluated once');
+  });
 }
 
 Widget _text(String value) =>
