@@ -8,6 +8,8 @@ library;
 import 'dart:io';
 
 import 'package:flagnetic_flutter/flagnetic_flutter.dart';
+// package:material_ui does not exist before Flutter 3.47, which this package still supports.
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
