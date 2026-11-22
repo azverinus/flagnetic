@@ -150,7 +150,7 @@ From 1.0 the public API below changes only additively until 2.0: a name is added
 - **Client**: `flagnetic.Client` with its keyword options, the getters `get_bool`, `get_string`, `get_number`, `get_int`, `get_json` and `get_detail`, `ready`, `stage`, `status`, `on_change`, `on_stage`, `exposure`, `alias`, `flush`, `close`, the `aready`, `aflush` and `aclose` forms, `recorder` and `local_overrides`.
 - **Values**: `flagnetic.Context`, `Detail`, `Experiment`, `Stage`, `Status`, `Document` (the accepted forms of an offline ruleset) and, of what `recorder` returns, `Exposure`, `Alias`, `SummaryCount` and `Recorder`.
 - **Local overrides**: `LocalOverrides` and its methods `set`, `remove`, `clear` and `list`.
-- **Errors**: `FlagneticError` and the two it is the base of, `LocalOverridesNotAllowed` and `LocalOverrideRefused`. A bad argument is a `ValueError`; getters never raise.
+- **Errors**: `FlagneticError` and the two it is the base of, `LocalOverridesNotAllowed` and `LocalOverrideRefused`. A bad option is a `ValueError` and an override value of the wrong type a `TypeError`; getters never raise.
 - **Logging**: `Logger`, the hook's type, and the event names in `flagnetic.events`, which are the strings operators alert on.
 - **Tests**: the functions of `flagnetic.testing` and the `TestClient` they return.
 - **OpenFeature**: `flagnetic.openfeature.Provider`, its arguments and the flag metadata it fills.
