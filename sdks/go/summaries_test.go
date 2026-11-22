@@ -702,25 +702,25 @@ func TestARefusedKeyLogsKeyRevokedOnceAndBacksOffToTheUnauthorizedCap(t *testing
 	}
 }
 
-// lastRetryIn waits for the nth ingest_failed event and returns the wait
+// lastRetryIn waits for the nth events_failed event and returns the wait
 // it announced.
 func lastRetryIn(t *testing.T, l *logs, n int) time.Duration {
 	t.Helper()
 	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
-		if entries := l.named(flagnetic.EventIngestFailed); len(entries) >= n {
+		if entries := l.named(flagnetic.EventEventsFailed); len(entries) >= n {
 			raw, ok := entries[n-1].Fields["retry_in"].(string)
 			if !ok {
-				t.Fatalf("ingest_failed carried retry_in %v, want a duration", entries[n-1].Fields["retry_in"])
+				t.Fatalf("events_failed carried retry_in %v, want a duration", entries[n-1].Fields["retry_in"])
 			}
 			d, err := time.ParseDuration(raw)
 			if err != nil {
-				t.Fatalf("ingest_failed retry_in %q: %v", raw, err)
+				t.Fatalf("events_failed retry_in %q: %v", raw, err)
 			}
 			return d
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatalf("ingest_failed was logged fewer than %d times", n)
+	t.Fatalf("events_failed was logged fewer than %d times", n)
 	return 0
 }
 

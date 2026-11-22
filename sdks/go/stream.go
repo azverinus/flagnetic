@@ -36,7 +36,7 @@ const (
 // After the last one the safety poll takes over.
 var catchUpDelays = []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second}
 
-// Causes of an sse_dropped event.
+// Causes of an stream_dropped event.
 const (
 	causeServerClosed = "server_closed"
 	// causeClosedEarly is a stream the server closed before its first
@@ -58,14 +58,17 @@ const (
 	// delivered a heartbeat, as it does about once an hour; reconnect after
 	// a short jitter.
 	streamClosed
-	// streamStopped: the key was refused or the client is closing; the
-	// stream stays down and the fetch loop carries on alone.
+	// streamStopped: the client is closing.
 	streamStopped
+	// streamRefused: the key was refused; the stream stays down, the fetch
+	// loop carries on alone, and a fetch that succeeds after the refusal
+	// opens the stream again.
+	streamRefused
 )
 
 // streamLoop keeps the ruleset stream open, reconnecting until ctx is done.
-// A refused key stops it for good; the fetch loop keeps serving and keeps
-// retrying at the unauthorized cap.
+// A refused key keeps it closed while the fetch loop, which keeps serving and
+// retrying at the unauthorized cap, is refused too.
 func (c *Client) streamLoop(ctx context.Context) {
 	failures := 0
 	for {
@@ -73,6 +76,12 @@ func (c *Client) streamLoop(ctx context.Context) {
 		c.firstAttemptDone()
 		if outcome == streamStopped || ctx.Err() != nil {
 			return
+		}
+		if outcome == streamRefused {
+			if !c.awaitReopen(ctx) {
+				return
+			}
+			continue
 		}
 		// A stream is stable once it has delivered a heartbeat: one that
 		// ends before that, however it was answered, is a failed
@@ -159,7 +168,7 @@ func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable 
 	case http.StatusUnauthorized, http.StatusForbidden:
 		c.keyRevoked(resp.StatusCode)
 		c.dropped(causeUnauthorized, fmt.Errorf("stream: %s", resp.Status), resp.StatusCode)
-		return streamStopped, false
+		return streamRefused, false
 	default:
 		c.dropped(causeHTTPStatus, fmt.Errorf("stream: %s", resp.Status), resp.StatusCode)
 		return streamErrored, false
@@ -175,7 +184,7 @@ func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable 
 		default:
 		}
 	}()
-	c.log(slog.LevelInfo, EventSSEConnected, map[string]any{"last_event_id": lastEventID})
+	c.log(slog.LevelInfo, EventStreamConnected, map[string]any{"last_event_id": lastEventID})
 	if !c.firstConnect {
 		// Versions may have been missed while the stream was down.
 		c.signal()
@@ -281,6 +290,26 @@ func (c *Client) announce(version int64) {
 	c.signal()
 }
 
+// awaitReopen waits, after the stream was refused, for a fetch that
+// succeeds after the refusal: the key the stream was refused for answers the
+// fetch, a restored key or a refusal that was a proxy's, so the stream is
+// tried again. A refused stream is not retried on its own, since every
+// attempt would be refused like the fetch. It reports false when ctx is done.
+func (c *Client) awaitReopen(ctx context.Context) bool {
+	// The fetch that follows a refusal at startup shows nothing the refusal
+	// did not, since both went out with the same key at once: the stream is
+	// tried again by the one after it.
+	after := max(c.fetchSuccesses.Load(), 1)
+	for c.fetchSuccesses.Load() <= after {
+		select {
+		case <-c.fetchSuccess:
+		case <-ctx.Done():
+			return false
+		}
+	}
+	return true
+}
+
 // signal wakes the fetch loop, coalescing with a wake already pending.
 func (c *Client) signal() {
 	select {
@@ -295,8 +324,8 @@ func (c *Client) firstAttemptDone() {
 	c.streamReadyOnce.Do(func() { close(c.streamReady) })
 }
 
-// dropped logs sse_dropped. reconnect is false only where the stream stays
-// down, which is a refused key.
+// dropped logs stream_dropped. reconnect is false only where the stream stays
+// down until a fetch succeeds, which is a refused key.
 func (c *Client) dropped(cause string, err error, status int) {
 	fields := map[string]any{"cause": cause, "error": err.Error(), "reconnect": cause != causeUnauthorized}
 	if status != 0 {
@@ -306,7 +335,7 @@ func (c *Client) dropped(cause string, err error, status int) {
 	if cause == causeServerClosed {
 		level = slog.LevelInfo
 	}
-	c.log(level, EventSSEDropped, fields)
+	c.log(level, EventStreamDropped, fields)
 }
 
 // heldVersion is the version of the held ruleset, zero at stage built_in.

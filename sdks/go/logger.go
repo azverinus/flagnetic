@@ -19,16 +19,16 @@ const (
 	// unauthorized, parse, schema_unsupported, wrong_scope,
 	// version_downgrade), error, and status for an HTTP status.
 	EventFetchFailed Event = "fetch_failed"
-	// EventSSEConnected (info): the ruleset stream is open. Fields:
+	// EventStreamConnected (info): the ruleset stream is open. Fields:
 	// last_event_id, the held version the stream resumes from, 0 for none.
-	EventSSEConnected Event = "sse_connected"
-	// EventSSEDropped (info for a server-side close of a stable stream, warn
+	EventStreamConnected Event = "stream_connected"
+	// EventStreamDropped (info for a server-side close of a stable stream, warn
 	// otherwise): the ruleset stream ended. Fields: cause (server_closed,
 	// closed_early for a stream closed before its first heartbeat, silence,
 	// timeout, network, http_status, unauthorized, malformed), error,
-	// reconnect (false where the stream stays down), and status for an HTTP
-	// status.
-	EventSSEDropped Event = "sse_dropped"
+	// reconnect (false where the stream stays down until a fetch succeeds
+	// after a refused key), and status for an HTTP status.
+	EventStreamDropped Event = "stream_dropped"
 	// EventStageChanged (info to fresh, warn otherwise): the fallback chain
 	// moved. Fields: from, to.
 	EventStageChanged Event = "stage_changed"
@@ -49,12 +49,12 @@ const (
 	// other flag serves normally. Upgrade the SDK. Fields: flag,
 	// constructs (each as "<kind> <name>"), ruleset_version.
 	EventRuleUnsupported Event = "rule_unsupported"
-	// EventIngestFailed (warn): an ingest batch was answered 429, a 5xx or
+	// EventEventsFailed (warn): an ingest batch was answered 429, a 5xx or
 	// nothing at all, and will be sent again with the same event IDs after
 	// retry_in. Fields: kind, events (how many), retry_in, status for an
 	// HTTP status and error.
 	// It exists because a retry nobody can see is a retry nobody can alert on.
-	EventIngestFailed Event = "ingest_failed"
+	EventEventsFailed Event = "events_failed"
 	// EventExposureSkipped (debug): an exposure call sent nothing.
 	// Fields: flag, cause (no_experiment when no evaluation of that flag
 	// has carried an experiment block, no_detail when one has but not for
@@ -63,10 +63,10 @@ const (
 	// It exists because "nothing was sent" is what a developer
 	// who called Exposure needs to see.
 	EventExposureSkipped Event = "exposure_skipped"
-	// EventExposuresDisabled (warn): the client was constructed with
+	// EventExposuresOff (warn): the client was constructed with
 	// WithExposures(false), so no exposure and no alias leaves the
 	// process.
-	EventExposuresDisabled Event = "exposures_disabled"
+	EventExposuresOff Event = "exposures_off"
 	// EventQueueDropped (warn): counts were given up on rather than sent
 	// again — a batch the platform refused with a 4xx other than 429,
 	// events it rejected, rows it dropped for naming a flag it does not

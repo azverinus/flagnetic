@@ -358,8 +358,8 @@ func TestAliasRecordsBothUnitPairsAndChangesNoContext(t *testing.T) {
 func TestExposuresAndAliasesAreOffWithTheOption(t *testing.T) {
 	var l logs
 	c := newExperiments(t, flagnetic.WithLogger(l.logger()), flagnetic.WithExposures(false))
-	if got := len(l.named(flagnetic.EventExposuresDisabled)); got != 1 {
-		t.Fatalf("exposures_disabled logged %d times at construction, want 1", got)
+	if got := len(l.named(flagnetic.EventExposuresOff)); got != 1 {
+		t.Fatalf("exposures_off logged %d times at construction, want 1", got)
 	}
 	ctx := unitContext("u-1")
 	c.Detail(context.Background(), ctx, "pricing", "built-in")
@@ -572,9 +572,9 @@ func TestEventsEnqueuedDuringFailuresFlushOnceWithTheSameIDs(t *testing.T) {
 	if fmt.Sprint(first) != fmt.Sprint(third) {
 		t.Errorf("the retry carries %v, want the first attempt's %v", third, first)
 	}
-	failed := l.named(flagnetic.EventIngestFailed)
+	failed := l.named(flagnetic.EventEventsFailed)
 	if len(failed) != 2 {
-		t.Fatalf("ingest_failed logged %d times, want 2", len(failed))
+		t.Fatalf("events_failed logged %d times, want 2", len(failed))
 	}
 	if failed[0].Fields["retry_in"] != time.Second.String() || failed[1].Fields["retry_in"] != (2*time.Second).String() {
 		t.Errorf("the backoff went %v then %v, want 1s then 2s", failed[0].Fields["retry_in"], failed[1].Fields["retry_in"])

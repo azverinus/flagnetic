@@ -14,7 +14,7 @@ import (
 
 // streamTimeDivisor is the one factor every duration of a ruleset stream
 // scenario is divided by — the SDK's intervals, the scenario's options and
-// its windows alike — so that four scenarios covering a minute and a half
+// its windows alike — so that the scenarios, each covering a minute or two
 // of stream behaviour run in seconds. The fixtures allow it: two loops
 // wait at once here, so the fetch loop's own clock cannot drive them.
 const streamTimeDivisor = 10
@@ -23,21 +23,27 @@ func scaled(ms int64) time.Duration {
 	return time.Duration(ms) * time.Millisecond / streamTimeDivisor
 }
 
-// streamScenarios are the ruleset stream scenarios of scenarios.json this
+// streamScenarios are the ruleset stream scenarios of readScenarios this
 // SDK runs.
 var streamScenarios = map[string]bool{
-	"server: a stream event above the held version triggers a fetch":                                     true,
-	"server: a dropped stream reconnects with Last-Event-ID and fetches":                                 true,
-	"server: 45 seconds of silence reconnect the stream":                                                 true,
-	"server: a fetch below the event's version is retried after 1, 2 and 4 seconds and never downgrades": true,
-	"server: a stream closed before its first heartbeat is retried with backoff":                         true,
+	"server: a stream event above the held version triggers a fetch":                                                true,
+	"server: a dropped stream reconnects with Last-Event-ID and fetches":                                            true,
+	"server: 45 seconds of silence reconnect the stream":                                                            true,
+	"server: a fetch below the event's version is retried after 1, 2 and 4 seconds and never downgrades":            true,
+	"server: a stream closed before its first heartbeat is retried with backoff":                                    true,
+	"server: a stream that drops after being connected and stays down brings the next fetch within the safety poll": true,
+	"server: a stream refused 401/403 while the fetch succeeds is opened again after the next successful fetch":     true,
+	"server: a stream refused 401/403 stays closed while the fetch is refused too":                                  true,
 }
 
 // windowTopScenarios are the scenarios whose point is how long the SDK
 // waits, so the runner draws every jitter at the top of its window: a
 // reconnect that skips the backoff then misses the window it must meet.
 var windowTopScenarios = map[string]bool{
-	"server: a stream closed before its first heartbeat is retried with backoff": true,
+	"server: a stream closed before its first heartbeat is retried with backoff":                                    true,
+	"server: a stream that drops after being connected and stays down brings the next fetch within the safety poll": true,
+	"server: a stream refused 401/403 while the fetch succeeds is opened again after the next successful fetch":     true,
+	"server: a stream refused 401/403 stays closed while the fetch is refused too":                                  true,
 }
 
 // windowTopSlack is what a request may come after the top of its window:
@@ -55,6 +61,9 @@ func TestProtocolStreamScenarios(t *testing.T) {
 		}
 		ran++
 		t.Run(sc.Name, func(t *testing.T) {
+			if !sc.Given.Options.Stream {
+				t.Fatal("the scenario turns the ruleset stream off, which this runner always opens")
+			}
 			reportScenario(t, sc.Name)
 			runStreamScenario(t, file, sc.Given.Options.PollIntervalMS, sc.Steps, windowTopScenarios[sc.Name])
 		})

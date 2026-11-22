@@ -74,6 +74,11 @@ type Client struct {
 	// a poll wait chosen while it was up shortens to the down poll.
 	streamDown chan struct{}
 	target     atomic.Int64
+	// fetchSuccesses counts the fetches that succeeded, and fetchSuccess
+	// tells a ruleset stream the key was refused for that one did, so that
+	// it opens again.
+	fetchSuccesses atomic.Int64
+	fetchSuccess   chan struct{}
 	// firstConnect and retryHint belong to the stream goroutine alone.
 	firstConnect bool
 	retryHint    time.Duration
@@ -233,7 +238,7 @@ func WithSummaryInterval(d time.Duration) Option {
 // WithExposures turns exposures and aliases on or off; they are on by
 // default. With them off Exposure and Alias record nothing and no event
 // leaves the process, so running experiments receive no data; construction
-// logs exposures_disabled as a warning, so a build shipped with the option
+// logs exposures_off as a warning, so a build shipped with the option
 // is noticed. Offline mode keeps recording them in the Recorder instead of
 // sending them.
 func WithExposures(enabled bool) Option {
@@ -321,6 +326,7 @@ func New(sdkKey, baseURL string, opts ...Option) (*Client, error) {
 	c.streamReady = make(chan struct{})
 	c.wake = make(chan struct{}, 1)
 	c.streamDown = make(chan struct{}, 1)
+	c.fetchSuccess = make(chan struct{}, 1)
 	c.firstConnect = true
 	c.startLoops(o, func(ctx context.Context, loops *sync.WaitGroup) {
 		if o.changeStream == nil || *o.changeStream {
@@ -370,7 +376,7 @@ func (c *Client) startLoops(o options, online func(context.Context, *sync.WaitGr
 			}()
 		}
 	} else {
-		c.log(slog.LevelWarn, EventExposuresDisabled, nil)
+		c.log(slog.LevelWarn, EventExposuresOff, nil)
 	}
 	if online != nil {
 		online(ctx, &loops)

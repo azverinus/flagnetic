@@ -114,6 +114,11 @@ func (c *Client) run(ctx context.Context) {
 		default:
 			failures = 0
 			polling = false
+			c.fetchSuccesses.Add(1)
+			select {
+			case c.fetchSuccess <- struct{}{}:
+			default:
+			}
 			if target := c.target.Load(); target != announced {
 				announced, catchUps = target, 0
 			}

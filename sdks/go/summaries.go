@@ -300,7 +300,7 @@ func (s *summaries) take() *summaryWindow {
 			s.log(slog.LevelWarn, EventQueueDropped, map[string]any{
 				"kind":  summaryEventType,
 				"rows":  len(kept.counts),
-				"cause": "window_older_than_one_hour",
+				"cause": "window_too_old",
 				"age":   age.String(),
 			})
 		} else {
