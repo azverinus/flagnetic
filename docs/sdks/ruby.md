@@ -31,6 +31,49 @@ client.bool("new_checkout", default: false, context: { units: { user: "u-1001" }
 
 Under Rails the gem builds `Flagnetic.client` itself from `config.flagnetic`, `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BASE_URL`, or credentials, so no initializer is needed; controllers and views get `flagnetic_context`. Tests build offline clients with `Flagnetic::Testing`, which make no request. The [gem's README](../../sdks/ruby/README.md) covers every option, the log events, the Rails settings and the test helpers.
 
+## Quickstart
+
+From an empty Gemfile to a served flag, an exposure and a clean shutdown. You need a Flagnetic server and a server key (`fn_srv_…`, see [SDK keys](keys.md)); the examples read both from the environment.
+
+**1. Install.**
+
+```bash
+bundle add flagnetic
+```
+
+**2. Create the client with the key.** One client per process, shared by every thread. `ready` waits for the first ruleset and returns the stage it reached; the client works either way, serving your defaults until a ruleset arrives.
+
+```ruby
+require "flagnetic"
+
+client = Flagnetic::Client.new(ENV.fetch("FLAGNETIC_SDK_KEY"), base_url: ENV.fetch("FLAGNETIC_BASE_URL"))
+client.ready(timeout: 5) # => :fresh, :last_good or :built_in
+```
+
+**3. Evaluate a flag with a context.** The context names who the evaluation is for: units (unit type to unit ID) decide rollouts and experiments, attributes feed rules. A getter never waits on the network and never raises; a flag it cannot serve returns your default.
+
+```ruby
+context = { units: { user: "u-1001" }, attributes: { plan: "pro" } }
+
+client.bool("new_checkout", default: false, context: context) # => true
+client.detail("new_checkout", default: false, context: context).reason # => :fallthrough
+```
+
+**4. Report an exposure.** Evaluating records nothing. When the person actually sees what an experiment decided, say so; `exposure` sends the experiment block of the latest evaluation of that flag for that context.
+
+```ruby
+variant = client.string("pricing", default: "standard", context: context)
+client.exposure("pricing", context: context)
+```
+
+**5. Shut down.** `close` sends what is queued and stops the background thread; call it when the process ends (the Rails integration does it for you).
+
+```ruby
+client.close(timeout: 5)
+```
+
+Under Rails none of the above needs code: see [Rails](../../sdks/ruby/README.md#rails). The [package README](../../sdks/ruby/README.md) has every option; the [behaviour matrix](behaviour-matrix.md) shows what the SDK is tested against.
+
 ## Propagation
 
 | The client | A change reaches it within |

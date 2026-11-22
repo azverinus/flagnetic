@@ -35,6 +35,10 @@ client.fetch_boolean_value(flag_key: "new_checkout", default_value: false, evalu
 - `provider.client` returns the wrapped `Flagnetic::Client`: local overrides, the recorder of an offline client (`offline:` for tests), flush and status.
 - A `logger:` keeps receiving every log event of the client.
 
+## What 1.0 promises
+
+From 1.0.0 the public API changes only additively until 2.0: `Flagnetic::OpenFeature::Provider` (`new` with `unit_type:`, `ready_timeout:`, `logger:` and every `Flagnetic::Client.new` option; `client`, `metadata`, `init`, `shutdown`, the `fetch_*_value` resolvers and `track`), `Provider::NAME`, `Flagnetic::OpenFeature::REASON_METADATA_KEY` and `Flagnetic::OpenFeature.reason_of`, the events and reason mapping documented here, and the flag metadata keys. The defaults (`unit_type` `user`, `ready_timeout` 10 seconds) are documented, not constants. Everything else is internal. The provider makes no request of its own: the wire promise is the `flagnetic` gem's.
+
 ## Events
 
 | When | Event |
