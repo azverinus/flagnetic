@@ -29,6 +29,23 @@ Duration scaledHalf(Object? ms) =>
 /// the first failure's 0–1 s) misses a window the latency does not cover.
 const windowTopScenarios = {
   'client: a stream closed before its first heartbeat is retried with backoff',
+  // The stream reconnects while the safety poll runs on its own timer: with
+  // every jitter at the top of its window the order of the two is fixed.
+  'client: a stream refused 401/403 while the evaluation succeeds is opened '
+      'again after the next successful evaluation',
+  'client: a stream refused 401/403 stays closed while the evaluation is '
+      'refused too',
+};
+
+/// Scenario durations at their own length.
+Duration scaledReal(Object? ms) => Duration(milliseconds: (ms! as num).toInt());
+
+/// The scenarios that run in real time: the retries after an answer below
+/// the announced version wait a fixed 1, 2 and 4 s, which no option scales,
+/// so every other duration of the scenario keeps its length too.
+const realTimeScenarios = {
+  'client: an evaluation below the event\'s version is retried after 1, 2 '
+      'and 4 seconds and never downgrades',
 };
 
 /// Draws the top of every window.
@@ -461,7 +478,12 @@ Future<void> _runScenario(
 ) async {
   final fixtures = harness.fixtures;
   final windowTop = windowTopScenarios.contains(scenario['name']);
-  final scale = windowTop ? scaledHalf : scaled;
+  final realTime = realTimeScenarios.contains(scenario['name']);
+  final scale = realTime
+      ? scaledReal
+      : windowTop
+      ? scaledHalf
+      : scaled;
   const sdkKey = clientKey;
   const fetchPath = evaluatePath;
   final given = scenario['given']! as Map<String, Object?>;
@@ -513,7 +535,7 @@ Future<void> _runScenario(
         store: store,
         logger: logs.call,
         pollInterval: scale(options['poll_interval_ms']),
-        sse: options['sse'] as bool?,
+        stream: options['stream'] as bool?,
         // The scenarios' 0–3 s wait, divided like every duration.
         rulesetEventJitter: scale(3000),
         random: windowTop ? _TopRandom() : null,
@@ -521,6 +543,11 @@ Future<void> _runScenario(
         streamBackoffCap: scale(30000),
         streamCloseJitter: scale(2000),
         streamSilenceTimeout: scale(45000),
+        // The fetch retries of client mode, from 2 s to 5 minutes, 15 while
+        // the key is refused.
+        retryBackoff: scale(2000),
+        retryBackoffCap: scale(300000),
+        unauthorizedBackoffCap: scale(900000),
         // Time as the scenario counts it: it moves only by `advance_ms` and
         // `no_request`, so the 10 s minimum refetch gap is tested in the
         // protocol's own seconds.

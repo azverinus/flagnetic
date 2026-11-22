@@ -53,7 +53,7 @@ export type { LogLevel };
  *
  * - `ruleset_loaded` (info): a ruleset was accepted. Fields: source, ruleset_version, flags.
  * - `fetch_failed` (warn): a ruleset fetch failed. Fields: cause, status?, retry_in_ms (when the next attempt is due).
- * - `sse_connected` (info) and `sse_dropped` (warn): the ruleset stream. Fields of the drop: cause, retry_in_ms.
+ * - `stream_connected` (info) and `stream_dropped` (warn): the ruleset stream. Fields of the drop: cause, retry_in_ms.
  * - `stage_changed` (warn when leaving `fresh`, else info). Fields: from, to.
  * - `key_revoked` (error): 401 or 403, logged once until a fetch succeeds. Fields: status.
  * - `schema_unsupported` (error): a document's schema_version is not one this SDK reads, logged once. Fields: schema_version, supported.
@@ -68,27 +68,31 @@ export type { LogLevel };
  * - `type_mismatch` (warn): a getter asked for another type than the flag's, logged once per flag. Fields: flag, flag_type, requested_type.
  * - `evaluation_failed`, `listener_failed` (error): an internal failure or a throwing listener, caught. Fields: cause.
  */
-export type LogEvent =
-  | "ruleset_loaded"
-  | "fetch_failed"
-  | "sse_connected"
-  | "sse_dropped"
-  | "stage_changed"
-  | "key_revoked"
-  | "schema_unsupported"
-  | "rule_unsupported"
-  | "value_too_deep"
-  | "store_failed"
-  | "events_failed"
-  | "queue_dropped"
-  | "exposures_off"
-  | "exposure_skipped"
-  | "override_set"
-  | "override_refused"
-  | "local_overrides_allowed"
-  | "type_mismatch"
-  | "evaluation_failed"
-  | "listener_failed";
+export const LOG_EVENTS = [
+  "ruleset_loaded",
+  "fetch_failed",
+  "stream_connected",
+  "stream_dropped",
+  "stage_changed",
+  "key_revoked",
+  "schema_unsupported",
+  "rule_unsupported",
+  "value_too_deep",
+  "store_failed",
+  "events_failed",
+  "queue_dropped",
+  "exposures_off",
+  "exposure_skipped",
+  "override_set",
+  "override_refused",
+  "local_overrides_allowed",
+  "type_mismatch",
+  "evaluation_failed",
+  "listener_failed",
+] as const;
+
+/** One of {@link LOG_EVENTS}. */
+export type LogEvent = (typeof LOG_EVENTS)[number];
 
 /**
  * Receives every log event with its level and structured fields. Called

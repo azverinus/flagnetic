@@ -144,7 +144,7 @@ def test_a_kill_switch_through_replica_a_reaches_the_sdk_streaming_from_replica_
     context = unit(SEED["units"]["outside_rollout"])
     client, logs = clients(SEED["replicas"]["b"], poll_interval=3600)
     assert client.ready(timeout=10) == flagnetic.Stage.FRESH
-    assert eventually(lambda: "sse_connected" in logs, 10), "the stream to replica B never connected"
+    assert eventually(lambda: "stream_connected" in logs, 10), "the stream to replica B never connected"
     # The replica announces the version the client holds as the stream opens;
     # give it a moment so that the kill switch is news to it.
     time.sleep(0.5)

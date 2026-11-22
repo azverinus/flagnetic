@@ -232,7 +232,7 @@ module Flagnetic
 
     def stream_connected
       @mutex.synchronize { @once.delete([:key_revoked, "stream"]) }
-      log(:info, :sse_connected)
+      log(:info, :stream_connected)
     end
 
     def persist(json)

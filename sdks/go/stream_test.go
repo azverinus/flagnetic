@@ -320,13 +320,13 @@ func TestAStreamWhoseHeadersNeverArriveTimesOutAndReconnects(t *testing.T) {
 		return attempts, attempts >= 3
 	}, "the reconnects after the header timeout")
 	timeouts := 0
-	for _, e := range l.named(flagnetic.EventSSEDropped) {
+	for _, e := range l.named(flagnetic.EventStreamDropped) {
 		if e.Fields["cause"] == "timeout" && e.Fields["reconnect"] == true {
 			timeouts++
 		}
 	}
 	if timeouts < 2 {
-		t.Errorf("sse_dropped timeout logged %d times, want one per attempt", timeouts)
+		t.Errorf("stream_dropped timeout logged %d times, want one per attempt", timeouts)
 	}
 	// Each timeout is a failed connection, so the reconnect backs off.
 	if got := j.ceilings(); len(got) < 2 || got[1] <= got[0] {
@@ -344,7 +344,7 @@ func TestAnIdleStreamOutlivesTheHeaderTimeout(t *testing.T) {
 	conn := srv.connect(t)
 	conn.send(t, heartbeat)
 	time.Sleep(300 * time.Millisecond)
-	if dropped := l.named(flagnetic.EventSSEDropped); len(dropped) != 0 {
+	if dropped := l.named(flagnetic.EventStreamDropped); len(dropped) != 0 {
 		t.Errorf("the idle stream was dropped: %+v", dropped)
 	}
 	srv.mu.Lock()
@@ -458,13 +458,13 @@ func TestStreamClosedBeforeItsFirstHeartbeatBacksOffAndAHeartbeatRestartsIt(t *t
 		t.Errorf("waits before the reconnects drew from %v, want %v", got, want)
 	}
 	early := 0
-	for _, e := range l.named(flagnetic.EventSSEDropped) {
+	for _, e := range l.named(flagnetic.EventStreamDropped) {
 		if e.Fields["cause"] == "closed_early" {
 			early++
 		}
 	}
 	if early != 4 {
-		t.Errorf("sse_dropped closed_early logged %d times, want 4", early)
+		t.Errorf("stream_dropped closed_early logged %d times, want 4", early)
 	}
 }
 
@@ -488,11 +488,11 @@ func TestAStreamThatHeardAHeartbeatRestartsTheBackoffHoweverItEnds(t *testing.T)
 		t.Errorf("waits before the reconnects drew from %v, want %v first", got, want)
 	}
 	malformed := false
-	for _, e := range l.named(flagnetic.EventSSEDropped) {
+	for _, e := range l.named(flagnetic.EventStreamDropped) {
 		malformed = malformed || e.Fields["cause"] == "malformed"
 	}
 	if !malformed {
-		t.Error("sse_dropped malformed was never logged")
+		t.Error("stream_dropped malformed was never logged")
 	}
 }
 
@@ -517,12 +517,12 @@ func TestDroppedStreamReconnectsWithTheHeldVersionAndFetches(t *testing.T) {
 	if got := c.Detail(context.Background(), linux, "greeting", "none"); got.Reason != flagnetic.ReasonOff {
 		t.Errorf("after the reconnect's fetch detail = %+v, want the off variation", got)
 	}
-	dropped := l.named(flagnetic.EventSSEDropped)
+	dropped := l.named(flagnetic.EventStreamDropped)
 	if len(dropped) == 0 || dropped[0].Fields["cause"] != "server_closed" {
-		t.Errorf("sse_dropped = %+v, want one for the server-side close", dropped)
+		t.Errorf("stream_dropped = %+v, want one for the server-side close", dropped)
 	}
-	if got := len(l.named(flagnetic.EventSSEConnected)); got < 2 {
-		t.Errorf("sse_connected logged %d times, want the connect and the reconnect", got)
+	if got := len(l.named(flagnetic.EventStreamConnected)); got < 2 {
+		t.Errorf("stream_connected logged %d times, want the connect and the reconnect", got)
 	}
 }
 
@@ -556,14 +556,111 @@ func TestRefusedKeyClosesTheRulesetStreamAndKeepsServing(t *testing.T) {
 	if revoked[0].Level != slog.LevelError {
 		t.Errorf("key_revoked at %v, want error", revoked[0].Level)
 	}
-	dropped := l.named(flagnetic.EventSSEDropped)
+	dropped := l.named(flagnetic.EventStreamDropped)
 	if len(dropped) != 1 || dropped[0].Fields["reconnect"] != false {
-		t.Errorf("sse_dropped = %+v, want exactly one that does not reconnect", dropped)
+		t.Errorf("stream_dropped = %+v, want exactly one that does not reconnect", dropped)
 	}
 	// The stream stays closed: nothing reopens it while the fetch loop
 	// goes on retrying.
-	if got := len(l.named(flagnetic.EventSSEConnected)); got != 0 {
-		t.Errorf("sse_connected logged %d times after a refusal, want 0", got)
+	if got := len(l.named(flagnetic.EventStreamConnected)); got != 0 {
+		t.Errorf("stream_connected logged %d times after a refusal, want 0", got)
+	}
+}
+
+func TestAStreamRefusedAtStartupOpensAfterTheSecondSuccessfulFetch(t *testing.T) {
+	var l logs
+	srv := newStreamServer(t, ruleset(7), status(http.StatusNotModified))
+	// A proxy refuses the stream alone: the fetch that went out with the
+	// same key at the same moment says nothing new about the refusal, the
+	// one after it does.
+	srv.streamStatuses = []int{http.StatusForbidden, http.StatusOK}
+	c := newStreaming(t, srv.URL, flagnetic.WithLogger(l.logger()), flagnetic.WithTimeDivisor(100))
+	if got := readyNow(t, c); got != flagnetic.StageFresh {
+		t.Fatalf("Ready = %q, want fresh", got)
+	}
+	srv.connect(t)
+	if got := srv.rulesetCount(); got < 2 {
+		t.Errorf("the stream opened again after %d fetches, want it after the second successful one", got)
+	}
+	waitFor(t, func() (bool, bool) {
+		return true, len(l.named(flagnetic.EventStreamConnected)) == 1
+	}, "stream_connected for the reopened stream")
+}
+
+func TestAStreamRefusedMidLifeOpensAfterTheNextSuccessfulFetch(t *testing.T) {
+	var l logs
+	var mu sync.Mutex
+	refused := false
+	var streams, fetchesAfterRestore int
+	conns := make(chan *streamConn, 8)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		deny := refused
+		if r.URL.Path == "/sdk/v1/stream" {
+			streams++
+		} else if !refused && streams > 1 {
+			fetchesAfterRestore++
+		}
+		mu.Unlock()
+		if deny {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		if r.URL.Path == "/sdk/v1/stream" {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			holdOpen(w, r, conns)
+			return
+		}
+		ruleset(7)(w, r)
+	}))
+	defer srv.Close()
+	c := newStreaming(t, srv.URL, flagnetic.WithLogger(l.logger()), flagnetic.WithTimeDivisor(100))
+	if got := readyNow(t, c); got != flagnetic.StageFresh {
+		t.Fatalf("Ready = %q, want fresh", got)
+	}
+	first := waitConn(t, conns)
+
+	// The key is revoked: the stream drops and its reconnect is refused,
+	// and so is every fetch.
+	mu.Lock()
+	refused = true
+	mu.Unlock()
+	first.close()
+	waitFor(t, func() (bool, bool) {
+		return true, len(l.named(flagnetic.EventFetchFailed)) >= 3
+	}, "the fetch loop refused three times")
+	mu.Lock()
+	refusedStreams := streams
+	mu.Unlock()
+	if refusedStreams != 2 {
+		t.Errorf("%d stream requests while the key is refused, want the first and one refused reconnect", refusedStreams)
+	}
+
+	// The key is restored: the first fetch that succeeds opens the stream.
+	mu.Lock()
+	refused = false
+	mu.Unlock()
+	waitConn(t, conns)
+	mu.Lock()
+	defer mu.Unlock()
+	if fetchesAfterRestore != 1 {
+		t.Errorf("the stream opened again after %d successful fetches, want the first", fetchesAfterRestore)
+	}
+	if streams != 3 {
+		t.Errorf("%d stream requests, want 3", streams)
+	}
+}
+
+// waitConn waits for the next ruleset stream the SDK opens on conns.
+func waitConn(t *testing.T, conns chan *streamConn) *streamConn {
+	t.Helper()
+	select {
+	case c := <-conns:
+		return c
+	case <-time.After(10 * time.Second):
+		t.Fatal("the SDK never opened the ruleset stream")
+		return nil
 	}
 }
 

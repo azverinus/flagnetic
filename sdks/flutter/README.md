@@ -8,7 +8,7 @@ flutter pub add flagnetic_flutter
 
 Requires Flutter 3.35 or newer, on iOS, Android, desktop and the web. Supported versions follow Flutter's stable releases of about the last twelve months; a version that leaves upstream support is dropped in a minor release.
 
-A kill switch reaches an app in the foreground within 5 seconds at the 99th percentile, a backgrounded app when it resumes, and an app built with `ClientOptions(sse: false)` within 5 minutes and at every resume; the [`flagnetic` README](https://pub.dev/packages/flagnetic) has the details and the offline test mode.
+A kill switch reaches an app in the foreground within 5 seconds at the 99th percentile, a backgrounded app when it resumes, and an app built with `ClientOptions(stream: false)` within 5 minutes and at every resume; the [`flagnetic` README](https://pub.dev/packages/flagnetic) has the details and the offline test mode.
 
 ```dart
 import 'package:flagnetic_flutter/flagnetic_flutter.dart';

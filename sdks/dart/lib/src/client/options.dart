@@ -46,9 +46,9 @@ final class OfflineSource {
 /// Whether the code was compiled for the web, where the stream is opt-in.
 const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
 
-/// [ClientOptions.sse] resolved: the explicit choice, else the platform's
+/// [ClientOptions.stream] resolved: the explicit choice, else the platform's
 /// default. A function rather than a getter, so that only the client reads it.
-bool streamEnabled(ClientOptions options) => options.sse ?? !_isWeb;
+bool streamEnabled(ClientOptions options) => options.stream ?? !_isWeb;
 
 /// How a client behaves. Every duration is configurable so that a test can
 /// run a whole scenario in milliseconds.
@@ -78,7 +78,7 @@ final class ClientOptions {
     this.sendExposures = true,
     this.sendSummaries = true,
     this.allowOverrides = false,
-    this.sse,
+    this.stream,
     this.rulesetEventJitter = const Duration(seconds: 3),
     this.random,
     this.clock,
@@ -202,7 +202,7 @@ final class ClientOptions {
   /// the web, where a connection per tab is the app's choice (the browser
   /// client behaves the same). Off, values stay fresh within [pollInterval]
   /// (five minutes by default) and at every `foreground`.
-  final bool? sse;
+  final bool? stream;
 
   /// The longest random wait between a `ruleset` event and the evaluate it
   /// asks for, so that the apps open when a kill switch is flipped do not

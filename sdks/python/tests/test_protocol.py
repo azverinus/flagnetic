@@ -47,6 +47,15 @@ DIVISORS = {
 # is not compressed, so a reconnect that skips the backoff (the routine 0-2 s against the first
 # failure's 0-1 s) misses a window that the scheduling slack of a step does not widen to cover.
 WINDOW_TOP = {"server: a stream closed before its first heartbeat is retried with backoff": 1}
+# The stream reconnects while the safety poll runs on its own timer: with every jitter at the top of
+# its window the order of the two is fixed, and the factor keeps the half minute short.
+WINDOW_TOP[
+    "server: a stream that drops after being connected and stays down brings the next fetch within the safety poll"
+] = 10
+WINDOW_TOP[
+    "server: a stream refused 401/403 while the fetch succeeds is opened again after the next successful fetch"
+] = 10
+WINDOW_TOP["server: a stream refused 401/403 stays closed while the fetch is refused too"] = 10
 DIVISORS.update(WINDOW_TOP)
 DEFAULT_DIVISOR = 50
 
@@ -76,7 +85,7 @@ def scenario_report() -> Iterator[None]:
         Path(report).write_text(json.dumps(sorted(PASSED)), encoding="utf-8")
 
 
-@pytest.mark.parametrize("name", [s["name"] for s in server_scenarios()])
+@pytest.mark.parametrize("name", [s["name"] for s in server_scenarios()], ids=str)
 def test_scenario(name: str, monkeypatch: pytest.MonkeyPatch) -> None:
     scenario = next(s for s in server_scenarios() if s["name"] == name)
     if name in WINDOW_TOP:
@@ -99,7 +108,7 @@ def test_events_degradation_case(case: dict[str, Any]) -> None:
         "mode": "server",
         "given": {
             "options": {
-                "sse": False,
+                "stream": False,
                 "poll_interval_ms": 3_600_000,
                 "flush_interval_ms": 3_600_000,
                 "send_summaries": False,

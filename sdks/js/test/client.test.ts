@@ -703,7 +703,7 @@ describe("the ruleset stream", () => {
     const c = h.client({ store: false, stream: true, pollInterval: 3_600_000 });
     (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: "retry: 3000\n\n" });
     await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
-    expect(h.count("sse_connected")).toBe(1);
+    expect(h.count("stream_connected")).toBe(1);
 
     h.net.send('event: ruleset\nid: 1\ndata: {"version":1}\n\n');
     await settle();
@@ -794,13 +794,17 @@ describe("the ruleset stream", () => {
 });
 
 describe("the ruleset stream, refused", () => {
-  test("a stream answering 401 stays closed, logs key_revoked once, and opens again after an evaluation succeeds", async () => {
+  test("a stream answering 401 at startup stays closed through the evaluation that follows and opens again after the next one", async () => {
     const h = harness();
     h.client({ store: false, stream: true, pollInterval: 30_000 });
     (await h.waitFor("/sdk/v1/stream")).answer({ status: 401, headers: { "Content-Type": "application/problem+json" }, body: "{}" });
     await settle();
     expect(h.count("key_revoked")).toBe(1);
     // The first values do not wait for a stream that will not open.
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    await settle();
+    expect(h.net.seen.filter((r) => r.path === "/sdk/v1/stream"), "the evaluation right after the refusal shows nothing new").toHaveLength(1);
+    await h.advance(30_000);
     await h.serve("/sdk/v1/evaluate", values(1, {}));
     const back = await h.waitFor("/sdk/v1/stream", 1);
     back.answer({ stream: true });
@@ -851,6 +855,32 @@ describe("the persisted event queue", () => {
     const sent = (JSON.parse(req.body ?? "{}") as { events: { from_unit_id: string }[] }).events;
     expect(sent.map((e) => e.from_unit_id)).toStrictEqual(["d-2", "d-3", "d-4"]);
     req.answer({ status: 202, body: JSON.stringify({ accepted: 3, duplicates: 0, dropped_rows: 0, rejected: [] }) });
+  });
+
+  test("a 202 rejecting an event logs queue_dropped naming its code, and the event is not sent again", async () => {
+    const h = harness();
+    const c = h.client({ store: false, pollInterval: 3_600_000, flushInterval: 3_600_000, sendSummaries: false });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-1", toUnitType: "user", toUnitId: "u-1001" });
+    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-2", toUnitType: "user", toUnitId: "u-1001" });
+    const flushed = c.flush();
+    const req = await h.waitFor("/sdk/v1/events");
+    const sent = (JSON.parse(req.body ?? "{}") as { events: { event_id: string }[] }).events;
+    req.answer({
+      status: 202,
+      body: JSON.stringify({
+        accepted: 1,
+        duplicates: 0,
+        dropped_rows: 0,
+        rejected: [{ index: 1, event_id: sent[1]?.event_id, code: "invalid_event", detail: "from_unit_id is the same as to_unit_id" }, null, 7],
+      }),
+    });
+    await flushed;
+    const dropped = h.logs.filter((l) => l.event === "queue_dropped");
+    expect(dropped.map((l) => l.fields)).toStrictEqual([{ cause: "refused_by_the_platform", events: 1, codes: ["invalid_event"] }]);
+    await c.flush();
+    await settle();
+    expect(h.net.seen.filter((r) => r.path === "/sdk/v1/events"), "a rejection is final").toHaveLength(1);
   });
 
   test("a queue that outlived the tab is flushed by the next client with the same event IDs", async () => {
@@ -1336,7 +1366,7 @@ describe("evaluation summaries in the queue", () => {
       for (const req of h.net.waiting("/sdk/v1/events")) req.answer({ status: 503 });
       await settle();
     }
-    expect(h.logs.some((l) => l.event === "queue_dropped" && l.fields.cause === "window_older_than_one_hour")).toBe(true);
+    expect(h.logs.some((l) => l.event === "queue_dropped" && l.fields.cause === "window_too_old")).toBe(true);
     const summaries = queued(store).filter((e) => e.type === "evaluation_summary");
     expect(summaries).toHaveLength(1);
     expect(h.clock.now() - Date.parse(String(summaries[0]?.interval_start))).toBeLessThanOrEqual(3_600_000 + 600_000);

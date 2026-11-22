@@ -326,7 +326,7 @@ class ClientTest < Minitest::Test
     c.ready(timeout: 2)
     c.string("on", default: "")
     @server.close_streams
-    eventually { logged(:sse_connected).size == 2 }
+    eventually { logged(:stream_connected).size == 2 }
     names = @log_mutex.synchronize { @logged.map { |e| e[1] } }.uniq
     assert_empty names - Flagnetic::EVENTS
     assert(names.all? { |n| Flagnetic::LEVELS.include?(@logged.find { |e| e[1] == n }[0]) })

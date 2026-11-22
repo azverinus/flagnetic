@@ -264,7 +264,7 @@ abstract final class LogEvents {
 
   /// (error) An internal failure was caught at the API boundary. Fields:
   /// operation, cause.
-  static const internalError = 'internal_error';
+  static const evaluationFailed = 'evaluation_failed';
 
   /// (warn) Events left the queue without reaching the platform. Fields:
   /// cause (`queue_full`, `client_error`, `refused_by_the_platform`,
@@ -301,14 +301,14 @@ abstract final class LogEvents {
   static const overrideRefused = 'override_refused';
 
   /// (info) The ruleset stream connected. Fields: last_event_id.
-  static const sseConnected = 'sse_connected';
+  static const streamConnected = 'stream_connected';
 
   /// (warn) The ruleset stream ended or failed; it reconnects after the
   /// delay in the fields. Fields: cause (`closed`, `closed_early` for a
   /// stream the server closed before its first heartbeat, `silent`,
   /// `status`, `network`, `parse`, `content_type` for a 200 that is not an
   /// event stream), status and detail where known, retry_in_ms.
-  static const sseDropped = 'sse_dropped';
+  static const streamDropped = 'stream_dropped';
 
   /// (error) A change or stage listener threw. Fields: cause.
   static const listenerFailed = 'listener_failed';

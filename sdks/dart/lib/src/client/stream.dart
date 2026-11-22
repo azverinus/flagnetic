@@ -311,7 +311,7 @@ final class RulesetStream {
       return;
     }
     _heard = false;
-    _log(LogLevel.info, LogEvents.sseConnected, {'last_event_id': id});
+    _log(LogLevel.info, LogEvents.streamConnected, {'last_event_id': id});
     final parser = SseParser();
     _body = stream.body.listen(
       (chunk) {
@@ -325,7 +325,7 @@ final class RulesetStream {
           if (_gone) return;
           _retryAfterError({'cause': 'parse', 'detail': '$e'});
         } on Object catch (e) {
-          _log(LogLevel.warn, LogEvents.sseDropped, {
+          _log(LogLevel.warn, LogEvents.streamDropped, {
             'cause': 'parse',
             'detail': '$e',
           });
@@ -396,7 +396,7 @@ final class RulesetStream {
   /// outage.
   void _retryAfterClose(String cause) {
     final delay = _settings.closeJitter * _jitter.nextDouble();
-    _log(LogLevel.warn, LogEvents.sseDropped, {
+    _log(LogLevel.warn, LogEvents.streamDropped, {
       'cause': cause,
       'retry_in_ms': delay.inMilliseconds,
     });
@@ -411,7 +411,7 @@ final class RulesetStream {
       _settings.backoffCap,
       _jitter,
     );
-    _log(LogLevel.warn, LogEvents.sseDropped, {
+    _log(LogLevel.warn, LogEvents.streamDropped, {
       ...fields,
       'retry_in_ms': delay.inMilliseconds,
     });

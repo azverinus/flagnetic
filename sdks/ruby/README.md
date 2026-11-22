@@ -70,11 +70,13 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 | `flush_interval:` | Seconds between sends of the exposure and alias queue (default 2); 500 queued events are sent at once. |
 | `summary_interval:` | Seconds between evaluation summaries (default 60). |
 | `send_summaries:` | `false` stops counting and sending evaluation summaries. |
-| `send_exposures:` | `false` makes `exposure` and `alias` send nothing (logged as `exposures_disabled`). |
+| `send_exposures:` | `false` makes `exposure` and `alias` send nothing (logged as `exposures_off`). |
 | `offline:`, `offline_file:` | A ruleset document (JSON text, a `Hash` or a callable returning one) or the path of one. No request is ever made, the stage is `:fresh`, and `reload` re-reads the source. |
 | `allow_overrides:` | Enables local overrides. |
 
 `stage` is `:fresh` while the latest attempt succeeded (a `304` included), `:last_good` while the held ruleset is older than the latest attempt (it came from an earlier success or from the store) and `:built_in` before any ruleset was received. `status` adds `stale_since`. `on_change` and `on_stage` register blocks and return a callable that removes them.
+
+A ruleset stream answered 401 or 403 logs `key_revoked` and stays closed while the fetch is refused too; it is tried again after the first successful fetch that follows the refusal (after the second when it was refused at startup, since the first fetch then shows nothing new), so a restored key gets its stream back.
 
 Every request, the ruleset stream included, goes through `Net::HTTP`, so the proxy configured for the process (`http_proxy`, `https_proxy`, `no_proxy`) applies.
 
@@ -114,8 +116,8 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 |---|---|---|
 | `ruleset_loaded` | info | `source` (`fetch`, `store`, `offline`), `ruleset_version`, `flags` |
 | `fetch_failed` | warn (error offline) | `cause`, `stage` (`source` offline) |
-| `sse_connected` | info | |
-| `sse_dropped` | info after a server close of a stable stream, warn otherwise | `cause` |
+| `stream_connected` | info | |
+| `stream_dropped` | info after a server close of a stable stream, warn otherwise | `cause` |
 | `stage_changed` | info to `fresh`, warn otherwise | `from`, `to` |
 | `key_revoked` | error, once per source until it recovers | `status`, `source` (`fetch`, `stream`) |
 | `schema_unsupported` | error, once | `schema_version`, `supported` |
@@ -130,10 +132,10 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `store_failed` | error | `path`, `cause` |
 | `worker_failed` | error | `cause` |
 | `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`); once at warn with `cause` `closed` for an exposure or alias after `close` |
-| `exposures_disabled` | warn | |
-| `ingest_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
+| `exposures_off` | warn | |
+| `events_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
 | `client_not_configured` | warn | `rails_env`: the Rails integration found no SDK key and base URL outside production and serves built-in defaults |
-| `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `not_serialisable`, `client_error`, `refused_by_the_platform`, `window_older_than_one_hour`) and what was dropped (`fault` for `not_serialisable`) |
+| `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `not_serialisable`, `client_error`, `refused_by_the_platform`, `window_too_old`) and what was dropped (`fault` for `not_serialisable`) |
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
 

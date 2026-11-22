@@ -113,7 +113,7 @@ final class FlagneticClient {
     try {
       _start();
     } on Object catch (e) {
-      _log(LogLevel.error, LogEvents.internalError, {
+      _log(LogLevel.error, LogEvents.evaluationFailed, {
         'operation': 'construct',
         'cause': '$e',
       });
@@ -1379,7 +1379,7 @@ final class FlagneticClient {
 
   void _internal(String operation, Object cause) => _log(
     LogLevel.error,
-    LogEvents.internalError,
+    LogEvents.evaluationFailed,
     {'operation': operation, 'cause': '$cause'},
   );
 

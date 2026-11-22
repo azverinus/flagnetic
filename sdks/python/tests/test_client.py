@@ -548,7 +548,7 @@ def test_a_refused_stream_key_stays_down_until_the_next_fetch_and_is_reported_on
     time.sleep(0.5)
     assert len(stream_requests) == 1
     assert logs.count("key_revoked") == 1
-    dropped = logs.named("sse_dropped")
+    dropped = logs.named("stream_dropped")
     assert [(f["cause"], f["reconnect"], f["status"]) for f in dropped] == [("unauthorized", False, 401)]
 
 
@@ -631,7 +631,7 @@ def test_a_malformed_ruleset_event_drops_the_stream_and_it_reconnects(clients: A
     assert eventually(lambda: [] if streams else ["no stream"]) == []
     server.stream_send(b"event: ruleset\ndata: not json\n\n")
     assert eventually(lambda: [] if len(streams) == 2 else ["no reconnect"]) == []
-    assert [f["cause"] for f in logs.named("sse_dropped")] == ["malformed"]
+    assert [f["cause"] for f in logs.named("stream_dropped")] == ["malformed"]
     assert streams[1].headers["last-event-id"] == "1"
 
 
@@ -678,7 +678,7 @@ def test_a_stream_closed_before_its_first_heartbeat_backs_off_and_a_heartbeat_re
     # The waits are 1 s doubling, then the routine 0-2 s, then 1 s again, all divided by 100.
     assert ceilings == pytest.approx([0.01, 0.02, 0.04, 0.02, 0.01])
     early = "closed_early"
-    assert [f["cause"] for f in logs.named("sse_dropped")] == [early, early, early, "server_closed", early]
+    assert [f["cause"] for f in logs.named("stream_dropped")] == [early, early, early, "server_closed", early]
 
 
 def test_close_ends_the_thread_while_the_stream_waits_for_its_answer(clients: Any) -> None:
@@ -706,7 +706,7 @@ def test_a_long_outage_never_stops_the_thread() -> None:
     logs = Logs()
     client = flagnetic.Client(SDK_KEY, "http://127.0.0.1:1", logger=logs, _time_divisor=100_000)
     try:
-        assert eventually(lambda: [] if logs.count("sse_dropped") > 1500 else ["too few"], 30) == []
+        assert eventually(lambda: [] if logs.count("stream_dropped") > 1500 else ["too few"], 30) == []
         assert logs.count("evaluation_failed") == 0
         assert [t for t in threading.enumerate() if t.name == "flagnetic" and t.is_alive()]
     finally:
@@ -730,7 +730,7 @@ def test_an_event_too_long_to_be_a_version_drops_the_stream(clients: Any) -> Non
     for _ in range(80):
         server.stream_send(b"data: " + b"x" * 1024 + b"\n")
     assert eventually(lambda: [] if len(streams) == 2 else ["no reconnect"]) == []
-    assert [f["cause"] for f in logs.named("sse_dropped")] == ["malformed"]
+    assert [f["cause"] for f in logs.named("stream_dropped")] == ["malformed"]
 
 
 def test_a_descriptor_beyond_the_select_limit_does_not_stop_the_thread(clients: Any) -> None:
@@ -847,7 +847,9 @@ def test_a_key_the_http_library_refuses_never_reaches_the_log(
         client.alias("anonymous", "d-1", "user", "u-1")
         client.flush(timeout=2)
         assert (
-            eventually(lambda: [] if logs.count("sse_dropped") and logs.count("fetch_failed") else ["none"])
+            eventually(
+                lambda: [] if logs.count("stream_dropped") and logs.count("fetch_failed") else ["none"]
+            )
             == []
         )
     logged = repr(logs.events) + caplog.text

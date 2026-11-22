@@ -348,7 +348,7 @@ class Player:
             options = given["options"]
             kwargs: dict[str, Any] = {
                 "poll_interval": options["poll_interval_ms"] / 1000,
-                "stream": options["sse"],
+                "stream": options["stream"],
                 "logger": self.logs,
                 "send_summaries": options.get("send_summaries", True),
                 "send_exposures": options.get("send_exposures", True),

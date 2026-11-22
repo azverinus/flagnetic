@@ -61,7 +61,7 @@ void main() {
     String baseUrl, {
     FlagneticContext context = const FlagneticContext(units: {}),
     Logs? logs,
-    bool sse = false,
+    bool stream = false,
   }) {
     final client = Flagnetic.client(
       seed.clientKey,
@@ -69,7 +69,7 @@ void main() {
       context: context,
       options: ClientOptions(
         logger: logs?.call,
-        sse: sse,
+        stream: stream,
         pollInterval: const Duration(hours: 1),
         platform: 'dart-e2e',
       ),
@@ -113,14 +113,14 @@ void main() {
             seed.replicaB,
             context: seed.outsideRollout,
             logs: log,
-            sse: true,
+            stream: true,
           ),
       ];
       for (final client in apps) {
         expect(await client.ready(const Duration(seconds: 10)), Stage.fresh);
       }
       await eventually(
-        () => logs.every((l) => l.has(LogEvents.sseConnected)),
+        () => logs.every((l) => l.has(LogEvents.streamConnected)),
         const Duration(seconds: 10),
         'a stream to replica B never connected',
       );
@@ -193,7 +193,7 @@ void main() {
             seed.replicaA,
             context: seed.outsideRollout,
             logs: log,
-            sse: true,
+            stream: true,
           ),
       ];
       for (final client in apps) {
@@ -204,7 +204,7 @@ void main() {
       await Future<void>.delayed(const Duration(seconds: 5));
       final streaming = [
         for (final (i, log) in logs.indexed)
-          if (log.has(LogEvents.sseConnected)) apps[i],
+          if (log.has(LogEvents.streamConnected)) apps[i],
       ];
       expect(streaming, isNotEmpty, reason: 'no stream to replica A connected');
 

@@ -94,8 +94,10 @@ module Flagnetic
     def run
       @fetch_backoff = Backoff.new(base: @timing.fetch_base, cap: @timing.fetch_cap)
       @stream_backoff = Backoff.new(base: @timing.stream_base, cap: @timing.stream_cap, random: @random)
-      @refused_backoff = Backoff.new(base: @timing.fetch_base, cap: @timing.unauthorized_cap)
       @next_fetch = now
+      @stream_stopped = false
+      @fetch_successes = 0
+      @reopen_after = 0
       @stream_due = @stream_enabled ? now : nil
       @connected = false
       @stable = false
@@ -198,17 +200,27 @@ module Flagnetic
       end
     end
 
-    # refused leaves a stream the key may not open closed, and tries again
-    # at the fetch loop's pace while the key is refused: backoff capped at
-    # the unauthorized cap, so a restored key gets its stream back.
+    # refused leaves a stream the key may not open closed, with no retry of
+    # its own: retrying a refused key on a timer only repeats the refusal.
+    # It is tried again after a later fetch succeeds, which shows a
+    # restored key or a refusal that was a proxy's. The fetch that follows
+    # a refusal at startup shows nothing the refusal did not, so then the
+    # one after it reopens the stream.
     def refused(status)
       close_stream
       @client.__send__(:key_revoked, status, "stream")
-      @stream_due = now + @refused_backoff.next_delay
+      stop_stream([@fetch_successes, 1].max)
+    end
+
+    # stop_stream keeps the stream closed until the fetch count passes
+    # after.
+    def stop_stream(after)
+      @stream_due = nil
+      @stream_stopped = true
+      @reopen_after = after
     end
 
     def connected
-      @refused_backoff.reset
       @connected = true
       @stable = false
       @client.__send__(:stream_connected)
@@ -239,7 +251,7 @@ module Flagnetic
         cause = "#{cause} before its first heartbeat"
       end
       close_stream
-      @client.__send__(:log, error ? :warn : :info, :sse_dropped, cause: cause)
+      @client.__send__(:log, error ? :warn : :info, :stream_dropped, cause: cause)
       delay = error ? @stream_backoff.next_delay : @random.rand * @timing.close_jitter
       @stream_due = now + delay
       @next_fetch = [@next_fetch, now + @timing.poll_down].min
@@ -259,6 +271,7 @@ module Flagnetic
       when :ok
         @fetch_backoff.reset
         @next_fetch = now + (@connected ? @timing.poll_connected : @timing.poll_down)
+        @fetch_successes += 1
         resume_stream
       when :revoked
         @next_fetch = now + @fetch_backoff.next_delay(cap: @timing.unauthorized_cap)
@@ -283,19 +296,19 @@ module Flagnetic
       @event_retry += 1
     end
 
-    # A revoked key closes the stream; a later successful fetch, after an
-    # operator restores the key, opens it again.
+    # A revoked key closes the stream, which stays closed until a later
+    # fetch succeeds, as one refused on the stream itself does.
     def close_revoked_stream
       return unless @stream
 
       close_stream
-      @stream_revoked = true
+      stop_stream(@fetch_successes)
     end
 
     def resume_stream
-      return unless @stream_revoked
+      return unless @stream_stopped && @fetch_successes > @reopen_after
 
-      @stream_revoked = false
+      @stream_stopped = false
       @stream_due = now if @stream_enabled
     end
 
