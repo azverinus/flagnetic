@@ -82,7 +82,7 @@ export interface Status {
  *   `store`, `bootstrap`, `offline`), ruleset_version, flags.
  * - `fetch_failed` (warn): a remote evaluation failed; the held values keep
  *   serving. Fields: cause, status?, code?, retry_in_ms.
- * - `sse_connected` (info) and `sse_dropped` (warn): the ruleset stream.
+ * - `stream_connected` (info) and `stream_dropped` (warn): the ruleset stream.
  *   Fields of the drop: cause, retry_in_ms.
  * - `stage_changed` (warn when leaving `fresh`, else info). Fields: from, to.
  * - `key_revoked` (error): 401 or 403, logged once until a fetch succeeds. Fields: status.
@@ -90,8 +90,11 @@ export interface Status {
  *   SDK reads, logged once. Fields: schema_version, supported.
  * - `attribute_ignored` (warn): the server ignored a context attribute,
  *   logged once per name. Fields: name, code.
- * - `queue_dropped` (warn): the event queue was full and dropped its oldest
- *   events. Fields: dropped, capacity.
+ * - `queue_dropped` (warn): events or summary rows were given up on; `cause`
+ *   names why: `queue_full` (the queue dropped its oldest events; fields
+ *   dropped, capacity), `window_too_old` (a summary window began over an hour
+ *   ago; fields kind, rows, age_ms) or `refused_by_the_platform` (a 202
+ *   rejected events, which are not sent again; fields events, codes).
  * - `events_failed` (warn): an ingest batch failed. Fields: cause, status?,
  *   retry_in_ms, events.
  * - `value_too_deep` (error): a flag of an accepted document holds a value
@@ -109,28 +112,32 @@ export interface Status {
  * - `evaluation_failed`, `listener_failed` (error): an internal failure or a
  *   throwing listener, caught. Fields: cause.
  */
-export type LogEvent =
-  | "values_loaded"
-  | "fetch_failed"
-  | "sse_connected"
-  | "sse_dropped"
-  | "stage_changed"
-  | "key_revoked"
-  | "schema_unsupported"
-  | "attribute_ignored"
-  | "value_too_deep"
-  | "queue_dropped"
-  | "events_failed"
-  | "store_failed"
-  | "override_set"
-  | "override_refused"
-  | "local_overrides_allowed"
-  | "exposures_off"
+export const LOG_EVENTS = [
+  "values_loaded",
+  "fetch_failed",
+  "stream_connected",
+  "stream_dropped",
+  "stage_changed",
+  "key_revoked",
+  "schema_unsupported",
+  "attribute_ignored",
+  "value_too_deep",
+  "queue_dropped",
+  "events_failed",
+  "store_failed",
+  "override_set",
+  "override_refused",
+  "local_overrides_allowed",
+  "exposures_off",
   /** An exposure call that sent nothing, naming why, at debug level. */
-  | "exposure_skipped"
-  | "type_mismatch"
-  | "evaluation_failed"
-  | "listener_failed";
+  "exposure_skipped",
+  "type_mismatch",
+  "evaluation_failed",
+  "listener_failed",
+] as const;
+
+/** One of {@link LOG_EVENTS}. */
+export type LogEvent = (typeof LOG_EVENTS)[number];
 
 /**
  * Receives every log event with its level and structured fields. Called

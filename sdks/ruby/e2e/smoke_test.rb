@@ -55,7 +55,7 @@ class SmokeTest < Minitest::Test
     flag = SEED["flags"]["on"]
     c = client(SEED["replicas"]["b"], poll_interval: 3600)
     assert_equal :fresh, c.ready(timeout: 10)
-    assert wait_until(5) { logged?(:sse_connected) }, "the stream never connected"
+    assert wait_until(5) { logged?(:stream_connected) }, "the stream never connected"
     # The replica announces the version the client holds as the stream
     # opens; give it a moment so that the kill switch is news to it.
     sleep 0.5

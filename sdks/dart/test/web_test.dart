@@ -22,14 +22,16 @@ void main() {
   setUpAll(() async => remote = await Remote.spawn());
   tearDown(() => showPage('visible'));
 
-  Future<(FlagneticClient, ScriptedServer)> started({bool sse = false}) async {
+  Future<(FlagneticClient, ScriptedServer)> started({
+    bool stream = false,
+  }) async {
     final server = await remote.startServer();
     final client = Flagnetic.client(
       clientKey,
       baseUrl: server.url,
       context: _context,
       options: scaledOptions(
-        sse: sse,
+        stream: stream,
         pollInterval: const Duration(hours: 1),
         minimumRefetchGap: Duration.zero,
       ),
@@ -80,7 +82,7 @@ void main() {
   });
 
   test('opens the stream with the key as sdk_key', () async {
-    final (_, server) = await started(sse: true);
+    final (_, server) = await started(stream: true);
     final stream = await server.next(path: '/sdk/v1/stream');
     expect(stream.query['sdk_key'], clientKey);
     expect(stream.headers.containsKey('authorization'), isFalse);
@@ -91,7 +93,7 @@ void main() {
   });
 
   test('a hidden page closes the stream and beacons its events', () async {
-    final (client, server) = await started(sse: true);
+    final (client, server) = await started(stream: true);
     final stream = await (await server.next(
       path: '/sdk/v1/stream',
     )).respondStream();

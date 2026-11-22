@@ -92,7 +92,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": false,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -131,7 +131,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -224,7 +224,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -279,7 +279,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -361,7 +361,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -460,7 +460,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": false,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -499,7 +499,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -587,7 +587,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -670,7 +670,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [
@@ -725,7 +725,7 @@
           "flush_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false
+          "stream": false
         }
       },
       "steps": [

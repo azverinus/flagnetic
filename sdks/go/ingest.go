@@ -282,7 +282,7 @@ func (i *ingest) pack(events []event) [][]event {
 func logIngestFailed(log func(slog.Level, Event, map[string]any), kind string, group []event, res sendResult, wait time.Duration) {
 	fields := map[string]any{"kind": kind, "events": len(group), "retry_in": wait.String()}
 	addFailure(fields, res)
-	log(slog.LevelWarn, EventIngestFailed, fields)
+	log(slog.LevelWarn, EventEventsFailed, fields)
 }
 
 // logBatchDropped reports a batch given up on: a 4xx other than 429 means

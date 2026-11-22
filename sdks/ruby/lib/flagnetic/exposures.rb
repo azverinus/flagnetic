@@ -361,7 +361,7 @@ module Flagnetic
     def schedule_retry(group, result)
       wait = @backoff.next_delay(cap: @timing.fetch_cap)
       @not_before = now + wait
-      log_ingest_failed(group, result, wait)
+      log_events_failed(group, result, wait)
       wait
     end
 

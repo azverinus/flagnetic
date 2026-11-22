@@ -190,6 +190,8 @@ type scenarioFile struct {
 				SendSummaries     bool  `json:"send_summaries"`
 				SendExposures     bool  `json:"send_exposures"`
 				AllowOverrides    bool  `json:"allow_overrides"`
+				// Stream turns the ruleset stream on or off.
+				Stream bool `json:"stream"`
 			} `json:"options"`
 		} `json:"given"`
 		Steps []protocolStep `json:"steps"`
@@ -514,10 +516,16 @@ func TestProtocolDegradationCases(t *testing.T) {
 	if err := json.Unmarshal(readProtocol(t, "degradation/cases.json"), &file); err != nil {
 		t.Fatal(err)
 	}
-	ran := 0
+	ran, eventsRan := 0, 0
 	for _, tc := range file.Cases {
-		if tc.Endpoint != "GET /sdk/v1/ruleset" {
-			continue // client mode
+		switch tc.Endpoint {
+		case "GET /sdk/v1/ruleset":
+		case "POST /sdk/v1/events":
+			eventsRan++
+			t.Run(tc.Name, func(t *testing.T) { playEventsCase(t, tc.Response) })
+			continue
+		default:
+			continue // the evaluate endpoint, which only a client SDK calls
 		}
 		ran++
 		t.Run(tc.Name, func(t *testing.T) {
@@ -553,6 +561,33 @@ func TestProtocolDegradationCases(t *testing.T) {
 	}
 	if ran == 0 {
 		t.Fatal("no ruleset degradation case ran")
+	}
+	if eventsRan == 0 {
+		t.Fatal("no events degradation case ran")
+	}
+}
+
+// playEventsCase sends a batch of aliases the platform answers as the case
+// says and checks that a batch it answered is done, whatever it rejected and
+// whatever the rejection is called: a second flush sends nothing, and no
+// retry is ever scheduled.
+func playEventsCase(t *testing.T, response protocolResponse) {
+	m := newIngestMock(t, reply{status: response.Status, body: string(readProtocol(t, response.Body))})
+	c := onExperiments(t, m, flagnetic.WithExposureSleep(func(_ context.Context, d time.Duration) bool {
+		t.Errorf("a retry was scheduled after %v for a batch the platform answered", d)
+		return false
+	}))
+	for i := range 12 {
+		c.Alias(context.Background(), "anonymous", fmt.Sprintf("d-%d", i), "user", "u-1001")
+	}
+	if err := c.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	if err := c.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+	if got := m.count(); got != 1 {
+		t.Errorf("%d batches sent, want 1: an answered batch was sent again", got)
 	}
 }
 
@@ -676,7 +711,8 @@ func TestProtocolScenarios(t *testing.T) {
 			if ms := sc.Given.Options.FlushIntervalMS; ms > 0 {
 				opts = append(opts, flagnetic.WithFlushInterval(time.Duration(ms)*time.Millisecond))
 			}
-			opts = append(opts, flagnetic.WithExposures(sc.Given.Options.SendExposures))
+			opts = append(opts, flagnetic.WithExposures(sc.Given.Options.SendExposures),
+				flagnetic.WithChangeStream(sc.Given.Options.Stream))
 			if sc.Given.Options.AllowOverrides {
 				opts = append(opts, flagnetic.WithLocalOverrides())
 			}

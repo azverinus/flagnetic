@@ -127,7 +127,7 @@ module Flagnetic
     def merge_kept(win, kept, wall_end)
       age = wall_end - kept[:start]
       if age > MAX_WINDOW_AGE
-        log(:warn, :queue_dropped, kind: kind, rows: kept[:counts].size, cause: "window_older_than_one_hour",
+        log(:warn, :queue_dropped, kind: kind, rows: kept[:counts].size, cause: "window_too_old",
                                    age: age.round(3))
         return
       end
@@ -242,7 +242,7 @@ module Flagnetic
                @backoff.next_delay(cap: @timing.fetch_cap)
              end
       @not_before = now + wait
-      log_ingest_failed(group, result, wait)
+      log_events_failed(group, result, wait)
       wait
     end
 

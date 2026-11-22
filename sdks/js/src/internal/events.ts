@@ -350,3 +350,24 @@ export function packBatches(events: readonly QueuedEvent[], envelopeOverhead: nu
   }
   return batches;
 }
+
+/** How many bytes of a 202 answer of the events endpoint an SDK reads before giving up on it. */
+export const MAX_ANSWER_BYTES = 1 << 20;
+
+/** One entry of a 202 answer's rejected list: an event the platform refused for good. */
+export interface Rejection {
+  readonly index: number;
+  readonly event_id: string;
+  readonly code: string;
+  readonly detail: string;
+}
+
+// Only what has the shape of a rejection is kept: the answer comes off the
+// network, and a null or a bare number in the list must not reach the code
+// that logs the codes.
+export function rejectionsOf(v: unknown): Rejection[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (x): x is Rejection => typeof x === "object" && x !== null && typeof (x as { code?: unknown }).code === "string",
+  );
+}

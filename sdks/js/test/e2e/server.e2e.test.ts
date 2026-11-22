@@ -46,7 +46,7 @@ describe("server mode against two replicas", () => {
     const context = seed.cases.find((c) => c.flag === seed.flags.on)?.context ?? {};
     try {
       await expect(client.ready(10_000)).resolves.toBe("fresh");
-      await eventually(() => Promise.resolve(logs.includes("sse_connected")), 10_000, "the stream to replica B never connected");
+      await eventually(() => Promise.resolve(logs.includes("stream_connected")), 10_000, "the stream to replica B never connected");
       expect(client.getBool(context, seed.flags.on, false)).toBe(true);
 
       const off = new Promise<number>((resolve) => {

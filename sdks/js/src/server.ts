@@ -5,6 +5,7 @@
  */
 export { createServer, FlagneticServer, LocalOverrideRefused, LocalOverrides, LocalOverridesNotAllowed, type Status } from "./server/client.js";
 export { consoleLogger } from "./server/logger.js";
+export { LOG_EVENTS } from "./server/types.js";
 export { serializeBootstrap } from "./internal/bootstrap.js";
 export { Recorder, type SummaryCount } from "./server/recorder.js";
 export { testServer, testServerFromValues, TestServer } from "./server/testing.js";

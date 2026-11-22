@@ -76,8 +76,8 @@ module Flagnetic
       log(:error, :key_revoked, status: result.status, source: "events")
     end
 
-    def log_ingest_failed(group, result, wait)
-      log(:warn, :ingest_failed, kind: kind, events: group.size, retry_in: wait.round(3), status: result.status,
+    def log_events_failed(group, result, wait)
+      log(:warn, :events_failed, kind: kind, events: group.size, retry_in: wait.round(3), status: result.status,
                                  error: result.error)
     end
 

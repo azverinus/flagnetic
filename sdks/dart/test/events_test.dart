@@ -810,7 +810,7 @@ void main() {
       await acceptBatch(exchange);
       await flushed;
       expect(logs.count(LogEvents.storeFailed), greaterThan(0));
-      expect(logs.count(LogEvents.internalError), 0);
+      expect(logs.count(LogEvents.evaluationFailed), 0);
     });
   });
 
@@ -1154,7 +1154,7 @@ void main() {
       final events = eventsOf(exchange);
       await acceptBatch(exchange);
       await flushed;
-      expect(run.logs.count(LogEvents.internalError), 0);
+      expect(run.logs.count(LogEvents.evaluationFailed), 0);
       return (events: events, logs: run.logs, store: store);
     }
 
@@ -1264,7 +1264,7 @@ void main() {
       ]);
       await acceptBatch(exchange);
       await flushed;
-      expect(run.logs.count(LogEvents.internalError), 0);
+      expect(run.logs.count(LogEvents.evaluationFailed), 0);
     });
   });
 

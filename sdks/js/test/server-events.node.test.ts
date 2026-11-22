@@ -233,7 +233,7 @@ describe("evaluation summaries", () => {
     expect(summaryOf(p, p.batches.length - 1).counts).toStrictEqual([
       { flag: "auto_on", variation: "off", reason: "fallthrough", count: 1 },
     ]);
-    expect(h.events("queue_dropped").map((l) => l.fields.cause)).toContain("window_older_than_one_hour");
+    expect(h.events("queue_dropped").map((l) => l.fields.cause)).toContain("window_too_old");
   });
 
   test("sendSummaries off reports nothing", async () => {

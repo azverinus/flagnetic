@@ -25,8 +25,8 @@ class PumaTest < Minitest::Test
       found if found.size == 2
     end
     assert workers, output.call
-    connected = -> { logged(:sse_connected).map { |e| e["pid"] }.uniq }
-    assert eventually(15) { connected.call.size == 1 }, "sse_connected from #{connected.call}\n#{output.call}"
+    connected = -> { logged(:stream_connected).map { |e| e["pid"] }.uniq }
+    assert eventually(15) { connected.call.size == 1 }, "stream_connected from #{connected.call}\n#{output.call}"
     sleep 1
     assert_equal 1, connected.call.size, "a worker opened a stream before it evaluated: #{connected.call}"
 
@@ -41,7 +41,7 @@ class PumaTest < Minitest::Test
       seen[body["pid"]] = body["value"]
       seen.size == 2 && seen.values.none?
     end, "workers: #{seen}")
-    assert_empty workers - connected.call, "sse_connected from #{connected.call}, workers #{workers}"
+    assert_empty workers - connected.call, "stream_connected from #{connected.call}, workers #{workers}"
 
     # Shutdown closes each worker's client, which flushes its summary.
     Process.kill("TERM", pid)

@@ -124,7 +124,7 @@ export class RulesetStream {
         await res.body?.cancel().catch(() => undefined);
         throw new Error(`status ${res.status} ${type}`.trim());
       }
-      this.host.log("info", "sse_connected", {});
+      this.host.log("info", "stream_connected", {});
       this.host.opened();
       const parser = new SseParser();
       const reader = res.body.getReader();
@@ -157,7 +157,7 @@ export class RulesetStream {
     // reconnects; after an error, or a stream closed before it was stable,
     // the backoff does.
     const delay = clean ? Math.floor(this.config.random() * timing.closeJitter) : this.backoff.next(timing.retryMax);
-    this.host.log("warn", "sse_dropped", { cause, retry_in_ms: delay });
+    this.host.log("warn", "stream_dropped", { cause, retry_in_ms: delay });
     this.reconnectTimer = clock.setTimeout(() => {
       if (run === this.run && this.wanted) void this.connect();
     }, delay);

@@ -145,7 +145,7 @@ describe("the ruleset fetch", () => {
     await p.until(() => p.rulesetRequests().length >= 2);
     expect(p.rulesetRequests()[1]?.headers["if-none-match"]).toBe('"1"');
     expect(h.events("ruleset_loaded").map((l) => l.fields)).toStrictEqual([{ source: "network", ruleset_version: 1, flags: 1 }]);
-    expect(h.events("sse_connected")).toHaveLength(1);
+    expect(h.events("stream_connected")).toHaveLength(1);
     expect(h.changes).toStrictEqual([["a"]]);
   });
 
@@ -384,8 +384,8 @@ describe("the ruleset stream", () => {
     const streams = p.streamRequests();
     expect(streams.length).toBeGreaterThanOrEqual(3);
     expect(streams.at(-1)?.headers["last-event-id"]).toBe("1");
-    expect(h.events("sse_dropped").map((l) => l.fields.cause)).toStrictEqual(["closed by the server", "status 502 application/problem+json"]);
-    expect(h.events("sse_connected")).toHaveLength(2);
+    expect(h.events("stream_dropped").map((l) => l.fields.cause)).toStrictEqual(["closed by the server", "status 502 application/problem+json"]);
+    expect(h.events("stream_connected")).toHaveLength(2);
     expect(h.client.getBool(ctx, "a", true)).toBe(false);
   });
 
@@ -406,7 +406,7 @@ describe("the ruleset stream", () => {
     await p.until(() => p.streamRequests().length === 5 && p.openStreams === 1);
     p.closeStreams();
     await p.until(() => p.streamRequests().length === 6 && p.openStreams === 1);
-    const dropped = h.events("sse_dropped");
+    const dropped = h.events("stream_dropped");
     expect(dropped.map((l) => l.fields.retry_in_ms)).toStrictEqual([40, 80, 160, 50, 40]);
     const early = "closed by the server before its first heartbeat";
     expect(dropped.map((l) => l.fields.cause)).toStrictEqual([early, early, early, "closed by the server", early]);
@@ -432,7 +432,7 @@ describe("the ruleset stream", () => {
     clearInterval(beat);
     expect(p.streamRequests()).toHaveLength(1);
     await p.until(() => p.streamRequests().length >= 2, 1000);
-    expect(h.events("sse_dropped")[0]?.fields.cause).toBe("no frame for 150 ms");
+    expect(h.events("stream_dropped")[0]?.fields.cause).toBe("no frame for 150 ms");
   });
 
   test("a ruleset answer over the size cap is a fetch failure; no body is buffered", async () => {
@@ -469,7 +469,7 @@ describe("the ruleset stream", () => {
     await p.until(() => p.openStreams === 1);
     p.write("data: " + "x".repeat(70_000));
     await p.until(() => p.streamRequests().length >= 2, 2000);
-    expect(h.events("sse_dropped")[0]?.fields.cause).toBe("event stream line too long");
+    expect(h.events("stream_dropped")[0]?.fields.cause).toBe("event stream line too long");
   });
 
   test("a fetch below the announced version is retried after 1, 2 and 4 s (scaled); the version never goes down", async () => {
@@ -525,14 +525,36 @@ describe("the ruleset stream", () => {
     });
   });
 
-  test("a 401 on the stream logs key_revoked and does not reconnect", async () => {
+  test("a stream refused at startup stays closed through the fetch that follows and is tried again after the next one", async () => {
     const p = await platform(rulesetOf(1, {}));
-    p.streamDefault = { kind: "status", status: 403 };
-    const h = start(p);
+    p.streamReplies.push({ kind: "status", status: 403 });
+    const h = start(p, {}, { pollDisconnected: 150 });
     await expect(h.client.ready(2000)).resolves.toBe("fresh");
-    await sleep(200);
+    await sleep(100);
+    // The first fetch succeeded, yet the stream was not asked again.
     expect(p.streamRequests()).toHaveLength(1);
     expect(h.events("key_revoked").map((l) => l.fields)).toStrictEqual([{ status: 403 }]);
+    await p.until(() => p.openStreams === 1, 2000);
+    const fetches = p.rulesetRequests().map((r) => r.at);
+    const streams = p.streamRequests().map((r) => r.at);
+    expect(streams).toHaveLength(2);
+    expect(streams[1]).toBeGreaterThanOrEqual(fetches[1] ?? Infinity);
+  });
+
+  test("a stream refused after it ran is tried again after the next successful fetch", async () => {
+    const p = await platform(rulesetOf(1, {}));
+    const h = start(p, {}, { pollConnected: 150, pollDisconnected: 150 });
+    await expect(h.client.ready(2000)).resolves.toBe("fresh");
+    await p.until(() => p.openStreams === 1);
+    p.streamReplies.push({ kind: "status", status: 401 });
+    p.write(": hb\n\n");
+    p.closeStreams();
+    await p.until(() => p.streamRequests().length === 2, 2000);
+    const fetchesAtRefusal = p.rulesetRequests().length;
+    await p.until(() => p.openStreams === 1, 2000);
+    expect(p.streamRequests()).toHaveLength(3);
+    expect(p.rulesetRequests().length).toBeGreaterThan(fetchesAtRefusal);
+    expect(h.events("key_revoked").map((l) => l.fields)).toStrictEqual([{ status: 401 }]);
   });
 
   test("a failing stream reconnects with backoff while polling takes over at the short interval", async () => {
@@ -543,7 +565,7 @@ describe("the ruleset stream", () => {
     await p.until(() => p.streamRequests().length >= 4, 2000);
     expectGaps(p.streamRequests().map((r) => r.at), [100, 200, 400]);
     expect(p.rulesetRequests().length).toBeGreaterThanOrEqual(4);
-    expect(h.events("sse_dropped")[0]?.fields).toMatchObject({ cause: "status 500 application/problem+json", retry_in_ms: 100 });
+    expect(h.events("stream_dropped")[0]?.fields).toMatchObject({ cause: "status 500 application/problem+json", retry_in_ms: 100 });
   });
 });
 

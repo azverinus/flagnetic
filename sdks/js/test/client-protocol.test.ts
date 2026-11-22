@@ -2,7 +2,7 @@
 // mode: every client-mode scenario of scenarios.json,
 // versioning-scenarios.json, experiment-scenarios.json and
 // page-scenarios.json, whole, and the
-// evaluate degradation cases of degradation/cases.json. It runs in Node and
+// evaluate and events degradation cases of degradation/cases.json. It runs in Node and
 // in a real browser, so the fixtures are bundled through import.meta.glob and
 // the server is mocked at `fetch` rather than on a socket. Time is virtual:
 // the client schedules on a clock this runner advances, so a window of 15
@@ -191,7 +191,7 @@ class Runner {
     const options: ClientOptions = {
       context: this.context,
       store: this.store,
-      stream: o.sse === true,
+      stream: o.stream === true,
       pollInterval: o.poll_interval_ms as number,
       flushInterval: o.flush_interval_ms as number,
       ...(typeof o.summary_interval_ms === "number" && { summaryInterval: o.summary_interval_ms }),
@@ -569,7 +569,7 @@ describe("protocol degradation cases, the evaluate endpoint", () => {
   });
 
   test.each(evaluateCases.map((c) => [c.name, c] as const))("%s", async (_, c) => {
-    const r = await runner(cases.context, { options: { sse: false, poll_interval_ms: 30_000, flush_interval_ms: 3_600_000 } });
+    const r = await runner(cases.context, { options: { stream: false, poll_interval_ms: 30_000, flush_interval_ms: 3_600_000 } });
     const ok = { "Cache-Control": "no-store", "Content-Type": "application/json" };
     const accept = c.outcome === "accept";
     await r.run([
@@ -579,6 +579,31 @@ describe("protocol degradation cases, the evaluate endpoint", () => {
         respond: c.response,
         expect: { stage: accept ? "fresh" : "last_good", stale_since: accept ? "unset" : "set", answers: c.answers },
       },
+    ]);
+  });
+});
+
+describe("protocol degradation cases, the events endpoint", () => {
+  const eventsCases = cases.cases.filter((c) => c.endpoint === "POST /sdk/v1/events");
+
+  test("there are events cases", () => {
+    expect(eventsCases.length).toBeGreaterThan(0);
+  });
+
+  // The batch was answered, so whatever it rejected, and whatever the
+  // rejection is called, is dropped: nothing is sent again.
+  test.each(eventsCases.map((c) => [c.name, c] as const))("%s", async (_, c) => {
+    const r = await runner(cases.context, {
+      options: { stream: false, poll_interval_ms: 3_600_000, flush_interval_ms: 3_600_000, send_summaries: false },
+    });
+    const ok = { "Cache-Control": "no-store", "Content-Type": "application/json" };
+    await r.run([
+      { request: { method: "POST", path: "/sdk/v1/evaluate" }, respond: { status: 200, headers: ok, body: "server/evaluation.json" }, expect: { stage: "fresh" } },
+      { call: { op: "alias", times: 12 } },
+      { call: { op: "flush" } },
+      { request: { method: "POST", path: "/sdk/v1/events" }, respond: c.response },
+      { call: { op: "flush" } },
+      { no_request: { path: "/sdk/v1/events", for_ms: 600_000 } },
     ]);
   });
 });

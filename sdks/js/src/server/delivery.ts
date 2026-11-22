@@ -74,7 +74,7 @@ export interface DeliveryConfig {
   readonly sdkKey: string;
   readonly baseUrl: string;
   readonly platform: string;
-  readonly sse: boolean;
+  readonly stream: boolean;
   readonly timing: Timing;
   readonly random: () => number;
   readonly clock: Clock;
@@ -132,11 +132,16 @@ export class Delivery {
   /** Whether the fetch loop is backing off after a failure. */
   private retrying = false;
 
-  // Once-per-episode logs. A key the fetch saw refused reopens the stream
-  // when it works again; a stream refused on its own stays closed.
+  // Once-per-episode logs.
   private revoked = false;
-  private fetchRefused = false;
   private schemaLogged = false;
+
+  // A stream refused with 401 or 403 stays closed while the fetch is refused
+  // too, and is tried again after the first successful fetch that follows
+  // the refusal: the key was restored, or the refusal was a proxy's that
+  // guards only the stream. Counting successes tells which fetch follows it.
+  private fetchSuccesses = 0;
+  private reopenAfter = 0;
 
   // The stream.
   private streamAbort: AbortController | undefined;
@@ -176,7 +181,7 @@ export class Delivery {
    * at most the stream's first wait.
    */
   async start(): Promise<void> {
-    if (this.config.sse) {
+    if (this.config.stream) {
       const settled = this.openStream();
       let timer: unknown;
       const waited = new Promise<void>((resolve) => (timer = this.clock.setTimeout(resolve, this.config.timing.streamFirstWait)));
@@ -256,13 +261,10 @@ export class Delivery {
     this.retrying = false;
     this.fetchBackoff.reset();
     this.revoked = false;
-    if (this.fetchRefused) {
-      // The key works again: the stream comes back, if it was ever wanted.
-      this.fetchRefused = false;
-      if (this.streamStopped && this.config.sse) {
-        this.streamStopped = false;
-        void this.openStream();
-      }
+    this.fetchSuccesses++;
+    if (this.streamStopped && this.config.stream && this.fetchSuccesses > this.reopenAfter) {
+      this.streamStopped = false;
+      void this.openStream();
     }
     if (outcome.kind === "accepted") this.host.accept(outcome.rs, outcome.text);
     else this.host.notModified();
@@ -342,8 +344,9 @@ export class Delivery {
         if (unauthorized(res.status)) {
           await res.body?.cancel();
           this.keyRevoked(res.status);
-          this.fetchRefused = true;
-          this.stopStream();
+          // The stream carries the same key: it comes back with the next
+          // fetch that succeeds.
+          this.stopStream(this.fetchSuccesses);
           throw new AttemptFailed(`status ${res.status}`, res.status);
         }
         if (res.status !== 200) {
@@ -437,7 +440,9 @@ export class Delivery {
         this.clock.clearTimeout(this.silenceTimer);
         await res.body?.cancel();
         this.keyRevoked(res.status);
-        this.stopStream();
+        // The fetch that follows a refusal at startup shows nothing the
+        // refusal did not: the stream is tried again by the one after it.
+        this.stopStream(Math.max(this.fetchSuccesses, 1));
         settle();
         this.trace({ kind: "stream_ended" });
         return;
@@ -448,7 +453,7 @@ export class Delivery {
         throw new Error(`status ${res.status} ${type}`.trim());
       }
       this.streamUp = true;
-      this.host.log("info", "sse_connected", {});
+      this.host.log("info", "stream_connected", {});
       // Every (re)connect is followed by a fetch: versions may have been
       // missed. While fetches back off, the pending retry is that fetch.
       if (!this.retrying) void this.fetch();
@@ -498,7 +503,7 @@ export class Delivery {
     const delay = clean
       ? Math.floor(this.config.random() * this.config.timing.streamCloseJitter)
       : this.streamBackoff.next(this.config.timing.streamRetryMax);
-    this.host.log("warn", "sse_dropped", { cause, retry_in_ms: delay });
+    this.host.log("warn", "stream_dropped", { cause, retry_in_ms: delay });
     // Polling takes over at the short interval while the stream is down.
     if (!this.fetching && !this.retrying && this.fetchDueAt - this.clock.now() > this.config.timing.pollDisconnected) {
       this.schedule(this.config.timing.pollDisconnected);
@@ -536,9 +541,10 @@ export class Delivery {
     if (!this.retrying) void this.fetch();
   }
 
-  /** Closes the stream for good, until a fetch succeeds again. */
-  private stopStream(): void {
+  /** Closes the stream until a fetch succeeds after the given count of successful fetches. */
+  private stopStream(reopenAfter: number): void {
     this.streamStopped = true;
+    this.reopenAfter = reopenAfter;
     this.streamUp = false;
     this.clock.clearTimeout(this.streamTimer);
     this.endStream();

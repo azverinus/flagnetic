@@ -11,7 +11,8 @@
 // to the page's beacon.
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
-import { countKey, orderRows, packBatch, summaryEvents, SummaryCounter, utf8Length, type QueuedEvent, type SummaryRow } from "../internal/events.js";
+import { countKey, MAX_ANSWER_BYTES, orderRows, packBatch, rejectionsOf, summaryEvents, SummaryCounter, utf8Length, type QueuedEvent, type SummaryRow } from "../internal/events.js";
+import { readBoundedText } from "../internal/http.js";
 import { causeOf, requestCauseOf, type LogLevel } from "../internal/logger.js";
 import type { SafeStore } from "./storage.js";
 import type { LogEvent, Reason } from "./types.js";
@@ -248,7 +249,7 @@ export class Ingest {
   private replace(queue: QueuedEvent[]): number {
     let over = queue.length - this.config.capacity;
     if (over > 0) {
-      this.log("warn", "queue_dropped", { dropped: over, capacity: this.config.capacity });
+      this.log("warn", "queue_dropped", { cause: "queue_full", dropped: over, capacity: this.config.capacity });
       const kept = queue.filter((e) => {
         if (over > 0 && e.type === "evaluation_summary") {
           over--;
@@ -305,7 +306,7 @@ export class Ingest {
     if (kept.length > 0) {
       const rows = kept.flatMap((e) => (Array.isArray(e.counts) ? (e.counts as SummaryRow<Reason>[]) : []));
       if (aged) {
-        this.log("warn", "queue_dropped", { kind: "evaluation_summary", cause: "window_older_than_one_hour", rows: rows.length, age_ms: end - began });
+        this.log("warn", "queue_dropped", { kind: "evaluation_summary", cause: "window_too_old", rows: rows.length, age_ms: end - began });
       } else {
         if (began < start) start = began;
         rows.forEach(add);
@@ -361,11 +362,13 @@ export class Ingest {
     let outcome: "sent" | "retry" | "drop" = "retry";
     let status: number | undefined;
     let cause = "";
+    let rejected: string[] = [];
     try {
       const res = await this.post(batch);
       status = res.status;
       if (res.status === 202) {
         outcome = "sent";
+        rejected = await rejectedCodes(res);
       } else if (res.status === 429 || res.status >= 500 || res.status === 401 || res.status === 403) {
         // Safe to retry: every event carries its own ID. The backoff alone
         // spaces the retries, as in server mode: a `Retry-After` of a minute
@@ -390,6 +393,7 @@ export class Ingest {
       const left = this.remove(batch);
       this.backoff.reset();
       if (outcome === "drop") this.log("warn", "events_failed", { cause, status, events: batch.length, dropped: batch.length });
+      if (rejected.length > 0) this.log("warn", "queue_dropped", { cause: "refused_by_the_platform", events: rejected.length, codes: rejected });
       if (left > 0 && !this.closed) await this.drain();
       return;
     }
@@ -433,6 +437,16 @@ export class Ingest {
     } finally {
       this.config.clock.clearTimeout(timer);
     }
+  }
+}
+
+// The codes of a 202 answer's rejected list. A body that does not decode
+// rejects nothing: the batch was accepted either way, so nothing is retried.
+async function rejectedCodes(res: Response): Promise<string[]> {
+  try {
+    return rejectionsOf((JSON.parse(await readBoundedText(res, MAX_ANSWER_BYTES)) as { rejected?: unknown }).rejected).map((r) => r.code);
+  } catch {
+    return [];
   }
 }
 

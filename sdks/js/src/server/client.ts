@@ -216,7 +216,7 @@ export class FlagneticServer {
         sdkKey,
         baseUrl,
         platform: options.platform ?? "node",
-        sse: options.stream !== false,
+        stream: options.stream !== false,
         timing,
         random: internals.random ?? Math.random,
         clock: internals.clock ?? realClock,

@@ -56,6 +56,7 @@ The Dart runner plays the device scenarios on the VM and the page scenarios in C
 | client: offline mode makes no request | client |  |  | ✓ |  | ✓ |
 | client: events are retried on 5xx and 429 with the same IDs and never after a rejection | client |  |  | ✓ |  | ✓ |
 | client: the evaluation summary counts every evaluation, fallback included | client |  |  | ✓ |  | ✓ |
+| client: an evaluation below the event's version is retried after 1, 2 and 4 seconds and never downgrades | client |  |  | ✓ |  | ✓ |
 | server: an answer carries the experiment block | server | ✓ | ✓ | ✓ | ✓ |  |
 | server: an explicit exposure is sent with its envelope | server | ✓ | ✓ | ✓ | ✓ |  |
 | server: an evaluation alone records no exposure | server | ✓ | ✓ | ✓ | ✓ |  |
@@ -76,6 +77,11 @@ The Dart runner plays the device scenarios on the VM and the page scenarios in C
 | client: a hidden or closing page hands its events to a beacon | client |  |  | ✓ |  | ✓ |
 | server: a stream closed before its first heartbeat is retried with backoff | server | ✓ | ✓ | ✓ | ✓ |  |
 | client: a stream closed before its first heartbeat is retried with backoff | client |  |  | ✓ |  | ✓ |
+| server: a stream that drops after being connected and stays down brings the next fetch within the safety poll | server | ✓ | ✓ | ✓ | ✓ |  |
+| server: a stream refused 401/403 while the fetch succeeds is opened again after the next successful fetch | server | ✓ | ✓ | ✓ | ✓ |  |
+| client: a stream refused 401/403 while the evaluation succeeds is opened again after the next successful evaluation | client |  |  | ✓ |  | ✓ |
+| server: a stream refused 401/403 stays closed while the fetch is refused too | server | ✓ | ✓ | ✓ | ✓ |  |
+| client: a stream refused 401/403 stays closed while the evaluation is refused too | client |  |  | ✓ |  | ✓ |
 | server: a schema_version outside the supported range is a failure logged once | server | ✓ | ✓ | ✓ | ✓ |  |
 | client: a schema_version outside the supported range is a failure logged once | client |  |  | ✓ |  | ✓ |
 <!-- generated:matrix:end -->
