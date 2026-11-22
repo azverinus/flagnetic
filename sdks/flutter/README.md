@@ -50,7 +50,7 @@ FlagBuilder<bool>(
 
 From 1.0 the API below changes in a breaking way only in a new major version, and is deprecated in a minor release before it goes. Everything else is internal and may change in any release.
 
-- **Widgets and listenables**: `FlagneticScope` (`of`, `maybeOf`, `observeLifecycle`), `FlagBuilder`, `FlagListenable`, `StageListenable` and `FlagneticLifecycleObserver`.
+- **Widgets and listenables**: `FlagneticScope` (`of`, which throws a `FlutterError` when no scope is above the context, `maybeOf`, `observeLifecycle`), `FlagBuilder`, `FlagListenable`, `StageListenable` and `FlagneticLifecycleObserver`.
 - **Store**: `FlutterStore` and where it keeps entries (the backup-free directories described above).
 - **Dev Tools**: `FlagneticDevTools` and `FlagneticDevToolsScreen`.
 - **The client**: this package re-exports `flagnetic`, and the [API that package promises](https://github.com/azverinus/flagnetic/blob/main/sdks/dart/README.md#what-10-promises) is promised here too. `flagnetic_flutter` follows the `flagnetic` it requires.

@@ -57,6 +57,7 @@ From 1.0 the API below changes in a breaking way only in a new major version, an
 - **Store**: the `FlagneticStore` interface, `InMemoryStore`, `StoreKeys`, `isLastGoodValuesKey`, `anonymousUnitId` and `anonymousUnitIdKey`, for apps and packages that bring their own store.
 - **Logging**: `Logger`, `LogLevel` and `LogEvents`: an event name and the meaning of its documented fields never change; a release may add events and fields.
 - **Testing and development**: `OfflineMode`, `SummaryRow` and `LocalOverrides`, as returned by `client.offline` and `client.overrides`.
+- **Errors**: `Flagnetic.client` throws an `ArgumentError` for a server key or a key that cannot be an HTTP header; `client.overrides` throws a `StateError` without `allowOverrides`; `LocalOverrides.set` throws an `ArgumentError` for a value that does not fit the flag's type. These are the errors the package promises; a failure of the network, the server or the store is logged and never thrown.
 
 A getter never throws, and an unknown flag, a wrong type or a missing value serves the default you pass. The protocol the client speaks (`/sdk/v1`, `schema_version` 1) is frozen on its own terms: see [Compatibility and support](https://github.com/azverinus/flagnetic/blob/main/docs/compatibility.md). Not promised: anything under `lib/src`, `package:flagnetic/testing.dart`, and the free-text `cause` and `detail` fields of log events.
 
