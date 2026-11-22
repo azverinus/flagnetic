@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.2.0...sdks/python/v0.3.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430))
+
+### Features
+
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430)) ([f8a28d9](https://github.com/azverinus/flagnetic/commit/f8a28d9640a2edafc0bc4e45409eda22168023a8))
+
 ## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.5...sdks/python/v0.2.0) (2026-11-22)
 
 
