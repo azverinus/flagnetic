@@ -51,6 +51,7 @@ module Flagnetic
 
     def read(http, response)
       status = response.code.to_i
+      @transport.note_deprecation("streamRuleset", response)
       post(:head, status)
       return unless status == 200
 

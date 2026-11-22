@@ -29,7 +29,13 @@ module Flagnetic
 
     attr_reader :stream_uri, :timeout
 
-    def initialize(sdk_key:, base_url:, platform:, timeout:, ruleset_limit: RULESET_LIMIT, answer_limit: ANSWER_LIMIT)
+    # deprecated, when given, is called with an operation's name (its
+    # operationId in api/sdk.yaml) and the raw Deprecation and Sunset header
+    # values of every answer that carries a Deprecation header; it decides
+    # how often to report. A failure of its own never reaches a request.
+    def initialize(sdk_key:, base_url:, platform:, timeout:, deprecated: nil, ruleset_limit: RULESET_LIMIT,
+                   answer_limit: ANSWER_LIMIT)
+      @deprecated = deprecated
       @ruleset_limit = ruleset_limit
       @answer_limit = answer_limit
       base = URI(base_url.to_s.chomp("/"))
@@ -67,6 +73,7 @@ module Flagnetic
         h.request(request) do |response|
           status = response.code.to_i
           retry_after = response["Retry-After"]
+          note_deprecation("postEvents", response)
           body = begin
             read_body(response, @answer_limit)
           rescue BodyTooLarge
@@ -93,10 +100,22 @@ module Flagnetic
       http_for(@ruleset_uri, @timeout).start do |h|
         h.request(request) do |response|
           status = response.code.to_i
+          note_deprecation("getRuleset", response)
           body = read_body(response, @ruleset_limit)
         end
       end
       Response.new(status: status, body: body)
+    end
+
+    # note_deprecation reports a Deprecation header on an answer to
+    # operation. Every answer to a deprecated operation carries it, errors
+    # included, so it is read from the head before the body.
+    def note_deprecation(operation, response)
+      header = response["Deprecation"] or return
+
+      @deprecated&.call(operation, header, response["Sunset"])
+    rescue StandardError
+      nil
     end
 
     # stream_request is the ruleset stream's request; Last-Event-ID is the

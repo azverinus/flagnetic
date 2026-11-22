@@ -319,6 +319,8 @@ module Flagnetic
       @once = {}
       @unsupported_logged = {}
       @invalid_logged = {}
+      @deprecations_mutex = Mutex.new
+      @deprecations_logged = Set.new
       @pid = Process.pid
       @closed = false
     end
@@ -353,7 +355,7 @@ module Flagnetic
     def start_online(sdk_key, base_url, store:, stream:, platform:)
       @stream_enabled = stream
       @transport = Transport.new(sdk_key: sdk_key, base_url: base_url, platform: platform,
-                                 timeout: @timing.request_timeout)
+                                 timeout: @timing.request_timeout, deprecated: method(:deprecation_seen))
       build_reporters(@transport, nil)
       @store = store && FileStore.new(store, sdk_key)
       load_store if @store
@@ -376,6 +378,20 @@ module Flagnetic
       @exposures = Exposures.new(transport: transport, timing: @timing, log: method(:log_hook),
                                  record: recorder&.method(:record_event), platform: @platform,
                                  app_version: @app_version, wake: -> { @worker&.wake })
+    end
+
+    # deprecation_seen logs a Deprecation header once per operation: the
+    # client lives as long as the process, so this is once per operation
+    # and process. deprecated_since is the instant in unix seconds when the
+    # header is the RFC 9745 form (@<seconds>); any other value is passed
+    # on as deprecation, since the call is never refused for it.
+    def deprecation_seen(operation, header, sunset)
+      return unless @deprecations_mutex.synchronize { @deprecations_logged.add?(operation) }
+
+      since = header[/\A@(\d+)\z/, 1]
+      log(:warn, :deprecation_received, operation: operation,
+                                        **(since ? { deprecated_since: since.to_i } : { deprecation: header }),
+                                        **(sunset ? { sunset: sunset } : {}))
     end
 
     # log_hook adapts Client#log's keyword arguments to the (level, event,
