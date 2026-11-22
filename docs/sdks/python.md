@@ -61,7 +61,7 @@ Close the client when the process ends: it sends what is queued and stops its th
 client.close()
 ```
 
-A deprecated operation of the SDK API is announced in the log: the client logs `deprecated_operation` once per operation, at warning level, with the `Sunset` date when the server sent one, and keeps serving.
+A deprecated operation of the SDK API is announced in the log: the client logs `operation_deprecated` once per operation, at warning level, with the `Sunset` date when the server sent one, and keeps serving.
 
 ## Mode
 

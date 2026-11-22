@@ -81,7 +81,7 @@ OVERRIDE_REFUSED = "override_refused"
 #: logged once per operation, and the call is never failed. Fields: operation ("<METHOD> <path>"
 #: under /sdk/v1), deprecation (the header value, "@<unix seconds>"), and sunset (the Sunset
 #: header value, an HTTP date) when the response carried one.
-DEPRECATED_OPERATION = "deprecated_operation"
+OPERATION_DEPRECATED = "operation_deprecated"
 
 
 def standard_logger(level: int, event: str, fields: Mapping[str, Any]) -> None:
