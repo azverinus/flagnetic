@@ -26,6 +26,8 @@ var replacedLogNames = []string{
 	"sse_connected",
 	"sse_dropped",
 	"window_older_than_one_hour",
+	"deprecation_received",
+	"deprecated_operation",
 }
 
 // documentedLogNames reads the first column of the "Log names" table.

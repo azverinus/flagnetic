@@ -121,7 +121,7 @@ Event names are stable: filter and alert on them.
 | `override_set`, `override_refused`, `local_overrides_allowed` | warn | local overrides |
 | `type_mismatch` | warn | a getter asked for another type than the flag's; once per flag |
 | `evaluation_failed`, `listener_failed` | error | a failure was contained at the API boundary or in a listener |
-| `deprecation_received` | warn | the platform answered an operation (`operation`: ruleset, stream or events) with a `Deprecation` header, with the `sunset` when it names one; logged once per operation, and the call is never failed for it |
+| `operation_deprecated` | warn | the platform answered an operation (`operation`: ruleset, stream or events) with a `Deprecation` header, with the `sunset` when it names one; logged once per operation, and the call is never failed for it |
 
 **`rule_unsupported`** means the server is newer than this SDK: a flag uses an operator, a condition kind or a serve kind this SDK's evaluator does not know. The line names the flag, its constructs (for example `operator glob_matches`) and the ruleset version. Wherever evaluating the flag reaches the construct it serves your built-in default with `inconsistent_ruleset`; every other flag keeps working. The fix is to upgrade the SDK.
 

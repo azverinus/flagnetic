@@ -98,12 +98,12 @@ const (
 	EventEvaluationFailed Event = "evaluation_failed"
 	// EventListenerFailed (error): a change listener panicked. Fields: cause.
 	EventListenerFailed Event = "listener_failed"
-	// EventDeprecationReceived (warn): the platform answered an operation with
+	// EventOperationDeprecated (warn): the platform answered an operation with
 	// a Deprecation header; logged once per operation, and the call goes on as
 	// before. Fields: operation (ruleset, stream or events), deprecation (the
-	// header as received), deprecated_since when it reads, and sunset when
-	// the answer carries one.
-	EventDeprecationReceived Event = "deprecation_received"
+	// header as received), and sunset (the header as received) when the
+	// answer carries one.
+	EventOperationDeprecated Event = "operation_deprecated"
 )
 
 // Logger receives every log event with its level and structured fields.

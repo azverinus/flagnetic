@@ -11,12 +11,11 @@ from typing import Any
 
 from . import events
 
-# The SDK API lives under this path; a base URL's own path prefix is not part of an operation.
-_API = "/sdk/v1"
-
 
 class DeprecationNotes:
     """Logs the first ``Deprecation`` header seen for each operation, and nothing after it.
+
+    An operation is ``ruleset``, ``stream`` or ``events``.
 
     The server marks an operation deprecated (RFC 9745) and may add its removal date in ``Sunset``
     (RFC 8594). The warning is for the operator, so it never raises and never changes the answer
@@ -28,16 +27,14 @@ class DeprecationNotes:
         self._lock = threading.Lock()
         self._seen: set[str] = set()
 
-    def observe(self, method: str, path: str, resp: http.client.HTTPResponse) -> None:
+    def observe(self, operation: str, resp: http.client.HTTPResponse) -> None:
         with contextlib.suppress(Exception):
-            self._observe(method, path, resp)
+            self._observe(operation, resp)
 
-    def _observe(self, method: str, path: str, resp: http.client.HTTPResponse) -> None:
+    def _observe(self, operation: str, resp: http.client.HTTPResponse) -> None:
         deprecation = resp.getheader("Deprecation")
         if not deprecation:
             return
-        _, _, tail = path.partition(_API)
-        operation = f"{method} {_API}{tail}".split("?", 1)[0]
         with self._lock:
             if operation in self._seen:
                 return
@@ -46,4 +43,4 @@ class DeprecationNotes:
         sunset = resp.getheader("Sunset")
         if sunset:
             fields["sunset"] = sunset
-        self._log(logging.WARNING, events.DEPRECATED_OPERATION, **fields)
+        self._log(logging.WARNING, events.OPERATION_DEPRECATED, **fields)

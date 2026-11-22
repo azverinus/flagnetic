@@ -13,6 +13,9 @@ import (
 	flagnetic "github.com/azverinus/flagnetic/sdks/go"
 )
 
+// sunsetHeader is the Sunset an answer carries; the client logs it as received.
+const sunsetHeader = "Wed, 01 Jul 2026 00:00:00 GMT"
+
 // deprecatingServer answers every SDK operation with a Deprecation header
 // and a Sunset, the stream with an error and the events post with 202, and
 // counts what it served.
@@ -54,7 +57,7 @@ func newDeprecatingServer(t *testing.T, deprecation, sunset string) *deprecating
 }
 
 func TestADeprecationHeaderIsLoggedOncePerOperationAndFailsNothing(t *testing.T) {
-	m := newDeprecatingServer(t, "@1767225600", "Wed, 01 Jul 2026 00:00:00 GMT")
+	m := newDeprecatingServer(t, "@1767225600", sunsetHeader)
 	var l logs
 	c, err := flagnetic.New(serverKey, m.URL, flagnetic.WithLogger(l.logger()),
 		flagnetic.WithStream(true))
@@ -82,22 +85,22 @@ func TestADeprecationHeaderIsLoggedOncePerOperationAndFailsNothing(t *testing.T)
 	}
 
 	got := map[any]logEntry{}
-	for _, e := range l.named(flagnetic.EventDeprecationReceived) {
+	for _, e := range l.named(flagnetic.EventOperationDeprecated) {
 		if _, dup := got[e.Fields["operation"]]; dup {
-			t.Errorf("deprecation_received logged twice for %v", e.Fields["operation"])
+			t.Errorf("operation_deprecated logged twice for %v", e.Fields["operation"])
 		}
 		got[e.Fields["operation"]] = e
 	}
 	for _, op := range []string{"ruleset", "stream", "events"} {
 		e, ok := got[op]
 		if !ok {
-			t.Errorf("no deprecation_received for %s; logged %v", op, got)
+			t.Errorf("no operation_deprecated for %s; logged %v", op, got)
 			continue
 		}
 		if e.Level != slog.LevelWarn {
 			t.Errorf("%s: level %v, want warn", op, e.Level)
 		}
-		want := map[string]any{"deprecation": "@1767225600", "deprecated_since": "2026-01-01T00:00:00Z", "sunset": "2026-07-01T00:00:00Z"}
+		want := map[string]any{"deprecation": "@1767225600", "sunset": sunsetHeader}
 		for k, v := range want {
 			if e.Fields[k] != v {
 				t.Errorf("%s: %s = %v, want %v", op, k, e.Fields[k], v)
@@ -105,7 +108,7 @@ func TestADeprecationHeaderIsLoggedOncePerOperationAndFailsNothing(t *testing.T)
 		}
 	}
 	if len(got) != 3 {
-		t.Errorf("deprecation_received for %d operations, want 3", len(got))
+		t.Errorf("operation_deprecated for %d operations, want 3", len(got))
 	}
 }
 
@@ -120,8 +123,8 @@ func TestEveryPollOfADeprecatedOperationIsSilentAfterTheFirst(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close(context.Background()) })
 	waitFor(t, func() (struct{}, bool) { return struct{}{}, m.rulesets.Load() >= 4 }, "four fetches")
-	if got := l.named(flagnetic.EventDeprecationReceived); len(got) != 1 {
-		t.Errorf("deprecation_received logged %d times over %d fetches, want 1", len(got), m.rulesets.Load())
+	if got := l.named(flagnetic.EventOperationDeprecated); len(got) != 1 {
+		t.Errorf("operation_deprecated logged %d times over %d fetches, want 1", len(got), m.rulesets.Load())
 	}
 }
 
@@ -137,9 +140,9 @@ func TestADeprecationWithoutASunsetOrInUnknownFormIsStillLogged(t *testing.T) {
 	if stage := readyNow(t, c); stage != flagnetic.StageFresh {
 		t.Fatalf("Ready = %q, want fresh", stage)
 	}
-	got := l.named(flagnetic.EventDeprecationReceived)
+	got := l.named(flagnetic.EventOperationDeprecated)
 	if len(got) != 1 {
-		t.Fatalf("deprecation_received logged %d times, want 1", len(got))
+		t.Fatalf("operation_deprecated logged %d times, want 1", len(got))
 	}
 	f := got[0].Fields
 	if f["operation"] != "ruleset" || f["deprecation"] != "true" {
@@ -149,7 +152,7 @@ func TestADeprecationWithoutASunsetOrInUnknownFormIsStillLogged(t *testing.T) {
 		t.Errorf("sunset = %v, the answer carried none", f["sunset"])
 	}
 	if _, ok := f["deprecated_since"]; ok {
-		t.Errorf("deprecated_since = %v from a header that names no date", f["deprecated_since"])
+		t.Errorf("deprecated_since = %v, a field no SDK logs", f["deprecated_since"])
 	}
 }
 
@@ -170,7 +173,7 @@ func TestNoDeprecationHeaderLogsNothing(t *testing.T) {
 	if err := c.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if got := l.named(flagnetic.EventDeprecationReceived); len(got) != 0 {
-		t.Errorf("deprecation_received logged without a header: %v", got)
+	if got := l.named(flagnetic.EventOperationDeprecated); len(got) != 0 {
+		t.Errorf("operation_deprecated logged without a header: %v", got)
 	}
 }

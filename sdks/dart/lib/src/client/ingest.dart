@@ -635,7 +635,7 @@ final class Ingest {
     } on TransportException catch (e) {
       return (outcome: _Outcome.retry, status: null, cause: e.kind.name);
     }
-    _deprecations.note('postEvents', response.headers);
+    _deprecations.note('events', response.headers);
     final status = response.status;
     if (status == 202) {
       _reportRejected(batch, response.body);

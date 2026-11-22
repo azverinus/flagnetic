@@ -14,7 +14,7 @@ TABLE = ROOT.parent / "docs" / "sdks" / "conformance.md"
 
 # The names the shared ones replaced: a client logging them would break an alert written against
 # the table.
-REPLACED = ("sse_connected", "sse_dropped")
+REPLACED = ("sse_connected", "sse_dropped", "deprecation_received", "deprecated_operation")
 
 
 def shared_names() -> list[str]:

@@ -58,12 +58,16 @@ void main() {
       await eventually(() => run.client.stage == Stage.fresh);
       expect(run.client.getBool('checkout', false), isNotNull);
 
-      expect(run.logs.fieldsOf(LogEvents.deprecatedOperation), [
-        {'operation': 'evaluate', 'sunset': sunset},
+      expect(run.logs.fieldsOf(LogEvents.operationDeprecated), [
+        {
+          'operation': 'evaluate',
+          'deprecation': '@1760000000',
+          'sunset': sunset,
+        },
       ]);
       expect(
         run.logs.events
-            .singleWhere((e) => e.event == LogEvents.deprecatedOperation)
+            .singleWhere((e) => e.event == LogEvents.operationDeprecated)
             .level,
         LogLevel.warn,
       );
@@ -76,7 +80,7 @@ void main() {
         headers: {'Content-Type': 'application/json', ...deprecated},
       );
       await again;
-      expect(run.logs.count(LogEvents.deprecatedOperation), 1);
+      expect(run.logs.count(LogEvents.operationDeprecated), 1);
     },
   );
 
@@ -90,8 +94,8 @@ void main() {
         headers: {'Content-Type': 'application/json', ...deprecated},
       );
       await eventually(() => run.client.stage == Stage.fresh);
-      expect(run.logs.fieldsOf(LogEvents.deprecatedOperation), [
-        {'operation': 'evaluate'},
+      expect(run.logs.fieldsOf(LogEvents.operationDeprecated), [
+        {'operation': 'evaluate', 'deprecation': '@1760000000'},
       ]);
     },
   );
@@ -100,7 +104,7 @@ void main() {
     final run = await start();
     await (await run.server.next()).respond(503, headers: deprecated);
     await eventually(
-      () => run.logs.count(LogEvents.deprecatedOperation) == 1,
+      () => run.logs.count(LogEvents.operationDeprecated) == 1,
       reason: 'the deprecation log',
     );
     expect(run.logs.fieldsOf(LogEvents.fetchFailed), isNotEmpty);
@@ -110,10 +114,21 @@ void main() {
     final run = await start();
     await (await run.server.next()).respondJson(evaluation);
     await eventually(() => run.client.stage == Stage.fresh);
-    expect(run.logs.count(LogEvents.deprecatedOperation), 0);
+    expect(run.logs.count(LogEvents.operationDeprecated), 0);
   });
 
-  test('an events answer is logged under postEvents, once', () async {
+  test('an empty Deprecation header logs nothing', () async {
+    final run = await start();
+    await (await run.server.next()).respond(
+      200,
+      body: jsonEncode(evaluation),
+      headers: {'Content-Type': 'application/json', 'Deprecation': ''},
+    );
+    await eventually(() => run.client.stage == Stage.fresh);
+    expect(run.logs.count(LogEvents.operationDeprecated), 0);
+  });
+
+  test('an events answer is logged under events, once', () async {
     final run = await start();
     await (await run.server.next()).respondJson(evaluation);
     await eventually(() => run.client.stage == Stage.fresh);
@@ -133,23 +148,23 @@ void main() {
       await flushed;
       run.client.getBool('checkout', false);
     }
-    expect(run.logs.fieldsOf(LogEvents.deprecatedOperation), [
-      {'operation': 'postEvents', 'sunset': sunset},
+    expect(run.logs.fieldsOf(LogEvents.operationDeprecated), [
+      {'operation': 'events', 'deprecation': '@1760000000', 'sunset': sunset},
     ]);
   });
 
-  test('a stream answer is logged under streamRuleset', () async {
+  test('a stream answer is logged under stream', () async {
     final run = await start(stream: true);
     final stream = await (await run.server.next(path: '/sdk/v1/stream'))
         .respondStream(
           headers: {...eventStreamHeaders, ...deprecated, 'Sunset': sunset},
         );
     await eventually(
-      () => run.logs.count(LogEvents.deprecatedOperation) == 1,
+      () => run.logs.count(LogEvents.operationDeprecated) == 1,
       reason: 'the deprecation log',
     );
-    expect(run.logs.fieldsOf(LogEvents.deprecatedOperation), [
-      {'operation': 'streamRuleset', 'sunset': sunset},
+    expect(run.logs.fieldsOf(LogEvents.operationDeprecated), [
+      {'operation': 'stream', 'deprecation': '@1760000000', 'sunset': sunset},
     ]);
     unawaited(stream.closeStream());
   });
