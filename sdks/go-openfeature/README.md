@@ -14,6 +14,7 @@ go get github.com/azverinus/flagnetic/sdks/go-openfeature
 import (
 	of "github.com/open-feature/go-sdk/openfeature"
 
+	flagnetic "github.com/azverinus/flagnetic/sdks/go"
 	flagneticof "github.com/azverinus/flagnetic/sdks/go-openfeature"
 )
 
