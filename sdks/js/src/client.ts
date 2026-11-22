@@ -5,10 +5,12 @@
  * the tab becomes visible or the network returns. It never evaluates
  * locally, so this entry point never contains the evaluator.
  */
-export { createClient, FlagneticClient, LocalOverrides, OfflineMode } from "./client/client.js";
+export { createClient } from "./client/client.js";
+export type { FlagneticClient, LocalOverrides, OfflineMode } from "./client/client.js";
 export { anonymousId } from "./client/anonymous.js";
 export { LocalOverrideRefused, LocalOverridesNotAllowed } from "./internal/overrides.js";
 export { consoleLogger } from "./client/logger.js";
+export { LOG_EVENTS } from "./client/types.js";
 export type { AliasLink, QueuedEvent } from "./internal/events.js";
 export type {
   ClientOptions,
@@ -27,4 +29,4 @@ export type {
   Status,
   ValuesSource,
 } from "./client/types.js";
-export { SCHEMA_VERSION_MAX, SCHEMA_VERSION_MIN, SDK_API_PATH, VERSION } from "./version.js";
+export { VERSION } from "./version.js";

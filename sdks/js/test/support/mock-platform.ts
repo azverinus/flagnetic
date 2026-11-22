@@ -65,6 +65,8 @@ export class MockPlatform {
   eventsDefault: EventsReply = { kind: "accepted" };
   /** Serve the ruleset gzip-compressed when the SDK accepts it. */
   gzip = false;
+  /** Headers added to every answer, whatever the endpoint and the scripted reply. */
+  responseHeaders: Record<string, string> = {};
 
   private document: Record<string, unknown> | undefined;
   private readonly streams = new Set<ServerResponse>();
@@ -162,6 +164,7 @@ export class MockPlatform {
     const path = new URL(req.url ?? "/", "http://x").pathname;
     this.requests.push({ path, headers: req.headers, at: Date.now() });
     for (const w of this.waiters.splice(0)) w();
+    for (const [name, value] of Object.entries(this.responseHeaders)) res.setHeader(name, value);
     if (path === "/sdk/v1/ruleset") this.ruleset(req, res);
     else if (path === "/sdk/v1/stream") this.stream(res);
     else if (path === "/sdk/v1/events") this.events_(req, res);

@@ -15,6 +15,7 @@ import { assertHeaderToken } from "../internal/key.js";
 import { causeOf, consoleLogger, safeLog } from "./logger.js";
 import { Recorder } from "./recorder.js";
 import { Summaries } from "./summaries.js";
+import { reportingDeprecations } from "../internal/deprecation.js";
 import { readStore, removeStaleTemporaries, writeStore } from "./store.js";
 import type {
   Detail,
@@ -211,6 +212,9 @@ export class FlagneticServer {
       ...internals.timing,
     };
     this.store = options.store === undefined ? undefined : { path: options.store, sdkKey };
+    const doFetch = reportingDeprecations(internals.fetch ?? ((input, init) => fetch(input, init)), (fields) => {
+      this.log("warn", "operation_deprecated", { ...fields });
+    });
     this.delivery = new Delivery(
       {
         sdkKey,
@@ -220,7 +224,7 @@ export class FlagneticServer {
         timing,
         random: internals.random ?? Math.random,
         clock: internals.clock ?? realClock,
-        fetch: internals.fetch ?? ((input, init) => fetch(input, init)),
+        fetch: doFetch,
         ...(internals.trace && { trace: internals.trace }),
       },
       {
@@ -254,7 +258,7 @@ export class FlagneticServer {
       requestTimeout: timing.requestTimeout,
       clock,
       now,
-      fetch: internals.fetch ?? ((input, init) => fetch(input, init)),
+      fetch: doFetch,
     });
     const trace = internals.trace;
     const handled = trace ? (): void => { trace({ kind: "events_handled" }); } : undefined;

@@ -45,6 +45,8 @@ The logger hook receives named events, and operators alert on those names, so ev
 | `stream_connected` | The ruleset stream is open. |
 | `stream_dropped` | The ruleset stream ended. |
 
+A received `Deprecation` header is logged once per operation as `operation_deprecated`, at warning level, with the fields `operation`, `deprecation` and, when set, `sunset`; the call proceeds. It has no row in the table until every SDK exports it.
+
 The protocol option that switches the ruleset stream on or off is `stream`. Each SDK's tests check that its exported names are the ones in this table and that none of the names it replaced is still logged.
 
 ## 4. OpenFeature

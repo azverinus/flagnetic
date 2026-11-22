@@ -20,6 +20,65 @@ npm install flagnetic
 
 `react`, `@openfeature/server-sdk` and `@openfeature/web-sdk` are optional peer dependencies: install the ones of the entry points you import. Each entry point refuses the other kind of key at construction, so a server key never ends up in a bundle and a client key never in a backend (see [SDK keys](keys.md)). The package speaks `/sdk/v1` and reads `schema_version` 1 (see [Versioning and compatibility](compatibility.md)).
 
+## Quickstart
+
+The server mode in five steps: install, a key, one evaluation, a context, an exposure and a clean shutdown. The snippets below run in order as one program, and the package's tests run them.
+
+Install the package:
+
+```bash
+npm install flagnetic
+```
+
+Create a [server key](keys.md) for the environment in the console and keep it in the environment of the process, never in the source:
+
+```bash
+export FLAGNETIC_SDK_KEY=fn_srv_…
+```
+
+Evaluate a flag. `ready` waits at most two seconds for the first ruleset and never rejects; a getter returns your default whenever it cannot evaluate, so the first request is never blocked on the network:
+
+```ts
+import { createServer } from "flagnetic/server";
+
+const flagnetic = createServer(process.env.FLAGNETIC_SDK_KEY!, "https://flags.example.com");
+const stage = await flagnetic.ready(2000); // "fresh", "last_good" or "built_in"
+```
+
+Evaluate for a context: the unit IDs the flag buckets by, and the attributes its rules read. `getDetail` also says why the value was served:
+
+```ts
+const context = { units: { user: "u-1001" }, attributes: { country: "DE" } };
+
+const enabled = flagnetic.getBool(context, "new_checkout", false);
+const detail = flagnetic.getDetail(context, "banner_text", "Welcome");
+console.log(stage, enabled, detail.value, detail.reason);
+```
+
+An experiment's exposure is explicit: call it where the unit is shown the experience. When the unit signs in, link its anonymous ID to its user ID with an alias:
+
+```ts
+flagnetic.exposure(context, "banner_text");
+flagnetic.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+```
+
+Close the client when the process shuts down; it sends what is queued within 5 seconds:
+
+```ts
+await flagnetic.close();
+```
+
+In a browser, with a [client key](keys.md), the same steps use `flagnetic/client` and no context argument:
+
+```ts
+import { anonymousId, createClient } from "flagnetic/client";
+
+const browser = createClient("fn_cli_…", "https://flags.example.com", {
+  context: { units: { anonymous: anonymousId() } },
+});
+const checkout = browser.getBool("new_checkout", false);
+```
+
 ## Server mode
 
 `createServer(serverKey, baseUrl)` downloads the environment's [ruleset](ruleset.md), follows the [stream](stream.md) and evaluates every flag in the process, so a getter costs no request and stays under a millisecond at p99. `ready(timeout)` waits for the first ruleset and tells the stage reached (`fresh`, `last_good` from the `store` file, or `built_in`); it never rejects, and a getter serves your built-in default whenever it cannot evaluate. The `store` file is headed by a SHA-256 digest of the server key that wrote it: a file written under another key, such as another environment's, or by an SDK version that wrote no digest, is discarded with `store_failed` and rewritten on the next accepted ruleset. Exposures, aliases and evaluation summaries are queued and posted to [events](events.md); `close()` sends what is queued within 5 seconds, so call it when the process shuts down.
@@ -53,6 +112,10 @@ How soon a change made in Flagnetic is served:
 ## Tests and offline use
 
 `testServer(ruleset)` and `testServerFromValues(values)` in `flagnetic/server`, and the browser client's `offline` option, make no request at all: set a value, reload, and read the exposures and aliases that would have been sent. Local overrides need `allowOverrides: true` and are refused in a protected environment.
+
+## Deprecations
+
+When the server deprecates an operation of the SDK API (see [Compatibility and support](../compatibility.md#deprecation-and-removal)) it answers every request to it with a `Deprecation` header, and with `Sunset` when a date is set. Both modes log the first such answer of each operation (`ruleset`, `stream`, `evaluate` or `events`) once per client, at warning level, as the `operation_deprecated` event with the fields `operation`, `deprecation` and, when set, `sunset`. The call itself is answered and read as if the header were not there. The date is the earliest a major release of the server may remove the operation, never a removal date.
 
 ## Releases
 

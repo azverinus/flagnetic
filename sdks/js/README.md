@@ -17,6 +17,24 @@ npm install flagnetic
 
 Supported: Node 22 and later (the releases Node still supports; a release reaching its end of life is dropped in a minor version), browsers that run ES2022, React 18 and later, `@openfeature/server-sdk` 1.23 and later, `@openfeature/web-sdk` 1.10 and later. The package speaks the SDK API `/sdk/v1` and works with every Flagnetic server from 0.1.0 on ([compatibility](../../docs/sdks/compatibility.md)); [docs/sdks/javascript.md](../../docs/sdks/javascript.md) is how to choose and deploy each entry point.
 
+## What 1.0 promises
+
+From 1.0.0 until 2.0.0 the public API below changes only additively: a name is not renamed or removed, a signature does not narrow what it accepts or widen what it returns, an option keeps its meaning and default, and an error keeps its class. A new option is optional, a new method or export is an addition, and a deprecated name keeps working until the next major release. Everything not named here is internal, whatever the type declarations let you reach: the files under `dist` apart from the entry points, the shapes of log fields, and the constructors of the classes below, which are built by the functions beside them.
+
+The public API is the exports of the five entry points, and what the objects they return offer:
+
+| Entry point | Exports |
+|---|---|
+| `flagnetic` | `VERSION`, and the types `Context`, `ErrorCode`, `ExperimentDetail`, `JsonValue`, `Reason`, `Result` |
+| `flagnetic/server` | `createServer`, `testServer`, `testServerFromValues`, `serializeBootstrap`, `consoleLogger`, `decodeRuleset`, `RulesetDecodeError`, `LocalOverrideRefused`, `LocalOverridesNotAllowed`, `LOG_EVENTS`, `REASONS`, `VERSION`, and types: `FlagneticServer`, `LocalOverrides`, `TestServer`, `Recorder`, `ServerOptions`, `Detail`, `Status`, `Stage`, `Logger`, `LogEvent`, `LogLevel`, `Context`, `Ruleset` with the ruleset document types, `ValuesDocument` and their kin |
+| `flagnetic/client` | `createClient`, `anonymousId`, `consoleLogger`, `LocalOverrideRefused`, `LocalOverridesNotAllowed`, `LOG_EVENTS`, `VERSION`, and types: `FlagneticClient`, `LocalOverrides`, `OfflineMode`, `ClientOptions`, `ClientStore`, `Detail`, `Status`, `Stage`, `Logger`, `LogEvent`, `LogLevel`, `Context`, `ValuesSource` and their kin |
+| `flagnetic/react` | `FlagneticProvider`, `FlagneticBootstrap`, `serializeBootstrap`, `useFlag`, `useFlagDetail`, `useFlagnetic`, `useStage`, and the types of their props and values |
+| `flagnetic/openfeature` | `FlagneticServerProvider`, `FlagneticWebProvider`, `reasonOf`, `REASON_METADATA_KEY`, and the types of their options |
+
+The objects: a server client (`FlagneticServer`) offers `ready`, `stage`, `status`, `onChange`, `onStage`, `getBool`, `getString`, `getNumber`, `getJson`, `getDetail`, `values`, `exposure`, `alias`, `flush`, `close` and `overrides`; a browser client (`FlagneticClient`) the same without the context argument, plus `setContext`, `clearStored` and `offline`. The options of `createServer` and `createClient` are those listed under each mode below. Every call that can fail for a reason outside your code returns your default or resolves with the stage reached instead of throwing; the errors that remain are for a mistake in your code (a key of the wrong kind, a local override that is not allowed: `LocalOverridesNotAllowed`, `LocalOverrideRefused`) or for a document you hand to `decodeRuleset` that it cannot read (`RulesetDecodeError`).
+
+What is open: the set of log event names and `Reason` values may grow in a minor release (switch over them with a default case), and a log event's fields may grow. A deprecation is logged as `operation_deprecated` when the server reports an operation as deprecated (see [deprecations](../../docs/sdks/javascript.md#deprecations)).
+
 ## Server mode
 
 ```ts

@@ -3,7 +3,8 @@
 // in the browser project, so the fixtures are bundled through
 // import.meta.glob instead of being read from disk.
 import { describe, expect, test } from "vitest";
-import { bucket, decodeRuleset, murmur3, RulesetDecodeError, type Context } from "../src/server.js";
+import { bucket, murmur3 } from "../src/evaluator/bucket.js";
+import { decodeRuleset, RulesetDecodeError, type Context } from "../src/server.js";
 import { oneCondition } from "./one-condition.js";
 
 interface MurmurVectors {
