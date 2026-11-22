@@ -45,7 +45,7 @@ final class FixedRandom implements Random {
 /// first values are held.
 Future<(FlagneticClient, OpenStream)> streaming(
   MockServer server, {
-  bool? sse,
+  bool? stream,
   Duration jitter = Duration.zero,
   Random? random,
   Duration minimumRefetchGap = Duration.zero,
@@ -56,7 +56,7 @@ Future<(FlagneticClient, OpenStream)> streaming(
     baseUrl: server.url,
     context: anonymous,
     options: scaledOptions(
-      sse: sse,
+      stream: stream,
       pollInterval: const Duration(hours: 1),
       streamSilenceTimeout: const Duration(seconds: 30),
       rulesetEventJitter: jitter,
@@ -69,10 +69,10 @@ Future<(FlagneticClient, OpenStream)> streaming(
     await client.close();
     await server.close();
   });
-  final stream = await (await server.next(path: streamPath)).respondStream();
+  final open = await (await server.next(path: streamPath)).respondStream();
   await (await server.next(path: evaluatePath)).respondJson(evaluation);
   await eventually(() => client.stage == Stage.fresh);
-  return (client, stream);
+  return (client, open);
 }
 
 int count(MockServer server, String path) =>
@@ -97,7 +97,7 @@ void main() {
           baseUrl: server.url,
           context: anonymous,
           options: scaledOptions(
-            sse: false,
+            stream: false,
             pollInterval: const Duration(milliseconds: 60),
           ),
         );

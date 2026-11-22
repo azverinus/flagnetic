@@ -3,7 +3,7 @@
 library;
 
 // The client-mode refetch triggers against the mock server: setting the context, foreground, the interval, refresh and
-// the SSE opt-in, all coalesced into one in-flight request. Durations are
+// the stream opt-in, all coalesced into one in-flight request. Durations are
 // the protocol's divided by 1000, as in the other behaviour tests.
 import 'dart:async';
 import 'dart:convert';
@@ -387,7 +387,7 @@ void main() {
     });
   });
 
-  group('the SSE opt-in', () {
+  group('the stream opt-in', () {
     test('is off by default: no stream is opened', () async {
       final server = await MockServer.start();
       final client = Flagnetic.client(
@@ -418,7 +418,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           logger: logs.call,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
@@ -437,7 +437,7 @@ void main() {
 
       await (await server.next()).respondJson(evaluation);
       await eventually(() => client.stage == Stage.fresh);
-      expect(logs.count(LogEvents.sseConnected), 1);
+      expect(logs.count(LogEvents.streamConnected), 1);
 
       // The held version: nothing to fetch.
       await stream.send(
@@ -470,7 +470,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           logger: logs.call,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
@@ -503,8 +503,8 @@ void main() {
           answersOf('server/evaluation-after-kill-switch.json'),
         ),
       );
-      expect(logs.count(LogEvents.sseDropped), 1);
-      expect(logs.fieldsOf(LogEvents.sseDropped).single['cause'], 'closed');
+      expect(logs.count(LogEvents.streamDropped), 1);
+      expect(logs.fieldsOf(LogEvents.streamDropped).single['cause'], 'closed');
     });
 
     test('a stream closed before its first heartbeat backs off like a '
@@ -516,7 +516,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           logger: logs.call,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
@@ -575,20 +575,17 @@ void main() {
       // drawn waits themselves are pinned through the log below.
       expect(waits[3], lessThan(const Duration(milliseconds: 400)));
       expect(waits[4], greaterThanOrEqualTo(const Duration(milliseconds: 100)));
-      expect(logs.fieldsOf(LogEvents.sseDropped).map((f) => f['cause']), [
+      expect(logs.fieldsOf(LogEvents.streamDropped).map((f) => f['cause']), [
         'closed_early',
         'closed_early',
         'closed_early',
         'closed',
         'closed_early',
       ]);
-      expect(logs.fieldsOf(LogEvents.sseDropped).map((f) => f['retry_in_ms']), [
-        100,
-        200,
-        400,
-        20,
-        100,
-      ]);
+      expect(
+        logs.fieldsOf(LogEvents.streamDropped).map((f) => f['retry_in_ms']),
+        [100, 200, 400, 20, 100],
+      );
     });
 
     test('a 200 that is not an event stream is a failed connection', () async {
@@ -599,7 +596,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           logger: logs.call,
           pollInterval: const Duration(hours: 1),
         ),
@@ -612,13 +609,13 @@ void main() {
       await (await server.next()).respondStream(
         headers: {'Content-Type': 'text/html'},
       );
-      await eventually(() => logs.count(LogEvents.sseDropped) >= 1);
-      expect(logs.fieldsOf(LogEvents.sseDropped).first, {
+      await eventually(() => logs.count(LogEvents.streamDropped) >= 1);
+      expect(logs.fieldsOf(LogEvents.streamDropped).first, {
         'cause': 'content_type',
         'detail': 'text/html',
         'retry_in_ms': isA<int>(),
       });
-      expect(logs.count(LogEvents.sseConnected), 0);
+      expect(logs.count(LogEvents.streamConnected), 0);
     });
 
     test('a stream line past the bound drops the connection and '
@@ -630,7 +627,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           logger: logs.call,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
@@ -648,7 +645,7 @@ void main() {
       expect(await stream.closedBySdk(const Duration(seconds: 5)), isTrue);
       final again = await server.next();
       expect(again.path, '/sdk/v1/stream');
-      expect(logs.fieldsOf(LogEvents.sseDropped).single['cause'], 'parse');
+      expect(logs.fieldsOf(LogEvents.streamDropped).single['cause'], 'parse');
     });
 
     test('the background suspends the stream and the foreground opens it '
@@ -659,7 +656,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
           minimumRefetchGap: Duration.zero,
@@ -703,7 +700,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
           minimumRefetchGap: Duration.zero,
@@ -778,7 +775,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           logger: logs.call,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
@@ -809,7 +806,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
         ),
@@ -854,7 +851,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: scaledOptions(
-          sse: true,
+          stream: true,
           pollInterval: const Duration(hours: 1),
           streamSilenceTimeout: const Duration(seconds: 30),
         ),
@@ -926,7 +923,7 @@ void main() {
         baseUrl: server.url,
         context: anonymous,
         options: ClientOptions(
-          sse: true,
+          stream: true,
           pollInterval: const Duration(hours: 1),
         ),
       );
