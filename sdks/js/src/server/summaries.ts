@@ -114,7 +114,7 @@ export class Summaries {
       if (age > this.config.maxWindowAge) {
         this.log("warn", "queue_dropped", {
           kind: "evaluation_summary",
-          cause: "window_older_than_one_hour",
+          cause: "window_too_old",
           rows: kept.rows.length,
           age_ms: age,
         });

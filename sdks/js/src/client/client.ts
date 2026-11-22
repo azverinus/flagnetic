@@ -181,6 +181,15 @@ export class FlagneticClient {
   private readonly attemptWaiters: { readonly minSeq: number; readonly resolve: (stage: Stage) => void }[] = [];
   private readonly backoff: Backoff;
   private unauthorized = false;
+  /**
+   * A stream refused with 401 or 403 stays closed while the evaluation is
+   * refused too, and is tried again after the first successful evaluation
+   * that follows the refusal: the key was restored, or the refusal was a
+   * proxy's that guards only the stream. Counting successes tells which
+   * evaluation follows it.
+   */
+  private evaluations = 0;
+  private reopenStreamAfter = 0;
   private announced = 0;
   private catchUpStep = 0;
   /**
@@ -322,6 +331,9 @@ export class FlagneticClient {
           },
           refused: (status) => {
             this.once("revoked", "error", "key_revoked", { status });
+            // The evaluation that follows a refusal at startup shows nothing
+            // the refusal did not: the stream is tried again by the one after it.
+            this.reopenStreamAfter = Math.max(this.evaluations, 1);
             // The first values must not wait out the grace period below for
             // a stream that will not open.
             if (!this.started) this.refetch("start");
@@ -921,6 +933,7 @@ export class FlagneticClient {
           // The ruleset stream carries the same key: it stays closed until
           // an evaluation succeeds again.
           this.stream?.close();
+          this.reopenStreamAfter = this.evaluations;
         }
         this.failed({ source: "network", cause: "status", status: res.status, trigger });
         return false;
@@ -945,7 +958,8 @@ export class FlagneticClient {
     if (!this.accept(text, "network", context !== this.acceptedContext, context)) return false;
     // The server answers again, so a stream a refusal closed comes back.
     this.logged.delete("revoked");
-    if (this.stream && !this.stream.running) this.stream.open();
+    this.evaluations++;
+    if (this.stream && !this.stream.running && this.evaluations > this.reopenStreamAfter) this.stream.open();
     this.persist({ ...(context.units ?? {}) });
     return true;
   }

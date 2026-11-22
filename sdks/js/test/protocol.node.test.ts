@@ -208,7 +208,7 @@ class Runner {
     this.baseUrl = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
     const o = given.options;
     const options: ServerOptions = {
-      stream: o.sse === true,
+      stream: o.stream === true,
       pollInterval: o.poll_interval_ms as number,
       pollIntervalWithoutStream: o.poll_interval_ms as number,
       allowOverrides: o.allow_overrides === true,
@@ -559,7 +559,14 @@ const serverScenarios = scenarios.scenarios.filter((s) => s.mode === "server");
 
 // The scenarios about how long a wait is: every jitter is drawn at the top of
 // its window, so a reconnect that skips the backoff misses the window.
-const windowTopScenarios = new Set(["server: a stream closed before its first heartbeat is retried with backoff"]);
+// The stream reconnects while the safety poll runs on its own timer: with
+// every jitter at the top of its window the order of the two is fixed.
+const windowTopScenarios = new Set([
+  "server: a stream closed before its first heartbeat is retried with backoff",
+  "server: a stream that drops after being connected and stays down brings the next fetch within the safety poll",
+  "server: a stream refused 401/403 while the fetch succeeds is opened again after the next successful fetch",
+  "server: a stream refused 401/403 stays closed while the fetch is refused too",
+]);
 
 describe("protocol scenarios, server mode", () => {
   test("there are server-mode scenarios, and every one of them runs whole", () => {
@@ -580,7 +587,7 @@ describe("protocol degradation cases, the ruleset endpoint", () => {
   });
 
   test.each(rulesetCases.map((c) => [c.name, c] as const))("%s", async (_, c) => {
-    const options = { sse: false, poll_interval_ms: 30_000 };
+    const options = { stream: false, poll_interval_ms: 30_000 };
     const r = await runner(cases.context, { options });
     const held = JSON.parse(read(c.held)) as { version: number };
     const ok = { "Content-Type": "application/json", ETag: `"${held.version}"` };
@@ -607,7 +614,7 @@ describe("protocol degradation cases, the events endpoint", () => {
   // rejection is called, is dropped: nothing is sent again.
   test.each(eventsCases.map((c) => [c.name, c] as const))("%s", async (_, c) => {
     const r = await runner(cases.context, {
-      options: { sse: false, poll_interval_ms: 3_600_000, flush_interval_ms: 3_600_000, send_summaries: false },
+      options: { stream: false, poll_interval_ms: 3_600_000, flush_interval_ms: 3_600_000, send_summaries: false },
     });
     const ok = { "Content-Type": "application/json", ETag: '"1"' };
     await r.run([
