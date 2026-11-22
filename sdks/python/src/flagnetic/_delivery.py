@@ -60,7 +60,7 @@ MAX_RULESET_BYTES = 256 << 20
 
 RULESET_EVENT = "ruleset"
 
-# Causes of fetch_failed and sse_dropped.
+# Causes of fetch_failed and stream_dropped.
 CAUSE_TIMEOUT = "timeout"
 CAUSE_NETWORK = "network"
 CAUSE_HTTP_STATUS = "http_status"
@@ -657,7 +657,7 @@ class Delivery:
             host.key_revoked(resp.status)
             host.log(
                 logging.WARNING,
-                _events.SSE_DROPPED,
+                _events.STREAM_DROPPED,
                 cause=CAUSE_UNAUTHORIZED,
                 error=f"stream: {resp.status} {resp.reason}",
                 reconnect=False,
@@ -685,7 +685,7 @@ class Delivery:
         now = time.monotonic()
         self._last_data = now
         self._stream_stable = False
-        host.log(logging.INFO, _events.SSE_CONNECTED, last_event_id=last_event_id)
+        host.log(logging.INFO, _events.STREAM_CONNECTED, last_event_id=last_event_id)
         if not self._first_connect:
             # Versions may have been missed while the stream was down.
             self._wake_fetch = True
@@ -695,7 +695,7 @@ class Delivery:
         fields: dict[str, Any] = {"cause": cause, "error": str(err), "reconnect": True}
         if status:
             fields["status"] = status
-        self._host.log(logging.WARNING, _events.SSE_DROPPED, **fields)
+        self._host.log(logging.WARNING, _events.STREAM_DROPPED, **fields)
         self._stream_failures += 1
         self._next_stream = time.monotonic() + full_jitter(
             backoff_ceiling(self._stream_failures, self._waits.retry_base, self._waits.stream_retry_cap)
@@ -758,14 +758,14 @@ class Delivery:
         return True
 
     def _stream_dropped(self, cause: str, error: str, *, errored: bool) -> None:
-        """Logs sse_dropped, closes the connection and schedules the reconnect."""
+        """Logs stream_dropped, closes the connection and schedules the reconnect."""
         if cause == CAUSE_SERVER_CLOSED and not self._stream_stable:
             # A stream is stable once it has delivered a heartbeat. One the server ends before
             # that is a failed connection, so a draining replica or a proxy that closes every
             # stream at once is backed off from instead of reconnected to every other second.
             cause, errored = CAUSE_CLOSED_EARLY, True
         level = logging.WARNING if errored or cause != CAUSE_SERVER_CLOSED else logging.INFO
-        self._host.log(level, _events.SSE_DROPPED, cause=cause, error=error, reconnect=True)
+        self._host.log(level, _events.STREAM_DROPPED, cause=cause, error=error, reconnect=True)
         now = time.monotonic()
         self._drop_stream_connection()
         # The fetch scheduled while the stream was up may be a poll interval away; without the
