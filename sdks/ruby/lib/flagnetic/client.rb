@@ -101,7 +101,7 @@ module Flagnetic
       @app_version = app_version&.to_s
       init_state
       log(:warn, :local_overrides_allowed) if allow_overrides
-      log(:warn, :exposures_disabled) unless @send_exposures
+      log(:warn, :exposures_off) unless @send_exposures
       @timing = build_timing(poll_interval, request_timeout, flush_interval, summary_interval, timing)
 
       if offline || offline_file

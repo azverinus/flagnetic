@@ -25,7 +25,7 @@ class ClientStreamTest < Minitest::Test
     assert_equal "Bearer fn_srv_#{"a" * 40}", stream["authorization"]
     assert_equal "flagnetic-ruby/#{Flagnetic::VERSION} (server)", stream["user-agent"]
     assert_nil stream["last-event-id"], "nothing held yet"
-    assert_equal 1, logged(:sse_connected).size
+    assert_equal 1, logged(:stream_connected).size
     assert c.bool("a", default: false)
   end
 
@@ -72,8 +72,8 @@ class ClientStreamTest < Minitest::Test
     assert_equal "1", @server.stream_requests.last["last-event-id"]
     eventually { !c.bool("a", default: true) }
     refute c.bool("a", default: true)
-    assert_equal [[:info, { cause: "closed by the server" }]], logged(:sse_dropped)
-    assert_equal 2, logged(:sse_connected).size
+    assert_equal [[:info, { cause: "closed by the server" }]], logged(:stream_dropped)
+    assert_equal 2, logged(:stream_connected).size
   end
 
   # TopRandom draws the top of every window, so that a wait is the ceiling
@@ -104,7 +104,7 @@ class ClientStreamTest < Minitest::Test
     assert_operator gaps[3], :<, 0.1
     assert_operator gaps[4], :>=, 0.05
     early = "closed by the server before its first heartbeat"
-    causes = logged(:sse_dropped).map { |_, fields| fields[:cause] }
+    causes = logged(:stream_dropped).map { |_, fields| fields[:cause] }
     assert_equal [early, early, early, "closed by the server", early], causes
   end
 
@@ -128,7 +128,7 @@ class ClientStreamTest < Minitest::Test
     @server.reset_streams
     eventually { @server.stream_requests.size == 2 }
     eventually { @server.fetches.size > fetches }
-    level, fields = logged(:sse_dropped).first
+    level, fields = logged(:stream_dropped).first
     assert_equal :warn, level
     refute_equal "closed by the server", fields[:cause]
   end
@@ -137,7 +137,7 @@ class ClientStreamTest < Minitest::Test
     connected_client
     @server.streams.first.write("data: #{"x" * (70 << 10)}")
     eventually { @server.stream_requests.size >= 2 }
-    level, fields = logged(:sse_dropped).first
+    level, fields = logged(:stream_dropped).first
     assert_equal :warn, level
     assert_match(/event-stream line exceeds 65536 bytes/, fields[:cause])
   end
@@ -145,7 +145,7 @@ class ClientStreamTest < Minitest::Test
   def test_silence_reconnects
     connected_client(timing: { silence: 0.3 })
     eventually { @server.stream_requests.size >= 2 }
-    assert_match(/no frame for 0.3 s/, logged(:sse_dropped).first[1][:cause])
+    assert_match(/no frame for 0.3 s/, logged(:stream_dropped).first[1][:cause])
   end
 
   def test_heartbeats_keep_the_stream_alive
@@ -195,24 +195,47 @@ class ClientStreamTest < Minitest::Test
     c = client(timing: { poll_down: 0.05 })
     assert_equal :built_in, c.ready(timeout: 2)
     eventually { @server.fetches.size >= 4 }
-    assert_empty logged(:sse_connected)
+    assert_empty logged(:stream_connected)
     assert_equal [[:error, { status: 401, source: "stream" }], [:error, { status: 401, source: "fetch" }]],
                  logged(:key_revoked), "once per source"
-    assert_empty logged(:sse_dropped)
+    assert_empty logged(:stream_dropped)
   end
 
-  def test_a_refused_stream_is_retried_and_a_restored_key_gets_it_back
+  def test_a_refused_stream_stays_closed_while_the_fetch_is_refused_too
+    @server.on_stream { |_| [403, {}, ""] }
+    @server.on_ruleset { |_| [403, {}, ""] }
+    client(timing: { poll_down: 0.05 })
+    eventually { @server.fetches.size >= 6 }
+    assert_equal 1, @server.stream_requests.size, "the stream is not retried on a backoff of its own"
+  end
+
+  # At startup the fetch that follows the refusal shows nothing the refusal
+  # did not, so the stream is tried again after the second successful fetch.
+  def test_a_stream_refused_at_startup_is_tried_again_after_the_second_successful_fetch
     @server.publish(document(1, { "a" => true }))
-    refused = true
-    @server.on_stream { |_| refused ? [403, {}, ""] : nil }
-    c = client
+    refusals = 1
+    @server.on_stream { |_| (refusals -= 1) >= 0 ? [403, {}, ""] : nil }
+    c = client(timing: { poll_down: 0.1 })
     assert_equal :fresh, c.ready(timeout: 2)
-    eventually { @server.stream_requests.size >= 2 }
-    refused = false
     eventually { @server.streams.size == 1 }
-    assert_equal 1, @server.streams.size
-    assert_equal 1, logged(:key_revoked).size
+    second = @server.stream_requests[1]
+    assert_operator @server.fetches[1].at, :<, second.at
+    assert_equal 1, @server.fetches.count { |f| f.at < second.at } - 1, "one fetch after the first success"
+    assert_equal [[:error, { status: 403, source: "stream" }]], logged(:key_revoked)
     assert c.bool("a", default: false)
+  end
+
+  def test_a_stream_refused_on_reconnect_is_tried_again_after_the_next_successful_fetch
+    connected_client(timing: { poll_down: 0.3, stream_base: 0.01, stream_cap: 0.01 })
+    @server.on_stream { |_| [403, {}, ""] }
+    @server.close_streams
+    eventually { logged(:key_revoked).any? }
+    fetches = @server.fetches.size
+    requests = @server.stream_requests.size
+    eventually { @server.fetches.size > fetches }
+    eventually { @server.stream_requests.size > requests }
+    assert_operator @server.fetches[fetches].at, :<, @server.stream_requests[requests].at
+    assert_equal requests + 1, @server.stream_requests.size, "tried again once, after the fetch"
   end
 
   def test_a_revoked_fetch_closes_an_open_stream_and_recovery_reopens_it

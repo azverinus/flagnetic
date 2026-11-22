@@ -145,7 +145,7 @@ class SummariesTest < Minitest::Test
     c.flush(timeout: 2)
     assert_equal({ %w[on v fallthrough] => 1 }, rows(summaries(@server.events_requests.last).first))
     dropped = logged(:queue_dropped).map(&:last)
-    assert_equal(["window_older_than_one_hour"], dropped.map { |f| f[:cause] })
+    assert_equal(["window_too_old"], dropped.map { |f| f[:cause] })
   end
 
   def test_events_are_retried_on_5xx_with_the_same_event_id

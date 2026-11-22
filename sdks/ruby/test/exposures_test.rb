@@ -173,7 +173,7 @@ class ExposuresTest < Minitest::Test
     c.alias("anonymous", "d-8f1c", "user", "u-1001")
     assert_empty c.recorder.exposures
     assert_empty c.recorder.aliases
-    assert_equal [[:warn, {}]], logged(:exposures_disabled)
+    assert_equal [[:warn, {}]], logged(:exposures_off)
   end
 
   # --- strings that are no UTF-8 ----------------------------------------

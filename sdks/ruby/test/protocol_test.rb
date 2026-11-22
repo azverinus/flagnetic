@@ -35,13 +35,22 @@ class ProtocolTest < Minitest::Test
   FACTOR = 50.0
   SLACK = 0.3
 
-  # The scenarios about how long a wait is run on uncompressed time, with
-  # every jitter drawn at the top of its window: a reconnect that skips the
-  # backoff (the routine 0-2 s against the first failure's 0-1 s) then
-  # misses a window the scheduling slack does not widen to cover.
-  WINDOW_TOP = ["server: a stream closed before its first heartbeat is retried with backoff"].freeze
+  # The scenarios about how long a wait is run with every jitter drawn at
+  # the top of its window, by the factor each is compressed with. On
+  # uncompressed time, a reconnect that skips the backoff (the routine 0-2 s
+  # against the first failure's 0-1 s) misses a window the scheduling slack
+  # does not widen to cover. The stream reconnects while the safety poll
+  # runs on its own timer: with every jitter at the top of its window the
+  # order of the two is fixed, and the factor keeps the half minute short.
+  WINDOW_TOP = {
+    "server: a stream closed before its first heartbeat is retried with backoff" => 1.0,
+    "server: a stream that drops after being connected and stays down brings the next fetch within the " \
+    "safety poll" => 10.0,
+    "server: a stream refused 401/403 while the fetch succeeds is opened again after the next successful fetch" => 10.0,
+    "server: a stream refused 401/403 stays closed while the fetch is refused too" => 10.0
+  }.freeze
   FACTORS = { "server: a revoked key keeps the last good and retries at a capped backoff" => 2000.0,
-              **WINDOW_TOP.to_h { |name| [name, 1.0] } }.freeze
+              **WINDOW_TOP }.freeze
 
   # TopRandom draws the top of every window.
   class TopRandom
@@ -95,7 +104,7 @@ class ProtocolTest < Minitest::Test
       store = File.join(Dir.mktmpdir, "ruleset.json")
       Flagnetic.const_get(:FileStore).new(store, SERVER_KEY).save(read(stored))
     end
-    @client = Flagnetic::Client.new(SERVER_KEY, base_url: @server.base_url, stream: options["sse"], store: store,
+    @client = Flagnetic::Client.new(SERVER_KEY, base_url: @server.base_url, stream: options["stream"], store: store,
                                                 **common)
   end
 
@@ -130,6 +139,41 @@ class ProtocolTest < Minitest::Test
       client&.close(timeout: 1)
       server&.close
     end
+  end
+
+  # A batch the server answered is done, whatever it rejected and whatever
+  # the rejection is called: each events case is played as a scenario whose
+  # second flush must send nothing for ten minutes of its clock.
+  EVENTS_CASES = CASES["cases"].select { |c| c["endpoint"] == "POST /sdk/v1/events" }
+
+  EVENTS_CASES.each do |c|
+    define_method(:"test_events_degradation_case_#{c["name"].gsub(/\W+/, "_")}") do
+      # Ten minutes of quiet on a larger factor: a retry would come well
+      # within it, and the run stays short.
+      run_scenario(events_case_scenario(c), factor: FACTOR * 20)
+    end
+  end
+
+  def test_the_events_degradation_cases_are_played
+    refute_empty EVENTS_CASES
+  end
+
+  def events_case_scenario(events_case)
+    {
+      "name" => "events degradation: #{events_case["name"]}",
+      "given" => { "options" => { "stream" => false, "poll_interval_ms" => 3_600_000,
+                                  "flush_interval_ms" => 3_600_000, "send_summaries" => false } },
+      "steps" => [
+        { "request" => { "method" => "GET", "path" => "/sdk/v1/ruleset" },
+          "respond" => { "status" => 200, "headers" => { "ETag" => '"1"' }, "body" => "server/ruleset.json" },
+          "expect" => { "stage" => "fresh" } },
+        { "call" => { "op" => "alias", "times" => 12 } },
+        { "call" => { "op" => "flush" } },
+        { "request" => { "method" => "POST", "path" => "/sdk/v1/events" }, "respond" => events_case["response"] },
+        { "call" => { "op" => "flush" } },
+        { "no_request" => { "path" => "/sdk/v1/events", "for_ms" => 600_000 } }
+      ]
+    }
   end
 
   # --- scenarios ----------------------------------------------------------
@@ -167,11 +211,10 @@ class ProtocolTest < Minitest::Test
     assert_empty %w[exposure alias flush] - ops
   end
 
-  def run_scenario(scenario)
-    factor = FACTORS.fetch(scenario["name"], FACTOR)
+  def run_scenario(scenario, factor: FACTORS.fetch(scenario["name"], FACTOR))
     given = scenario["given"]
     build(factor, given["options"], stored: given["stored"], offline: given["offline"],
-                                    window_top: WINDOW_TOP.include?(scenario["name"]))
+                                    window_top: WINDOW_TOP.key?(scenario["name"]))
     step_end = now
     scenario["steps"].each_with_index do |step, i|
       label = "#{scenario["name"]}, step #{i}#{" (#{step["note"]})" if step["note"]}"
