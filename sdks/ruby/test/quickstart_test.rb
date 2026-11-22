@@ -55,7 +55,7 @@ class QuickstartTest < Minitest::Test
     assert_equal :fallthrough, client.detail("new_checkout", default: false, context: context).reason
     assert_includes %w[standard discount], scope.local_variable_get(:variant)
     exposures = @server.events_requests.flat_map(&:events).select { |e| e["type"] == "exposure" }
-    assert_equal [["pricing_test", "pricing"]], exposures.map { |e| e.values_at("experiment_key", "flag_key") }
+    assert_equal([%w[pricing_test pricing]], exposures.map { |e| e.values_at("experiment_key", "flag_key") })
   ensure
     %w[FLAGNETIC_SDK_KEY FLAGNETIC_BASE_URL].each { |k| previous&.key?(k) ? ENV[k] = previous[k] : ENV.delete(k) }
   end
