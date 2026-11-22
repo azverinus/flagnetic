@@ -11,6 +11,7 @@ import { changedFlags } from "./changes.js";
 import { defaultTiming, Delivery, realClock, type Clock, type Timing, type TraceEvent } from "./delivery.js";
 import { EventQueue } from "./events.js";
 import { Ingest } from "./ingest.js";
+import { assertHeaderToken } from "../internal/key.js";
 import { causeOf, consoleLogger, safeLog } from "./logger.js";
 import { Recorder } from "./recorder.js";
 import { Summaries } from "./summaries.js";
@@ -199,6 +200,7 @@ export class FlagneticServer {
     if (typeof sdkKey === "string" && sdkKey.startsWith("fn_cli_")) {
       throw new Error("flagnetic/server needs a server key (fn_srv_…); a client key belongs to flagnetic/client");
     }
+    assertHeaderToken(sdkKey);
     const timing: Timing = {
       ...defaultTiming,
       ...(options.pollInterval !== undefined && { pollConnected: Math.max(pollFloor, options.pollInterval) }),

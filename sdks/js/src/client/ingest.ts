@@ -12,7 +12,7 @@
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
 import { countKey, orderRows, packBatch, summaryEvents, SummaryCounter, utf8Length, type QueuedEvent, type SummaryRow } from "../internal/events.js";
-import { causeOf, type LogLevel } from "../internal/logger.js";
+import { causeOf, requestCauseOf, type LogLevel } from "../internal/logger.js";
 import type { SafeStore } from "./storage.js";
 import type { LogEvent, Reason } from "./types.js";
 import { SCHEMA_VERSION_MAX, SDK_API_PATH } from "../version.js";
@@ -378,7 +378,7 @@ export class Ingest {
         cause = `status ${res.status}`;
       }
     } catch (e) {
-      cause = `network error: ${causeOf(e)}`;
+      cause = `network error: ${requestCauseOf(e)}`;
     } finally {
       this.inFlight = new Set();
       this.trace?.("events_handled");

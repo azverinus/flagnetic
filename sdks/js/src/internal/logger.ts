@@ -30,6 +30,17 @@ export function safeLog<E extends string>(logger: LogSink<E>, level: LogLevel, e
   }
 }
 
+/**
+ * A readable cause for what a request threw. A `TypeError` with no cause of
+ * its own is what a runtime raises while it builds the request, and its
+ * message can hold the header value, which is the SDK key: it is named by its
+ * class only. A network failure keeps its message and the cause's.
+ */
+export function requestCauseOf(e: unknown): string {
+  if (e instanceof TypeError && !(e.cause instanceof Error)) return e.name;
+  return causeOf(e);
+}
+
 /** A readable cause for a caught value. */
 export function causeOf(e: unknown): string {
   if (e instanceof Error) {
