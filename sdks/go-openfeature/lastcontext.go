@@ -1,6 +1,7 @@
 package openfeature
 
 import (
+	"container/list"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,28 +19,39 @@ const lastContextCapacity = 10000
 // no hooks for Track, so the context Track receives lacks what a before
 // hook added to the evaluation, and the client would find no detail under
 // it; the remembered context is the one the detail is filed under.
+//
+// A unit evaluated again moves to the newest end, so a unit still in use is
+// not pushed out by units first seen after it.
 type lastContexts struct {
 	mu    sync.Mutex
-	byKey map[string]flagnetic.Context
-	order []string
+	byKey map[string]*list.Element
+	order *list.List // of lastContext, oldest at the front
+}
+
+type lastContext struct {
+	key string
+	fc  flagnetic.Context
 }
 
 func newLastContexts() *lastContexts {
-	return &lastContexts{byKey: map[string]flagnetic.Context{}}
+	return &lastContexts{byKey: map[string]*list.Element{}, order: list.New()}
 }
 
 func (l *lastContexts) remember(flag string, fc flagnetic.Context) {
 	key := lastContextKey(flag, fc.Units)
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if _, ok := l.byKey[key]; !ok {
-		if len(l.order) >= lastContextCapacity {
-			delete(l.byKey, l.order[0])
-			l.order = l.order[1:]
-		}
-		l.order = append(l.order, key)
+	if e, ok := l.byKey[key]; ok {
+		e.Value = lastContext{key: key, fc: fc}
+		l.order.MoveToBack(e)
+		return
 	}
-	l.byKey[key] = fc
+	if l.order.Len() >= lastContextCapacity {
+		oldest := l.order.Front()
+		delete(l.byKey, oldest.Value.(lastContext).key)
+		l.order.Remove(oldest)
+	}
+	l.byKey[key] = l.order.PushBack(lastContext{key: key, fc: fc})
 }
 
 // forget drops what was remembered, so an exposure for a flag that no
@@ -48,15 +60,9 @@ func (l *lastContexts) forget(flag string, units map[string]string) {
 	key := lastContextKey(flag, units)
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if _, ok := l.byKey[key]; !ok {
-		return
-	}
-	delete(l.byKey, key)
-	for i, k := range l.order {
-		if k == key {
-			l.order = append(l.order[:i], l.order[i+1:]...)
-			break
-		}
+	if e, ok := l.byKey[key]; ok {
+		delete(l.byKey, key)
+		l.order.Remove(e)
 	}
 }
 
@@ -65,8 +71,8 @@ func (l *lastContexts) forget(flag string, units map[string]string) {
 func (l *lastContexts) recall(flag string, fallback flagnetic.Context) flagnetic.Context {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if fc, ok := l.byKey[lastContextKey(flag, fallback.Units)]; ok {
-		return fc
+	if e, ok := l.byKey[lastContextKey(flag, fallback.Units)]; ok {
+		return e.Value.(lastContext).fc
 	}
 	return fallback
 }

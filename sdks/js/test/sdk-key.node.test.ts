@@ -1,7 +1,7 @@
 // An SDK key goes into an Authorization header: one that no header can carry
 // is refused at construction, and no log line repeats a key.
 import { describe, expect, test, vi } from "vitest";
-import { createClient } from "../src/client/client.js";
+import { createClient, createClientWith } from "../src/client/client.js";
 import { requestCauseOf } from "../src/internal/logger.js";
 import { createServer, createServerWith } from "../src/server/client.js";
 
@@ -61,7 +61,34 @@ describe("a request that throws while it is built", () => {
       },
     );
     await vi.waitFor(() => { expect(lines.some((l) => l.includes("fetch_failed"))).toBe(true); });
+    server.alias({ fromUnitType: "device", fromUnitId: "d-1", toUnitType: "user", toUnitId: "u-1" });
+    await server.flush();
     await server.close();
+    expect(lines.some((l) => l.includes("events_failed"))).toBe(true);
+    expect(lines.filter((l) => l.includes("SECRET"))).toStrictEqual([]);
+  });
+
+  test("no log line of the client carries the key", async () => {
+    const key = "fn_cli_SECRETSECRETSECRET";
+    const lines: string[] = [];
+    const client = createClientWith(
+      key,
+      base,
+      {
+        context: { units: { user: "u-1" } },
+        logger: (level, event, fields) => lines.push(`${level} ${event} ${JSON.stringify(fields)}`),
+      },
+      {
+        fetch: () => {
+          return Promise.reject(new TypeError(`Headers.append: "Bearer ${key}" is an invalid header value.`));
+        },
+      },
+    );
+    await vi.waitFor(() => { expect(lines.some((l) => l.includes("fetch_failed"))).toBe(true); });
+    client.alias({ fromUnitType: "device", fromUnitId: "d-1", toUnitType: "user", toUnitId: "u-1" });
+    await client.flush();
+    await vi.waitFor(() => { expect(lines.some((l) => l.includes("events_failed"))).toBe(true); });
+    await client.close();
     expect(lines.filter((l) => l.includes("SECRET"))).toStrictEqual([]);
   });
 });

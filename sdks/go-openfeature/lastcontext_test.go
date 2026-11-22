@@ -36,3 +36,20 @@ func TestLastContextsForgetFallsBack(t *testing.T) {
 		t.Errorf("recall after forget = %+v, want the fallback", got)
 	}
 }
+
+func TestLastContextsKeepAUnitEvaluatedAgain(t *testing.T) {
+	l := newLastContexts()
+	hot := map[string]string{"user": "hot"}
+	l.remember("flag", flagnetic.Context{Units: hot, Attributes: map[string]any{"v": 1}})
+	for i := 0; i < lastContextCapacity-1; i++ {
+		l.remember("flag", flagnetic.Context{Units: map[string]string{"user": strconv.Itoa(i)}})
+	}
+	l.remember("flag", flagnetic.Context{Units: hot, Attributes: map[string]any{"v": 2}})
+	l.remember("flag", flagnetic.Context{Units: map[string]string{"user": "new"}})
+	if got := l.recall("flag", flagnetic.Context{Units: hot}); got.Attributes["v"] != 2 {
+		t.Errorf("the unit evaluated again was pushed out: %+v", got)
+	}
+	if got := l.recall("flag", flagnetic.Context{Units: map[string]string{"user": "0"}}); got.Attributes != nil {
+		t.Errorf("the least recently evaluated unit was kept: %+v", got)
+	}
+}

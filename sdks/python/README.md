@@ -110,7 +110,6 @@ client = api.get_client()
 context = EvaluationContext("u-1001", {"plan": "pro", "units": {"account": "a-17"}})
 price = client.get_string_value("pricing", "Built-in price", context)
 client.track("exposure", context, TrackingEventDetails().add("flag", "pricing"))
-# reports the provider's most recent evaluation of the flag for the same units, with the context a before hook enriched
 client.track(
     "alias",
     tracking_event_details=TrackingEventDetails()
@@ -120,6 +119,9 @@ client.track(
     .add("toUnitId", "u-1001"),
 )
 ```
+
+`track("exposure")` records the exposure of the provider's most recent evaluation of that flag for the same units, with
+the context the evaluation had when a `before` hook added attributes to it, as the client's `exposure` does.
 
 The targeting key is the unit ID of `unit_type`; the `units` attribute adds further units by unit type; every other
 attribute is an attribute of the context. Reasons map as in every Flagnetic provider:
