@@ -41,14 +41,14 @@ From 1.0.0 the public API below changes only additively until 2.0: a name, a sig
 
 **The public API**
 
-- `Flagnetic::Client`: `new` with the options in the table above, except `timing:`; the getters `bool`, `string`, `number`, `int`, `int_detail`, `json` and `detail`; `stage`, `status`, `ready`, `on_change`, `on_stage`, `reload`, `exposure`, `alias`, `flush`, `close`, `after_fork`, `local_overrides` and, on an offline client, `recorder`.
+- `Flagnetic::Client`: `new` with the options in the table under [Client](#client), except `timing:`; the getters `bool`, `string`, `number`, `int`, `int_detail`, `json` and `detail`; `stage`, `status`, `ready`, `on_change`, `on_stage`, `reload`, `exposure`, `alias`, `flush`, `close`, `after_fork`, `local_overrides` and, on an offline client, `recorder`.
 - `Flagnetic::Detail` and `Flagnetic::Status` with their members; `Flagnetic::REASONS`, `STAGES`, `ERROR_CODES` and `EVENTS` (a release may add a member, never remove one); `Flagnetic::VERSION`.
 - `Flagnetic::LocalOverrides` (`set`, `remove`, `clear`, `list`) and `Flagnetic::Recorder` with the rows it returns.
 - The errors `Flagnetic::Error`, `NotConfigured`, `LocalOverridesNotAllowed`, `LocalOverrideRefused` and `OfflineError`.
 - `Flagnetic.client`, `client=`, `client_builder=` and `client?`.
-- The log events in the table above, with their levels and fields (a release may add a field or an event, never rename or drop one), and the `logger:` contract: a callable receiving `(level, event, fields)` or a standard `Logger`.
+- The log events in the table under [Events](#events), with their levels and fields (a release may add a field or an event, never rename or drop one), and the `logger:` contract: a callable receiving `(level, event, fields)` or a standard `Logger`.
 - `Flagnetic::Testing`: `offline`, `with_flags`, `with_ruleset`, `Helpers` and the offline client's `set` and `reload`.
-- The Rails integration: every `config.flagnetic` setting above, and the controller helpers `flagnetic_context` and `flagnetic_anonymous_id`.
+- The Rails integration: every `config.flagnetic` setting under [Rails](#rails), and the controller helpers `flagnetic_context` and `flagnetic_anonymous_id`.
 - `Flagnetic::Eval`, the evaluator: `Ruleset.decode` and the ruleset's `evaluate`, `evaluate_all`, `unsupported_rules`, `invalid_conditions` and `version`; `Context`, `Result`, `ExperimentDetail`, `Construct`, `DecodeError`, and `Eval::REASONS` and `ERROR_CODES`.
 
 **Everything else is internal and changes without notice**: every other constant and class under `Flagnetic` (the transport, worker, stream, exposure and summary machinery, the store and the log adapter), the evaluator's hash, date, version and regular expression machinery and the structs a decoded ruleset is made of, the `timing:` option (a seam for this gem's tests), the railtie's methods and any method the list above does not name. They are private constants where Ruby can say so; do not reach them with `const_get` or `send`.

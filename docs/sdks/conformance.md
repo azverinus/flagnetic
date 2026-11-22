@@ -42,7 +42,6 @@ The logger hook receives named events, and operators alert on those names, so ev
 | `exposures_off` | `send_exposures` is off, so no exposure or alias leaves the client. |
 | `evaluation_failed` | An internal failure was caught at the API boundary. |
 | `queue_dropped` | Events or summary rows were given up on; `cause` names why. A summary window older than one hour has the cause `window_too_old`. |
-| `deprecation_received` | A response carried a `Deprecation` header: logged once per operation and process, at warning level, with the operation, the instant it was deprecated and the `Sunset` when one is sent. The call is never failed for it. |
 | `stream_connected` | The ruleset stream is open. |
 | `stream_dropped` | The ruleset stream ended. |
 
