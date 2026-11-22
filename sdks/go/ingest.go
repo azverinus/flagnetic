@@ -114,6 +114,7 @@ type ingest struct {
 	identity   sdkIdentity
 	now        func() time.Time
 	keyRevoked func(status int)
+	deprecated func(h http.Header)
 }
 
 func newIngest(c *Client, now func() time.Time) *ingest {
@@ -125,6 +126,7 @@ func newIngest(c *Client, now func() time.Time) *ingest {
 		identity:   sdkIdentity{Name: sdkName, Version: Version, Platform: runtime.GOOS},
 		now:        now,
 		keyRevoked: c.keyRevoked,
+		deprecated: func(h http.Header) { c.noteDeprecation(operationEvents, h) },
 	}
 }
 
@@ -155,6 +157,7 @@ func (i *ingest) post(ctx context.Context, events []event) sendResult {
 		return sendResult{outcome: sendRetry, err: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
+	i.deprecated(resp.Header)
 
 	switch {
 	case resp.StatusCode == http.StatusAccepted:

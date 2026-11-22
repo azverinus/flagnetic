@@ -162,6 +162,7 @@ func (c *Client) streamOnce(ctx context.Context) (outcome streamOutcome, stable 
 		return streamErrored, false
 	}
 	defer func() { _ = resp.Body.Close() }()
+	c.noteDeprecation(operationStream, resp.Header)
 
 	switch resp.StatusCode {
 	case http.StatusOK:

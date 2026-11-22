@@ -205,7 +205,7 @@ func ceiling() flagnetic.Option {
 // and the summary's turn reporting back on, by passing the option after.
 func newOnline(t *testing.T, baseURL string, opts ...flagnetic.Option) *flagnetic.Client {
 	t.Helper()
-	opts = append([]flagnetic.Option{flagnetic.WithChangeStream(false), flagnetic.WithSummaries(false)}, opts...)
+	opts = append([]flagnetic.Option{flagnetic.WithStream(false), flagnetic.WithSummaries(false)}, opts...)
 	c, err := flagnetic.New(serverKey, baseURL, opts...)
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -259,7 +259,7 @@ func TestConstructionFailsOnlyForAClientKey(t *testing.T) {
 			var l logs
 			clk := newSleeper()
 			// Nothing listens there: the fetch fails, construction does not.
-			c, err := flagnetic.New(key, "http://127.0.0.1:1", flagnetic.WithChangeStream(false), clk.option(), flagnetic.WithLogger(l.logger()))
+			c, err := flagnetic.New(key, "http://127.0.0.1:1", flagnetic.WithStream(false), clk.option(), flagnetic.WithLogger(l.logger()))
 			if err != nil {
 				t.Fatalf("New: %v", err)
 			}
@@ -720,7 +720,7 @@ func TestStorePersistsAndSeedsLastGood(t *testing.T) {
 	var l logs
 	down := newMockServer(t, status(http.StatusInternalServerError))
 	clk2 := newSleeper()
-	c2, err := flagnetic.New(serverKey, down.URL, flagnetic.WithChangeStream(false), flagnetic.WithSummaries(false),
+	c2, err := flagnetic.New(serverKey, down.URL, flagnetic.WithStream(false), flagnetic.WithSummaries(false),
 		clk2.option(), flagnetic.WithStore(path), flagnetic.WithLogger(l.logger()))
 	if err != nil {
 		t.Fatal(err)
@@ -785,7 +785,7 @@ func TestStoreWrittenUnderAnotherKeyIsDiscarded(t *testing.T) {
 	var l logs
 	other := newMockServer(t, ruleset(3), ruleset(3))
 	clk2 := newSleeper()
-	c2, err := flagnetic.New(otherKey, other.URL, flagnetic.WithChangeStream(false), flagnetic.WithSummaries(false),
+	c2, err := flagnetic.New(otherKey, other.URL, flagnetic.WithStream(false), flagnetic.WithSummaries(false),
 		clk2.option(), flagnetic.WithStore(path), flagnetic.WithLogger(l.logger()))
 	if err != nil {
 		t.Fatal(err)
@@ -967,7 +967,7 @@ func TestSafetyPollWithoutTheRulesetStream(t *testing.T) {
 func TestCloseReturnsPromptly(t *testing.T) {
 	t.Run("during backoff", func(t *testing.T) {
 		srv := newMockServer(t, status(http.StatusInternalServerError))
-		c, err := flagnetic.New(serverKey, srv.URL, flagnetic.WithChangeStream(false), flagnetic.WithJitter(func(time.Duration) time.Duration { return time.Hour }))
+		c, err := flagnetic.New(serverKey, srv.URL, flagnetic.WithStream(false), flagnetic.WithJitter(func(time.Duration) time.Duration { return time.Hour }))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -984,7 +984,7 @@ func TestCloseReturnsPromptly(t *testing.T) {
 	})
 	t.Run("during a request", func(t *testing.T) {
 		srv := newMockServer(t, held(make(chan struct{}), ruleset(7)))
-		c, err := flagnetic.New(serverKey, srv.URL, flagnetic.WithChangeStream(false))
+		c, err := flagnetic.New(serverKey, srv.URL, flagnetic.WithStream(false))
 		if err != nil {
 			t.Fatal(err)
 		}

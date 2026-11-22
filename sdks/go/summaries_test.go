@@ -810,7 +810,7 @@ func TestCloseReturnsWithinItsFlushTimeoutWhileTheBatchHangs(t *testing.T) {
 	clk := newSleeper()
 	ticks := make(chan time.Time, 1)
 	c, err := flagnetic.New(serverKey, srv.URL,
-		flagnetic.WithChangeStream(false), clk.option(), flagnetic.WithSummaryTick(ticks))
+		flagnetic.WithStream(false), clk.option(), flagnetic.WithSummaryTick(ticks))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
