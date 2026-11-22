@@ -22,7 +22,7 @@ describe("construction with a key no header can carry", () => {
     } catch (e) {
       message = (e as Error).message;
     }
-    expect(message).toContain("no HTTP header allows");
+    expect(message).toContain("not a valid HTTP header value");
     expect(message).not.toContain(key);
   });
 
@@ -34,7 +34,7 @@ describe("construction with a key no header can carry", () => {
     } catch (e) {
       message = (e as Error).message;
     }
-    expect(message).toContain("no HTTP header allows");
+    expect(message).toContain("not a valid HTTP header value");
     expect(message).not.toContain(key);
   });
 });

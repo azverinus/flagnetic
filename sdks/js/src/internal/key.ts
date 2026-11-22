@@ -5,7 +5,7 @@
 
 /** Throws when `sdkKey` holds a character outside visible ASCII (0x21-0x7E); the message never quotes the key. */
 export function assertHeaderToken(sdkKey: string): void {
-  if (typeof sdkKey !== "string" || !/^[\x21-\x7e]*$/.test(sdkKey)) {
-    throw new Error("flagnetic: the SDK key holds a character no HTTP header allows");
+  if (!/^[\x21-\x7e]*$/.test(sdkKey)) {
+    throw new Error("flagnetic: the SDK key is not a valid HTTP header value");
   }
 }
