@@ -17,7 +17,13 @@ import 'package:test/test.dart';
 const _guide = '../../docs/sdks/conformance.md';
 
 /// The names the table replaced; none may be logged any more.
-const _replaced = ['sse_connected', 'sse_dropped', 'internal_error'];
+const _replaced = [
+  'sse_connected',
+  'sse_dropped',
+  'internal_error',
+  'deprecation_received',
+  'deprecated_operation',
+];
 
 /// The first-column names of the table under the "Log names" heading.
 List<String> _documentedNames() {
@@ -57,6 +63,7 @@ void main() {
       LogEvents.queueDropped,
       LogEvents.streamConnected,
       LogEvents.streamDropped,
+      LogEvents.operationDeprecated,
     });
   });
 

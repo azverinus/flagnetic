@@ -39,7 +39,7 @@
 // # Deprecations
 //
 // When the platform answers the ruleset fetch, the ruleset stream or the
-// events post with a Deprecation header, the client logs deprecation_received
+// events post with a Deprecation header, the client logs operation_deprecated
 // once for that operation, with the Sunset when the answer carries one, and
 // the call goes on as before: a deprecation is a notice, never a failure.
 //

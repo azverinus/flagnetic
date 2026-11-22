@@ -120,7 +120,7 @@ await client.ready(const Duration(seconds: 2)); // Stage.fresh, lastGood or buil
 client.getBool('new-checkout', false);
 ```
 
-A `Deprecation` header on any answer is logged once per operation, at warning level, as `deprecated_operation` with the operation (`evaluate`, `postEvents` or `streamRuleset`) and the `Sunset` when the answer has one; the call proceeds as before. See [Compatibility and support](../compatibility.md#deprecation-and-removal).
+A `Deprecation` header on any answer is logged once per operation, at warning level, as `operation_deprecated` with the operation (`evaluate`, `events` or `stream`) and the `Sunset` when the answer has one; the call proceeds as before. See [Compatibility and support](../compatibility.md#deprecation-and-removal).
 
 The [packages' READMEs](../../sdks/dart/README.md) cover every option, the log events, the offline test mode, local overrides and the anonymous ID; [`flagnetic_flutter`'s](../../sdks/flutter/README.md) the widgets, the store and the Dev Tools screen.
 

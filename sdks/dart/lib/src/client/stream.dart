@@ -289,7 +289,7 @@ final class RulesetStream {
       unawaited(stream.body.listen(null).cancel().catchError((Object _) {}));
       return;
     }
-    _deprecations.note('streamRuleset', stream.headers);
+    _deprecations.note('stream', stream.headers);
     if (stream.status != 200) {
       _running = false;
       // An error body may never end: cancelling releases the connection.

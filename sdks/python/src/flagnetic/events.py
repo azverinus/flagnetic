@@ -78,10 +78,10 @@ OVERRIDE_SET = "override_set"
 #: protected_environment), and environment for a protected one.
 OVERRIDE_REFUSED = "override_refused"
 #: warning: a response carried a Deprecation header, so the operation it answers is deprecated;
-#: logged once per operation, and the call is never failed. Fields: operation ("<METHOD> <path>"
-#: under /sdk/v1), deprecation (the header value, "@<unix seconds>"), and sunset (the Sunset
-#: header value, an HTTP date) when the response carried one.
-DEPRECATED_OPERATION = "deprecated_operation"
+#: logged once per operation, and the call is never failed. Fields: operation ("ruleset", "stream"
+#: or "events"), deprecation (the header as received), and sunset (the Sunset header as
+#: received) when the response carried one.
+OPERATION_DEPRECATED = "operation_deprecated"
 
 
 def standard_logger(level: int, event: str, fields: Mapping[str, Any]) -> None:

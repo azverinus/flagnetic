@@ -539,7 +539,7 @@ class Delivery:
                 return _FETCH_CLOSING
             send_request(conn, "GET", self._ruleset_path, headers)
             resp = conn.getresponse()
-            self._notes.observe("GET", self._ruleset_path, resp)
+            self._notes.observe("ruleset", resp)
             status = resp.status
             if status == 304:
                 if held:
@@ -639,7 +639,7 @@ class Delivery:
                 return
             send_request(conn, "GET", self._stream_path, headers)
             resp = conn.getresponse()
-            self._notes.observe("GET", self._stream_path, resp)
+            self._notes.observe("stream", resp)
         except TimeoutError as err:
             conn.close()
             self._first_attempt_done = True
