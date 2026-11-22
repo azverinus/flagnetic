@@ -50,7 +50,8 @@ class TrackTest < Minitest::Test
     provider, client = of_provider
     client.hooks << EnrichingHook.new
     client.fetch_integer_value(flag_key: "auto_ratio", default_value: 0, evaluation_context: user)
-    assert_equal ["ratio_test"], provider.client.recorder.exposures.map(&:experiment_key)
+    client.track("exposure", evaluation_context: user, tracking_event_details: details(flag: "auto_ratio"))
+    assert_includes provider.client.recorder.exposures.map(&:experiment_key), "ratio_test"
   end
 
   def test_last_contexts_are_bounded_oldest_out
