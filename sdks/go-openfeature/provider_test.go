@@ -561,3 +561,48 @@ func TestAKeyRefusedAtInitTurnsTheStatusToError(t *testing.T) {
 	client := onlineProvider(t, s)
 	becomes(t, client, of.ErrorState)
 }
+
+// enrichHook adds an attribute to every evaluation's context, as an
+// application's before hook that adds request attributes does.
+type enrichHook struct{ of.UnimplementedHook }
+
+func (enrichHook) Before(_ context.Context, _ of.HookContext, _ of.HookHints) (*of.EvaluationContext, error) {
+	ctx := of.NewTargetlessEvaluationContext(map[string]any{"country": "NL"})
+	return &ctx, nil
+}
+
+func TestExposureTrackReportsTheEvaluationABeforeHookEnriched(t *testing.T) {
+	provider, client := newProvider(t)
+	client.AddHooks(enrichHook{})
+	ctx := of.NewEvaluationContext("u-1", nil)
+	if _, err := client.StringValueDetails(context.Background(), "pricing", "def", ctx); err != nil {
+		t.Fatalf("StringValueDetails: %v", err)
+	}
+	client.Track(context.Background(), "exposure", ctx, of.NewTrackingEventDetails(0).Add("flag", "pricing"))
+
+	exposures := provider.Client().Recorder().Exposures()
+	if len(exposures) != 1 {
+		t.Fatalf("exposures recorded = %d, want 1", len(exposures))
+	}
+	if exposures[0].ExperimentKey != "pricing_test" || exposures[0].UnitID != "u-1" {
+		t.Errorf("exposure = %+v", exposures[0])
+	}
+}
+
+func TestExposureTrackReportsTheUnitItNames(t *testing.T) {
+	provider, client := newProvider(t)
+	client.AddHooks(enrichHook{})
+	first := of.NewEvaluationContext("u-1", nil)
+	second := of.NewEvaluationContext("u-2", nil)
+	for _, ctx := range []of.EvaluationContext{first, second} {
+		if _, err := client.StringValueDetails(context.Background(), "pricing", "def", ctx); err != nil {
+			t.Fatalf("StringValueDetails: %v", err)
+		}
+	}
+	client.Track(context.Background(), "exposure", first, of.NewTrackingEventDetails(0).Add("flag", "pricing"))
+
+	exposures := provider.Client().Recorder().Exposures()
+	if len(exposures) != 1 || exposures[0].UnitID != "u-1" {
+		t.Fatalf("exposures = %+v, want exactly one for u-1", exposures)
+	}
+}

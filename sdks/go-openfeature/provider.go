@@ -57,6 +57,8 @@ type Provider struct {
 	revoked     bool
 	reported    int
 
+	last *lastContexts
+
 	unsubChange func()
 	unsubStage  func()
 }
@@ -83,6 +85,7 @@ func New(sdkKey, baseURL string, opts ...Option) (*Provider, error) {
 		unitType:     cfg.unitType,
 		readyTimeout: cfg.readyTimeout,
 		events:       make(chan of.Event, eventBuffer),
+		last:         newLastContexts(),
 	}
 	clientOpts := make([]flagnetic.Option, 0, len(cfg.clientOptions)+1)
 	clientOpts = append(clientOpts, flagnetic.WithLogger(p.observe))
@@ -108,23 +111,37 @@ func (p *Provider) Metadata() of.Metadata {
 	return of.Metadata{Name: providerName}
 }
 
+// detail evaluates through the wrapped client and remembers the context of
+// an evaluation that carried an experiment block, which Track's exposure
+// reports.
+func (p *Provider) detail(ctx context.Context, flatCtx of.FlattenedContext, flag string, defaultValue any) flagnetic.Detail {
+	fc := p.context(flatCtx)
+	d := p.client.Detail(ctx, fc, flag, defaultValue)
+	if d.Experiment != nil {
+		p.last.remember(flag, fc)
+	} else {
+		p.last.forget(flag, fc.Units)
+	}
+	return d
+}
+
 // BooleanEvaluation serves a boolean flag through the wrapped client.
 func (p *Provider) BooleanEvaluation(ctx context.Context, flag string, defaultValue bool, flatCtx of.FlattenedContext) of.BoolResolutionDetail {
-	d := p.client.Detail(ctx, p.context(flatCtx), flag, defaultValue)
+	d := p.detail(ctx, flatCtx, flag, defaultValue)
 	value, _ := d.Value.(bool)
 	return of.BoolResolutionDetail{Value: value, ProviderResolutionDetail: resolution(d)}
 }
 
 // StringEvaluation serves a string flag through the wrapped client.
 func (p *Provider) StringEvaluation(ctx context.Context, flag string, defaultValue string, flatCtx of.FlattenedContext) of.StringResolutionDetail {
-	d := p.client.Detail(ctx, p.context(flatCtx), flag, defaultValue)
+	d := p.detail(ctx, flatCtx, flag, defaultValue)
 	value, _ := d.Value.(string)
 	return of.StringResolutionDetail{Value: value, ProviderResolutionDetail: resolution(d)}
 }
 
 // FloatEvaluation serves a number flag through the wrapped client.
 func (p *Provider) FloatEvaluation(ctx context.Context, flag string, defaultValue float64, flatCtx of.FlattenedContext) of.FloatResolutionDetail {
-	d := p.client.Detail(ctx, p.context(flatCtx), flag, defaultValue)
+	d := p.detail(ctx, flatCtx, flag, defaultValue)
 	value, _ := d.Value.(float64)
 	return of.FloatResolutionDetail{Value: value, ProviderResolutionDetail: resolution(d)}
 }
@@ -134,7 +151,7 @@ func (p *Provider) FloatEvaluation(ctx context.Context, flag string, defaultValu
 // so a number that is not whole or does not fit in an int64 serves the
 // default with TYPE_MISMATCH rather than a truncated value.
 func (p *Provider) IntEvaluation(ctx context.Context, flag string, defaultValue int64, flatCtx of.FlattenedContext) of.IntResolutionDetail {
-	d := p.client.Detail(ctx, p.context(flatCtx), flag, defaultValue)
+	d := p.detail(ctx, flatCtx, flag, defaultValue)
 	value, _ := d.Value.(int64)
 	return of.IntResolutionDetail{Value: value, ProviderResolutionDetail: resolution(d)}
 }
@@ -154,7 +171,7 @@ func (p *Provider) ObjectEvaluation(ctx context.Context, flag string, defaultVal
 			},
 		}
 	}
-	d := p.client.Detail(ctx, p.context(flatCtx), flag, json.RawMessage(raw))
+	d := p.detail(ctx, flatCtx, flag, json.RawMessage(raw))
 	if d.Reason == flagnetic.ReasonFallback {
 		return of.InterfaceResolutionDetail{Value: defaultValue, ProviderResolutionDetail: resolution(d)}
 	}
@@ -177,9 +194,12 @@ func (p *Provider) Hooks() []of.Hook {
 	return nil
 }
 
-// Track maps "exposure" to Exposure(flag) and "alias" to Alias(...), the
-// names every Flagnetic provider accepts. An event naming neither, or
-// missing the attributes its mapping needs, does nothing.
+// Track maps "exposure" to Exposure(flag), with the context the provider
+// last evaluated the flag with for the same units (the OpenFeature SDK runs
+// no before hook for Track, so Track's own context may lack what one added),
+// and "alias" to Alias(...), the names every Flagnetic provider accepts. An
+// event naming neither, or missing the attributes its mapping needs, does
+// nothing.
 func (p *Provider) Track(ctx context.Context, trackingEventName string, evalCtx of.EvaluationContext, details of.TrackingEventDetails) {
 	switch trackingEventName {
 	case trackExposure:
@@ -187,7 +207,8 @@ func (p *Provider) Track(ctx context.Context, trackingEventName string, evalCtx 
 		if !ok || flag == "" {
 			return
 		}
-		p.client.Exposure(ctx, p.context(flatten(evalCtx)), flag)
+		fc := p.last.recall(flag, p.context(flatten(evalCtx)))
+		p.client.Exposure(ctx, fc, flag)
 	case trackAlias:
 		fromUnitType, _ := details.Attribute("fromUnitType").(string)
 		fromUnitID, _ := details.Attribute("fromUnitId").(string)

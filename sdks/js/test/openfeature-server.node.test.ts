@@ -134,6 +134,31 @@ describe("track", () => {
     expect(p.events()).toMatchObject([{ type: "exposure", flag_key: "auto_off", experiment_key: "checkout_v2", variation_key: "control", unit_type: "anonymous", unit_id: "u_10482" }]);
   });
 
+  test("exposure reports the evaluation a before hook enriched", async () => {
+    const p = await platform(experiments.ruleset);
+    const { provider, client } = await register(key, p.baseUrl, { sendSummaries: false });
+    client.addHooks({ before: () => ({ country: "NL" }) });
+    const context = { targetingKey: "u-1", units: { anonymous: "u_10482" } };
+    await client.getStringValue("auto_off", "", context);
+    client.track("exposure", context, { flag: "auto_off" });
+    await provider.client.flush();
+    expect(p.events()).toMatchObject([{ type: "exposure", flag_key: "auto_off", experiment_key: "checkout_v2", variation_key: "control", unit_id: "u_10482" }]);
+  });
+
+  test("exposure reports the unit the tracked context names", async () => {
+    const p = await platform(experiments.ruleset);
+    const { provider, client } = await register(key, p.baseUrl, { sendSummaries: false });
+    client.addHooks({ before: () => ({ country: "NL" }) });
+    const first = { units: { anonymous: "u_10482" } };
+    const second = { units: { anonymous: "u_77" } };
+    await client.getStringValue("auto_off", "", first);
+    await client.getStringValue("auto_off", "", second);
+    client.track("exposure", first, { flag: "auto_off" });
+    await provider.client.flush();
+    expect(p.events()).toMatchObject([{ type: "exposure", unit_id: "u_10482" }]);
+    expect(p.events()).toHaveLength(1);
+  });
+
   test("alias records the alias its four unit attributes name", async () => {
     const p = await platform(experiments.ruleset);
     const { provider, client } = await register(key, p.baseUrl, { sendSummaries: false });

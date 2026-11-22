@@ -110,6 +110,7 @@ client = api.get_client()
 context = EvaluationContext("u-1001", {"plan": "pro", "units": {"account": "a-17"}})
 price = client.get_string_value("pricing", "Built-in price", context)
 client.track("exposure", context, TrackingEventDetails().add("flag", "pricing"))
+# reports the provider's most recent evaluation of the flag for the same units, with the context a before hook enriched
 client.track(
     "alias",
     tracking_event_details=TrackingEventDetails()

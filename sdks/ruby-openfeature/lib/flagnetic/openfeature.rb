@@ -5,6 +5,7 @@ require "open_feature/sdk"
 
 require_relative "openfeature/version"
 require_relative "openfeature/mapping"
+require_relative "openfeature/last_contexts"
 require_relative "openfeature/provider"
 
 module Flagnetic
