@@ -36,7 +36,7 @@ const (
 // After the last one the safety poll takes over.
 var catchUpDelays = []time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second}
 
-// Causes of an stream_dropped event.
+// Causes of a stream_dropped event.
 const (
 	causeServerClosed = "server_closed"
 	// causeClosedEarly is a stream the server closed before its first
