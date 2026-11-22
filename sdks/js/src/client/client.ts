@@ -18,6 +18,7 @@ import { defaultBeacon, defaultPage, type Page } from "./page.js";
 import { Recorder } from "./recorder.js";
 import { serveDetail, type ServeBase } from "./serve.js";
 import { defaultStore, SafeStore, sameUnits, StoreKeys } from "./storage.js";
+import { reportingDeprecations } from "../internal/deprecation.js";
 import { RulesetStream, defaultStreamTiming, type StreamTiming } from "./stream.js";
 import {
   copyJson,
@@ -227,7 +228,9 @@ export class FlagneticClient {
     this.clock = internals.clock ?? realClock;
     this.now = internals.now ?? (() => Date.now());
     this.random = internals.random ?? Math.random;
-    this.doFetch = internals.fetch ?? ((input, init) => fetch(input, init));
+    this.doFetch = reportingDeprecations(internals.fetch ?? ((input, init) => fetch(input, init)), (fields) => {
+      this.log("warn", "operation_deprecated", { ...fields });
+    });
     this.page = internals.page ?? defaultPage();
     this.traceEvent = internals.trace;
     this.baseUrl = trimTrailingSlashes(baseUrl);

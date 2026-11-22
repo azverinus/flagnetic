@@ -89,6 +89,8 @@ export const LOG_EVENTS = [
   "type_mismatch",
   "evaluation_failed",
   "listener_failed",
+  /** An operation of the SDK API answered with a `Deprecation` header, once per operation. Fields: operation, deprecation, sunset (when set). */
+  "operation_deprecated",
 ] as const;
 
 /** One of {@link LOG_EVENTS}. */
