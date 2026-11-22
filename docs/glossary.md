@@ -567,7 +567,3 @@ _Avoid_: signature (no separate one is made), checksum, provenance file, SBOM (p
 **Performance target**:
 A published p99 latency of one SDK API scenario (remote evaluation, ruleset fetch, events ingest, a change reaching stream subscribers) at a stated arrival rate on stated hardware. CI fails above a ceiling set well over the target, so a runner's noise does not fail it but a regression of a multiple does.
 _Avoid_: SLA, SLO, benchmark (one run, not the promise), budget
-
-**Mirror repository**:
-The public, read-only repository `azverinus/flagnetic-swift` that the Swift package is published through. A release job copies the history of `sdks/swift` into it and tags it with the plain version Swift Package Manager needs; nothing is committed to it by hand and it takes no pull requests.
-_Avoid_: fork, Swift repository (development stays in the monorepo), subtree
