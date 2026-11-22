@@ -30,7 +30,7 @@ c, err := flagnetic.New(os.Getenv("FLAGNETIC_SDK_KEY"), "https://flags.example.c
 if err != nil {
 	return err // a client SDK key: this SDK needs a server key
 }
-defer c.Close(context.Background())
+defer func() { _ = c.Close(context.Background()) }()
 
 readyCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 defer cancel()

@@ -48,7 +48,7 @@ func connectQuickstart(ctx context.Context) error {
 	if err != nil {
 		return err // a client SDK key: this SDK needs a server key
 	}
-	defer c.Close(context.Background())
+	defer func() { _ = c.Close(context.Background()) }()
 
 	readyCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -68,6 +68,9 @@ func shutdownQuickstart(c *flagnetic.Client) {
 	}
 	// docs:end shutdown
 }
+
+// The two functions above are compiled and never called.
+var _, _ = connectQuickstart, shutdownQuickstart
 
 // evaluateQuickstart is run by ExampleClient_quickstart against the
 // ruleset above.
