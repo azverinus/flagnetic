@@ -8,7 +8,7 @@
 // backoff after an error, a new connection after 45 seconds without a frame.
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
-import { causeOf, type LogLevel } from "../internal/logger.js";
+import { requestCauseOf, type LogLevel } from "../internal/logger.js";
 import { SseOverflow, SseParser } from "../internal/sse.js";
 import type { LogEvent } from "./types.js";
 
@@ -146,7 +146,7 @@ export class RulesetStream {
       cause = stable ? "closed by the server" : "closed by the server before its first heartbeat";
     } catch (e) {
       const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
-      cause = causeOf(reason);
+      cause = requestCauseOf(reason);
       // The peer's bytes failed the stream: stop reading them.
       if (e instanceof SseOverflow) this.end(e, abort);
     }

@@ -72,7 +72,7 @@ client.track("alias", tracking_event_details: OpenFeature::SDK::TrackingEventDet
 ))
 ```
 
-`exposure` records the exposure of the most recent evaluation of that flag for that context, as the client's `exposure` does, and `alias` links two unit IDs, as `alias` does. Any other event name, or one missing an attribute, does nothing. An evaluation alone never records an exposure, unless the flag asks for automatic exposure.
+`exposure` records the exposure of the provider's most recent evaluation of that flag for the same units, with the context the evaluation had when a `before` hook added attributes to it, as the client's `exposure` does, and `alias` links two unit IDs, as `alias` does. Any other event name, or one missing an attribute, does nothing. An evaluation alone never records an exposure, unless the flag asks for automatic exposure.
 
 ## Development
 

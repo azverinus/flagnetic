@@ -5,7 +5,7 @@ import { decodeRuleset, type Ruleset } from "../evaluator/evaluate.js";
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
 import { readBoundedText, retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
-import { causeOf } from "./logger.js";
+import { causeOf, requestCauseOf } from "./logger.js";
 import { SseOverflow, SseParser } from "../internal/sse.js";
 import type { LogEvent, LogLevel } from "./types.js";
 import { SCHEMA_VERSION_MAX, SCHEMA_VERSION_MIN, SDK_API_PATH, SUPPORTED_SCHEMA_VERSIONS, VERSION } from "../version.js";
@@ -357,7 +357,7 @@ export class Delivery {
       } catch (e) {
         if (e instanceof AttemptFailed) throw e;
         const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
-        throw new AttemptFailed(reason instanceof AttemptFailed ? reason.message : `network error: ${causeOf(e)}`);
+        throw new AttemptFailed(reason instanceof AttemptFailed ? reason.message : `network error: ${requestCauseOf(e)}`);
       }
       return { kind: "accepted", rs: this.parse(text, held), text };
     } catch (e) {
@@ -479,7 +479,7 @@ export class Delivery {
       cause = stable ? "closed by the server" : "closed by the server before its first heartbeat";
     } catch (e) {
       const reason: unknown = abort.signal.aborted ? abort.signal.reason : e;
-      cause = reason instanceof AttemptFailed ? reason.message : causeOf(e);
+      cause = reason instanceof AttemptFailed ? reason.message : requestCauseOf(e);
       // The peer's bytes failed the stream: stop reading them.
       if (e instanceof SseOverflow) this.endStream(e, abort);
     }

@@ -7,6 +7,7 @@ import { createServer, type FlagneticServer } from "../server/client.js";
 import { consoleLogger } from "../server/logger.js";
 import type { ServerOptions } from "../server/types.js";
 import { toFlagneticContext } from "./context.js";
+import { LastContexts } from "./last-context.js";
 import { ProviderEventEmitter, ProviderState } from "./events.js";
 import { resolution } from "./mapping.js";
 import { trackedAlias, trackedFlag } from "./tracking.js";
@@ -30,8 +31,9 @@ export interface FlagneticServerProviderOptions extends ServerOptions {
  *
  * Reasons map as every Flagnetic provider maps them (`reasonOf`), the
  * Flagnetic reason itself in the flag metadata under `REASON_METADATA_KEY`.
- * `track("exposure", context, { flag })` reports an exposure for the
- * context; `track("alias", context, { fromUnitType, fromUnitId, toUnitType,
+ * `track("exposure", context, { flag })` reports an exposure of the
+ * provider's most recent evaluation of the flag for the same units, with the
+ * context that evaluation had when a `before` hook added attributes to it; `track("alias", context, { fromUnitType, fromUnitId, toUnitType,
  * toUnitId })` records an alias.
  */
 export class FlagneticServerProvider implements Provider {
@@ -43,6 +45,7 @@ export class FlagneticServerProvider implements Provider {
   private readonly unitType: string;
   private readonly readyTimeout: number;
   private readonly state: ProviderState;
+  private readonly last = new LastContexts();
 
   constructor(sdkKey: string, baseUrl: string, options: FlagneticServerProviderOptions = {}) {
     const { unitType = "user", readyTimeout = 10_000, logger = consoleLogger("warn"), ...serverOptions } = options;
@@ -101,7 +104,7 @@ export class FlagneticServerProvider implements Provider {
   track(trackingEventName: string, context: EvaluationContext, trackingEventDetails: TrackingEventDetails): void {
     if (trackingEventName === "exposure") {
       const flag = trackedFlag(trackingEventDetails);
-      if (flag !== undefined) this.client.exposure(toFlagneticContext(context, this.unitType), flag);
+      if (flag !== undefined) this.client.exposure(this.last.recall(flag, toFlagneticContext(context, this.unitType)), flag);
     } else if (trackingEventName === "alias") {
       const link = trackedAlias(trackingEventDetails);
       if (link !== undefined) this.client.alias(link);
@@ -111,7 +114,10 @@ export class FlagneticServerProvider implements Provider {
   // Evaluation is local and synchronous; OpenFeature's server interface
   // asks for a promise all the same.
   private resolve<T>(flagKey: string, defaultValue: T, context: EvaluationContext): ResolutionDetails<T> {
-    const detail = this.client.getDetail(toFlagneticContext(context, this.unitType), flagKey, defaultValue as FlagneticJson);
+    const flagneticContext = toFlagneticContext(context, this.unitType);
+    const detail = this.client.getDetail(flagneticContext, flagKey, defaultValue as FlagneticJson);
+    if (detail.experiment) this.last.remember(flagKey, flagneticContext);
+    else this.last.forget(flagKey, flagneticContext);
     // The mapping's reasons and error codes are OpenFeature's own strings,
     // which its types declare as enums.
     return resolution({ ...detail, value: detail.value as T }) as unknown as ResolutionDetails<T>;

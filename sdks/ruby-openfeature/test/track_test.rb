@@ -20,6 +20,43 @@ class TrackTest < Minitest::Test
                   exposures.first.unit_id]
   end
 
+  # EnrichingHook adds an attribute to every evaluation's context, as a
+  # before hook that adds request attributes does.
+  class EnrichingHook
+    def before(**)
+      OF::EvaluationContext.new(country: "NL")
+    end
+  end
+
+  def test_exposure_reports_the_evaluation_a_before_hook_enriched
+    provider, client = of_provider
+    client.hooks << EnrichingHook.new
+    client.fetch_string_value(flag_key: "pricing", default_value: "x", evaluation_context: user)
+    client.track("exposure", evaluation_context: user, tracking_event_details: details(flag: "pricing"))
+    exposures = provider.client.recorder.exposures
+    assert_equal([%w[pricing_test u-1]], exposures.map { |e| [e.experiment_key, e.unit_id] })
+  end
+
+  def test_exposure_reports_the_unit_the_tracked_context_names
+    provider, client = of_provider
+    client.hooks << EnrichingHook.new
+    client.fetch_string_value(flag_key: "pricing", default_value: "x", evaluation_context: user)
+    client.fetch_string_value(flag_key: "pricing", default_value: "x", evaluation_context: user("u-2"))
+    client.track("exposure", evaluation_context: user, tracking_event_details: details(flag: "pricing"))
+    assert_equal ["u-1"], provider.client.recorder.exposures.map(&:unit_id)
+  end
+
+  def test_last_contexts_are_bounded_oldest_out
+    last = Flagnetic::OpenFeature.const_get(:LastContexts).new(capacity: 2)
+    %w[a b c].each { |id| last.remember("flag", { units: { "user" => id }, attributes: { "remembered" => true } }) }
+    assert_equal 2, last.size
+    fallback = { units: { "user" => "a" }, attributes: {} }
+    assert_same fallback, last.recall("flag", fallback)
+    assert_equal({ "remembered" => true }, last.recall("flag", { units: { "user" => "c" } })[:attributes])
+    last.forget("flag", { units: { "user" => "c" } })
+    assert_equal 1, last.size
+  end
+
   def test_exposure_of_a_flag_without_an_experiment_records_nothing
     provider, client = of_provider
     client.fetch_boolean_value(flag_key: "checkout", default_value: false, evaluation_context: user(country: "DE"))

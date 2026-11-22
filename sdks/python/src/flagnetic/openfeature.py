@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -126,6 +127,48 @@ def _resolution(detail: Detail) -> FlagResolutionDetails[Any]:
     )
 
 
+# The most flag and units pairs whose evaluation context the provider remembers; the oldest goes out first.
+_LAST_CONTEXT_CAPACITY = 10_000
+
+
+class _LastContexts:
+    """The context the provider last evaluated an experiment flag with, per flag and units.
+
+    OpenFeature runs no hooks for ``track``, so the context ``track`` receives lacks what a ``before``
+    hook added to the evaluation, and the client would find no served detail under it: the remembered
+    context is the one the detail is filed under.
+    """
+
+    def __init__(self, capacity: int = _LAST_CONTEXT_CAPACITY) -> None:
+        self._capacity = capacity
+        self._lock = threading.Lock()
+        self._by_key: OrderedDict[tuple[str, tuple[tuple[str, str], ...]], Context] = OrderedDict()
+
+    @staticmethod
+    def _key(flag: str, context: Context) -> tuple[str, tuple[tuple[str, str], ...]]:
+        return (flag, tuple(sorted(context.units.items())))
+
+    def remember(self, flag: str, context: Context) -> None:
+        key = self._key(flag, context)
+        with self._lock:
+            self._by_key.pop(key, None)
+            self._by_key[key] = context
+            while len(self._by_key) > self._capacity:
+                self._by_key.popitem(last=False)
+
+    def forget(self, flag: str, context: Context) -> None:
+        with self._lock:
+            self._by_key.pop(self._key(flag, context), None)
+
+    def recall(self, flag: str, fallback: Context) -> Context:
+        with self._lock:
+            return self._by_key.get(self._key(flag, fallback), fallback)
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._by_key)
+
+
 class Provider(AbstractProvider):
     """An OpenFeature provider serving the values of a ``flagnetic.Client`` it builds and owns.
 
@@ -144,13 +187,14 @@ class Provider(AbstractProvider):
     is fresh again; ERROR when the SDK key is revoked. A ``logger`` option
     keeps receiving every log event.
 
-    ``track("exposure", context, details)`` reports the exposure of the flag
-    named by the ``flag`` attribute for that context, as ``Client.exposure``
-    does; ``track("alias", context, details)`` records the alias named by the
-    ``fromUnitType``, ``fromUnitId``, ``toUnitType`` and ``toUnitId``
-    attributes. An event naming neither, or missing what its mapping needs,
-    does nothing. ``client`` is the wrapped client, for what OpenFeature
-    cannot reach.
+    ``track("exposure", context, details)`` reports the exposure of the provider's
+    most recent evaluation of the flag named by the ``flag`` attribute for the
+    same units, with the context that evaluation had when a ``before`` hook added
+    attributes to it, as ``Client.exposure`` does; ``track("alias", context,
+    details)`` records the alias named by the ``fromUnitType``,
+    ``fromUnitId``, ``toUnitType`` and ``toUnitId`` attributes. An event
+    naming neither, or missing what its mapping needs, does nothing. ``client``
+    is the wrapped client, for what OpenFeature cannot reach.
     """
 
     def __init__(
@@ -166,6 +210,7 @@ class Provider(AbstractProvider):
         self._unit_type = unit_type or "user"
         self._ready_timeout = ready_timeout
         self._closed = threading.Event()
+        self._last = _LastContexts()
         # Set by a revoked SDK key until the client is fresh again.
         self._revoked = False
         logger: Logger | None = options.pop("logger", None)
@@ -230,7 +275,13 @@ class Provider(AbstractProvider):
         return _resolution(self._detail(flag_key, default_value, evaluation_context))
 
     def _detail(self, flag_key: str, default: Any, evaluation_context: EvaluationContext | None) -> Detail:
-        return self._client.get_detail(self._context(evaluation_context), flag_key, default)
+        context = self._context(evaluation_context)
+        detail = self._client.get_detail(context, flag_key, default)
+        if detail.experiment is not None:
+            self._last.remember(flag_key, context)
+        else:
+            self._last.forget(flag_key, context)
+        return detail
 
     def _context(self, evaluation_context: EvaluationContext | None) -> Context:
         """The flag context of an OpenFeature evaluation context."""
@@ -264,7 +315,7 @@ class Provider(AbstractProvider):
         if tracking_event_name == _TRACK_EXPOSURE:
             flag = attributes.get("flag")
             if isinstance(flag, str) and flag:
-                self._client.exposure(self._context(evaluation_context), flag)
+                self._client.exposure(self._last.recall(flag, self._context(evaluation_context)), flag)
         elif tracking_event_name == _TRACK_ALIAS:
             units = [attributes.get(name) for name in _ALIAS_ATTRIBUTES]
             if all(isinstance(unit, str) and unit for unit in units):

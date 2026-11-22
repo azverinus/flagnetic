@@ -120,6 +120,9 @@ client.track(
 )
 ```
 
+`track("exposure")` records the exposure of the provider's most recent evaluation of that flag for the same units, with
+the context the evaluation had when a `before` hook added attributes to it, as the client's `exposure` does.
+
 The targeting key is the unit ID of `unit_type`; the `units` attribute adds further units by unit type; every other
 attribute is an attribute of the context. Reasons map as in every Flagnetic provider:
 

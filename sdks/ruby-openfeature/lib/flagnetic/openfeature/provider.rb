@@ -72,6 +72,7 @@ module Flagnetic
         @initialized = false
         @closed = false
         @revoked = false
+        @last = LastContexts.new
         @client = Flagnetic::Client.new(sdk_key, base_url: base_url, logger: method(:observe), **client_options)
         @unsubscribe = [@client.on_change { |keys| changed(keys) }, @client.on_stage { |stage| staged(stage) }]
       end
@@ -133,8 +134,10 @@ module Flagnetic
         Mapping.resolution(detail(flag_key, default_value, evaluation_context))
       end
 
-      # track reports the exposure of the flag named by the flag attribute
-      # for evaluation_context, as Flagnetic::Client#exposure does, for the
+      # track reports the exposure of the provider's most recent evaluation
+      # of the flag named by the flag attribute for the same units, with the
+      # context that evaluation had when a before hook added attributes to
+      # it (track runs no hook), as Flagnetic::Client#exposure does, for the
       # event "exposure"; for "alias" it records the alias named by the
       # fromUnitType, fromUnitId, toUnitType and toUnitId attributes. An
       # event naming neither, or missing what its mapping needs, does
@@ -144,7 +147,7 @@ module Flagnetic
         case tracking_event_name
         when TRACK_EXPOSURE
           flag = fields["flag"]
-          @client.exposure(flag, context: context(evaluation_context)) if present?(flag)
+          @client.exposure(flag, context: @last.recall(flag, context(evaluation_context))) if present?(flag)
         when TRACK_ALIAS
           units = fields.values_at(*ALIAS_ATTRIBUTES)
           @client.alias(*units) if units.all? { |unit| present?(unit) }
@@ -155,7 +158,19 @@ module Flagnetic
       private
 
       def detail(flag_key, default_value, evaluation_context)
-        @client.detail(flag_key, default: default_value, context: context(evaluation_context))
+        ctx = context(evaluation_context)
+        remember(flag_key, ctx, @client.detail(flag_key, default: default_value, context: ctx))
+      end
+
+      # remember files the context of an evaluation that carried an
+      # experiment block, for track's exposure, and returns served.
+      def remember(flag_key, ctx, served)
+        if served.experiment
+          @last.remember(flag_key, ctx)
+        else
+          @last.forget(flag_key, ctx)
+        end
+        served
       end
 
       # integer_detail narrows before the client counts and exposes the
@@ -163,9 +178,11 @@ module Flagnetic
       # int_detail narrows after, as the provider always did.
       def integer_detail(flag_key, default_value, evaluation_context)
         ctx = context(evaluation_context)
-        return @client.int_detail(flag_key, default: default_value, context: ctx) if @client.respond_to?(:int_detail)
+        if @client.respond_to?(:int_detail)
+          return remember(flag_key, ctx, @client.int_detail(flag_key, default: default_value, context: ctx))
+        end
 
-        integral(@client.detail(flag_key, default: default_value, context: ctx), default_value)
+        integral(remember(flag_key, ctx, @client.detail(flag_key, default: default_value, context: ctx)), default_value)
       end
 
       # integral narrows a served number to an Integer; one that is not

@@ -7,7 +7,7 @@
 import type { Clock } from "../internal/clock.js";
 import { MAX_ANSWER_BYTES, packBatches, rejectionsOf, type QueuedEvent, type Rejection } from "../internal/events.js";
 import { readBoundedText, retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
-import { causeOf } from "./logger.js";
+import { requestCauseOf } from "./logger.js";
 import { SCHEMA_VERSION_MAX, SDK_API_PATH, VERSION } from "../version.js";
 
 /** This SDK's name in the envelope and in the SDK inventory. */
@@ -101,7 +101,7 @@ export class Ingest {
       });
     } catch (e) {
       this.config.clock.clearTimeout(timer);
-      return { outcome: "retry", cause: `network error: ${causeOf(e)}` };
+      return { outcome: "retry", cause: `network error: ${requestCauseOf(e)}` };
     }
 
     // The request timeout covers the answer's body too: a 202 whose body

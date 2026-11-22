@@ -8,7 +8,8 @@ import { Backoff } from "../internal/backoff.js";
 import { realClock, type Clock } from "../internal/clock.js";
 import { readBoundedText, trimTrailingSlashes } from "../internal/http.js";
 import { MAX_VALUE_DEPTH } from "../internal/json.js";
-import { causeOf, consoleLogger, safeLog, type LogLevel } from "../internal/logger.js";
+import { assertHeaderToken } from "../internal/key.js";
+import { causeOf, consoleLogger, requestCauseOf, safeLog, type LogLevel } from "../internal/logger.js";
 import { SDK_API_PATH, VERSION } from "../version.js";
 import { aliasEvent, exposureEvent, ExposureSuppressor, type AliasLink } from "../internal/events.js";
 import { Ingest, SummaryCounter, type QueuedEvent } from "./ingest.js";
@@ -262,6 +263,7 @@ export class FlagneticClient {
       return;
     }
 
+    assertHeaderToken(sdkKey);
     this.ingest = new Ingest(
       {
         baseUrl: this.baseUrl,
@@ -923,7 +925,7 @@ export class FlagneticClient {
         // A closed client records no failure: it no longer fetches.
         if (this.closed) return false;
         const reason: unknown = controller.signal.aborted ? (controller.signal.reason as unknown) : e;
-        this.failed({ source: "network", cause: "network", trigger, detail: causeOf(reason) });
+        this.failed({ source: "network", cause: "network", trigger, detail: requestCauseOf(reason) });
         return false;
       }
       if (res.status !== 200) {
@@ -943,7 +945,7 @@ export class FlagneticClient {
       } catch (e) {
         if (this.closed) return false;
         const reason: unknown = controller.signal.aborted ? (controller.signal.reason as unknown) : e;
-        this.failed({ source: "network", cause: "network", trigger, detail: causeOf(reason) });
+        this.failed({ source: "network", cause: "network", trigger, detail: requestCauseOf(reason) });
         return false;
       }
     } finally {

@@ -20,11 +20,13 @@ from openfeature.evaluation_context import EvaluationContext
 from openfeature.event import EventDetails, ProviderEvent
 from openfeature.exception import ErrorCode
 from openfeature.flag_evaluation import Reason
+from openfeature.hook import Hook
 from openfeature.provider import ProviderStatus
 from openfeature.track import TrackingEventDetails
 
 import flagnetic
-from flagnetic.openfeature import REASON_METADATA_KEY, Provider, reason_of
+from flagnetic._eval import Context
+from flagnetic.openfeature import REASON_METADATA_KEY, Provider, _LastContexts, reason_of
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, Logs
 
@@ -359,6 +361,45 @@ def test_exposure_through_track(offline: Any) -> None:
         "treatment",
         "u-1",
     )
+
+
+class _EnrichingHook(Hook):
+    """Adds an attribute to every evaluation's context, as a before hook that adds request attributes does."""
+
+    def before(self, hook_context: Any, hints: Any) -> EvaluationContext | None:
+        return EvaluationContext(attributes={"country": "NL"})
+
+
+def test_exposure_reports_the_evaluation_a_before_hook_enriched(offline: Any) -> None:
+    provider, client = offline()
+    client.add_hooks([_EnrichingHook()])
+    client.get_string_value("pricing", "def", USER)
+    client.track("exposure", USER, TrackingEventDetails().add("flag", "pricing"))
+    (exposure,) = provider.client.recorder.exposures()
+    assert (exposure.experiment_key, exposure.unit_id) == ("pricing_test", "u-1")
+
+
+def test_exposure_reports_the_unit_the_tracked_context_names(offline: Any) -> None:
+    provider, client = offline()
+    client.add_hooks([_EnrichingHook()])
+    other = EvaluationContext("u-2")
+    client.get_string_value("pricing", "def", USER)
+    client.get_string_value("pricing", "def", other)
+    client.track("exposure", USER, TrackingEventDetails().add("flag", "pricing"))
+    (exposure,) = provider.client.recorder.exposures()
+    assert exposure.unit_id == "u-1"
+
+
+def test_last_contexts_are_bounded_oldest_out() -> None:
+    last = _LastContexts(capacity=2)
+    for unit in ("a", "b", "c"):
+        last.remember("flag", Context(units={"user": unit}, attributes={"remembered": True}))
+    assert len(last) == 2
+    fallback = Context(units={"user": "a"})
+    assert last.recall("flag", fallback) is fallback
+    assert last.recall("flag", Context(units={"user": "c"})).attributes == {"remembered": True}
+    last.forget("flag", Context(units={"user": "c"}))
+    assert len(last) == 1
 
 
 def test_exposure_of_a_flag_without_an_experiment_records_nothing(offline: Any) -> None:

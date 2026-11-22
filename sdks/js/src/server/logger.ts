@@ -3,7 +3,7 @@
 import { consoleLogger as sharedConsoleLogger } from "../internal/logger.js";
 import type { Logger, LogLevel } from "./types.js";
 
-export { causeOf, safeLog } from "../internal/logger.js";
+export { causeOf, requestCauseOf, safeLog } from "../internal/logger.js";
 
 /**
  * A logger writing events at minLevel and above to the console, the event
