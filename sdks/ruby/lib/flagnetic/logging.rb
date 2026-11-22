@@ -12,6 +12,7 @@ module Flagnetic
 
   # LEVELS are the log levels, lowest first.
   LEVELS = %i[debug info warn error].freeze
+  private_constant :LEVELS
 
   # Logging adapts the logger option: a callable receiving
   # (level, event, fields), or a standard library ::Logger (anything

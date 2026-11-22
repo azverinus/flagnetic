@@ -8,14 +8,14 @@ class VersionTest < Minitest::Test
   TABLE = File.expand_path("../../../docs/sdks/compatibility.md", __dir__)
 
   def test_the_schema_range_and_the_sdk_api_path_are_declared
-    assert_equal 1, Flagnetic::SCHEMA_VERSION_MIN
-    assert_equal 1, Flagnetic::SCHEMA_VERSION_MAX
-    assert_equal "/sdk/v1", Flagnetic::SDK_API_PATH
+    assert_equal 1, Flagnetic.const_get(:SCHEMA_VERSION_MIN)
+    assert_equal 1, Flagnetic.const_get(:SCHEMA_VERSION_MAX)
+    assert_equal "/sdk/v1", Flagnetic.const_get(:SDK_API_PATH)
   end
 
   # The evaluator compiles one schema; the SDK cannot read another.
   def test_the_highest_schema_is_the_evaluators
-    assert_equal Flagnetic::Eval::SCHEMA_VERSION, Flagnetic::SCHEMA_VERSION_MAX
+    assert_equal Flagnetic::Eval.const_get(:SCHEMA_VERSION), Flagnetic.const_get(:SCHEMA_VERSION_MAX)
   end
 
   # A release that changes the range or the path needs its row first, so
@@ -23,10 +23,10 @@ class VersionTest < Minitest::Test
   def test_the_compatibility_table_row_covering_this_version_says_what_it_declares
     row = covering(ruby_rows, Flagnetic::VERSION)
     refute_nil row, "no Ruby row of #{TABLE} covers #{Flagnetic::VERSION}"
-    min = Flagnetic::SCHEMA_VERSION_MIN
-    max = Flagnetic::SCHEMA_VERSION_MAX
+    min = Flagnetic.const_get(:SCHEMA_VERSION_MIN)
+    max = Flagnetic.const_get(:SCHEMA_VERSION_MAX)
     range = min == max ? max.to_s : "#{min}–#{max}"
-    assert_equal [range, "`#{Flagnetic::SDK_API_PATH}`"], [row[:schema], row[:path]]
+    assert_equal [range, "`#{Flagnetic.const_get(:SDK_API_PATH)}`"], [row[:schema], row[:path]]
   end
 
   # A new SDK API path is a new major version.

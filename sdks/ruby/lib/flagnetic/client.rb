@@ -44,7 +44,7 @@ module Flagnetic
     ).freeze
     MIN_POLL_INTERVAL = 30
     TYPES = %w[boolean string number json].freeze
-    private_constant :Timing, :DEFAULT_TIMING, :TYPES
+    private_constant :Timing, :DEFAULT_TIMING, :TYPES, :MIN_POLL_INTERVAL
 
     # new constructs a client for a server key and the base URL of the
     # instance. It fails loudly (ArgumentError) only for a client key and
