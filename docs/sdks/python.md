@@ -20,6 +20,49 @@ The package is pure Python with no runtime dependency, its regular expression en
 
 Supported runtimes follow upstream support: the oldest Python still supported upstream and every later one. CI runs the SDK on Python 3.11 and the newest release, with and without the extra, and the provider also on `openfeature-sdk` 0.9.0. A version that reaches its end of life upstream is dropped in a minor release.
 
+## Quickstart
+
+Install, hold the key in the environment, evaluate, report an exposure and shut down. Every snippet on this page is run by the package's tests against a mock server.
+
+```bash
+pip install flagnetic
+export FLAGNETIC_SDK_KEY="<server SDK key>"
+export FLAGNETIC_URL="https://flags.example.com"
+```
+
+Create one client per process, at start-up, and wait for the first ruleset. `ready` never raises: it returns the stage the client serves from (`fresh`, `last_good` or `built_in`).
+
+```python
+import os
+
+import flagnetic
+
+client = flagnetic.Client(os.environ["FLAGNETIC_SDK_KEY"], os.environ["FLAGNETIC_URL"])
+stage = client.ready(timeout=5)
+```
+
+A context names the units a flag is decided for (unit type to unit ID) and the attributes its rules read. The getters take the context, the flag key and the default served when the flag cannot be served:
+
+```python
+context = flagnetic.Context(units={"user": "u-1001"}, attributes={"plan": "pro"})
+enabled = client.get_bool(context, "new-checkout", False)
+detail = client.get_detail(context, "new-checkout", False)  # value, reason, variation, experiment block
+```
+
+An evaluation is not an exposure. Report one where the unit actually meets the behaviour, after reading the value:
+
+```python
+client.exposure(context, "pricing")
+```
+
+Close the client when the process ends: it sends what is queued and stops its thread.
+
+```python
+client.close()
+```
+
+A deprecated operation of the SDK API is announced in the log: the client logs `deprecated_operation` once per operation, at warning level, with the `Sunset` date when the server sent one, and keeps serving.
+
 ## Mode
 
 The SDK runs in server mode only: it takes a server key (`fn_srv_…`), downloads the environment's whole [ruleset](ruleset.md) and evaluates every flag inside the process, with the true evaluation reason. A client key is a `ValueError` at construction. Getters never do I/O and never raise; a flag that cannot be served gives the default you pass, with reason `fallback`.

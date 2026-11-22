@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from . import _events
+from . import events
 from ._delivery import backoff_ceiling, full_jitter
 from ._ingest import MAX_SUMMARY_ROWS, Event, Ingest, Outcome, Sent, encoded_size, event_id, iso
 
@@ -314,7 +314,7 @@ class EventQueue:
             # event's content, and unit IDs are not logged.
             self._log(
                 logging.WARNING,
-                _events.QUEUE_DROPPED,
+                events.QUEUE_DROPPED,
                 cause="not_serialisable",
                 events=1,
                 fault=_fault(err),
@@ -344,7 +344,7 @@ class EventQueue:
             self._overflow_logged = now
         self._log(
             logging.WARNING,
-            _events.QUEUE_DROPPED,
+            events.QUEUE_DROPPED,
             cause="queue_full",
             dropped=dropped,
             capacity=self._timing.capacity,
@@ -392,7 +392,7 @@ class EventQueue:
                 lost: dict[str, Any] = {"cause": "closing", "events": undelivered}
                 if sent.status:
                     lost["status"] = sent.status
-                self._log(logging.WARNING, _events.QUEUE_DROPPED, **lost)
+                self._log(logging.WARNING, events.QUEUE_DROPPED, **lost)
                 return
             self._failures += 1
             cap = (
@@ -407,23 +407,23 @@ class EventQueue:
             fields: dict[str, Any] = {"cause": sent.cause, "events": len(batch), "retry_in": wait}
             if sent.status:
                 fields["status"] = sent.status
-            self._log(logging.WARNING, _events.EVENTS_FAILED, **fields)
+            self._log(logging.WARNING, events.EVENTS_FAILED, **fields)
             self._retry_at = now + wait
             return
 
-    def _dropped(self, sent: Sent, events: int) -> None:
+    def _dropped(self, sent: Sent, count: int) -> None:
         if sent.outcome == Outcome.DROPPED:
             self._log(
                 logging.WARNING,
-                _events.QUEUE_DROPPED,
+                events.QUEUE_DROPPED,
                 cause="client_error",
                 status=sent.status,
-                events=events,
+                events=count,
             )
         elif sent.rejected:
             self._log(
                 logging.WARNING,
-                _events.QUEUE_DROPPED,
+                events.QUEUE_DROPPED,
                 cause="refused_by_the_server",
                 rejected=sent.rejected,
                 accepted=sent.accepted,
@@ -531,7 +531,7 @@ class Summaries:
             if age > self._timing.max_window_age:
                 self._log(
                     logging.WARNING,
-                    _events.QUEUE_DROPPED,
+                    events.QUEUE_DROPPED,
                     kind="evaluation_summary",
                     cause="window_too_old",
                     rows=len(kept.counts),
@@ -604,7 +604,7 @@ class Summaries:
             }
             if sent.status:
                 fields["status"] = sent.status
-            self._log(logging.WARNING, _events.EVENTS_FAILED, **fields)
+            self._log(logging.WARNING, events.EVENTS_FAILED, **fields)
             if final or now + wait >= self._give_up_at:
                 self._give_back()
                 return False
@@ -626,20 +626,20 @@ class Summaries:
             self._keep(_Window(window.start, window.end, counts))
         self._pending = []
 
-    def _delivered(self, sent: Sent, events: int) -> None:
+    def _delivered(self, sent: Sent, count: int) -> None:
         if sent.outcome == Outcome.DROPPED:
             self._log(
                 logging.WARNING,
-                _events.QUEUE_DROPPED,
+                events.QUEUE_DROPPED,
                 kind="evaluation_summary",
                 cause="client_error",
                 status=sent.status,
-                events=events,
+                events=count,
             )
         elif sent.dropped_rows or sent.rejected:
             self._log(
                 logging.WARNING,
-                _events.QUEUE_DROPPED,
+                events.QUEUE_DROPPED,
                 kind="evaluation_summary",
                 cause="refused_by_the_server",
                 accepted=sent.accepted,
@@ -688,7 +688,7 @@ class Reporter:
             try:
                 part.run(now, flush=bool(flushes), final=final)
             except Exception as err:  # reporting must never take the delivery thread down
-                self._log(logging.ERROR, _events.EVALUATION_FAILED, operation="report", cause=repr(err))
+                self._log(logging.ERROR, events.EVALUATION_FAILED, operation="report", cause=repr(err))
         for done in flushes:
             done.set()
 

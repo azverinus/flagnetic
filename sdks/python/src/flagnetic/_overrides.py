@@ -9,20 +9,21 @@ import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from . import _events
+from . import events
+from ._errors import FlagneticError
 
 if TYPE_CHECKING:
     from ._eval import Ruleset
 
 
-class LocalOverridesNotAllowed(Exception):
+class LocalOverridesNotAllowed(FlagneticError):
     """Raised by ``local_overrides.set`` on a client built without ``allow_overrides=True``."""
 
     def __init__(self) -> None:
         super().__init__("flagnetic: local overrides need allow_overrides=True")
 
 
-class LocalOverrideRefused(Exception):
+class LocalOverrideRefused(FlagneticError):
     """Raised by ``local_overrides.set`` while the held ruleset belongs to a protected environment."""
 
     def __init__(self, key: str) -> None:
@@ -92,7 +93,7 @@ class LocalOverrides:
         another type raises ``TypeError``.
         """
         if not self._allowed:
-            self._log(logging.WARNING, _events.OVERRIDE_REFUSED, flag=key, cause="not_allowed")
+            self._log(logging.WARNING, events.OVERRIDE_REFUSED, flag=key, cause="not_allowed")
             raise LocalOverridesNotAllowed
         ruleset = self._held()
         self._refuse_if_protected(key, ruleset)
@@ -112,14 +113,14 @@ class LocalOverrides:
                 held = None
         if held is not None:
             self._refuse_if_protected(key, held)
-        self._log(logging.WARNING, _events.OVERRIDE_SET, flag=key)
+        self._log(logging.WARNING, events.OVERRIDE_SET, flag=key)
         self._changed([key])
 
     def _refuse_if_protected(self, key: str, ruleset: Ruleset | None) -> None:
         if ruleset is not None and ruleset.protected:
             self._log(
                 logging.WARNING,
-                _events.OVERRIDE_REFUSED,
+                events.OVERRIDE_REFUSED,
                 flag=key,
                 cause="protected_environment",
                 environment=ruleset.environment_key,
@@ -160,7 +161,7 @@ class LocalOverrides:
         for key in keys:
             self._log(
                 logging.WARNING,
-                _events.OVERRIDE_REFUSED,
+                events.OVERRIDE_REFUSED,
                 flag=key,
                 cause="protected_environment",
                 environment=ruleset.environment_key,
