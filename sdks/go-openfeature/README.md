@@ -64,3 +64,7 @@ client.Track(ctx, "alias", evalCtx, of.NewTrackingEventDetails(0).
 ```
 
 `exposure` records the exposure of the provider's most recent evaluation of that flag for the same units, with the context the evaluation had when a `before` hook added attributes to it, as the SDK's `Exposure` does, and `alias` links two unit IDs, as `Alias` does. Any other event name, or one missing an attribute, does nothing. An evaluation alone never records an exposure, unless the flag asks for automatic exposure.
+
+## What 1.0 promises
+
+From 1.0.0 the public API below changes only additively until 2.0, with deprecations announced in a minor release before a major removes them: `New`, `Provider` with the OpenFeature provider methods (`Metadata`, `Hooks`, `Init`, `InitWithContext`, `Shutdown`, `ShutdownWithContext`, `EventChannel`, the five evaluation methods and `Track`) and `Provider.Client`, and the options `Option`, `WithUnitType`, `WithReadyTimeout` and `WithClientOptions`. The reasons and the flag metadata keys are those of `conformance/openfeature`. Everything else is internal. The provider follows the Go SDK it wraps: a minor release of the SDK may raise the SDK version this module requires, never past the SDK's own promise.

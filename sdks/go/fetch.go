@@ -234,6 +234,7 @@ func (c *Client) fetch(ctx context.Context) fetchOutcome {
 		return c.failed(ctx, transportCause(err), 0, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	c.noteDeprecation(operationRuleset, resp.Header)
 
 	switch resp.StatusCode {
 	case http.StatusOK:

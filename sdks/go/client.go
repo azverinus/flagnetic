@@ -53,6 +53,8 @@ type Client struct {
 	cancel       context.CancelFunc
 	done         chan struct{}
 	schemaLogged atomic.Bool
+	// deprecations holds the operations whose Deprecation header was logged.
+	deprecations sync.Map
 	// staleSince is when the first failure since the last success
 	// happened, in Unix nanoseconds; 0 while unset.
 	staleSince atomic.Int64
@@ -120,7 +122,7 @@ type options struct {
 	httpClient     *http.Client
 	requestTimeout time.Duration
 	pollInterval   time.Duration
-	changeStream   *bool
+	stream         *bool
 	storePath      string
 	sleep          func(context.Context, time.Duration) bool
 	jitter         func(time.Duration) time.Duration
@@ -196,13 +198,13 @@ func WithPollInterval(d time.Duration) Option {
 	return func(o *options) { o.pollInterval = d }
 }
 
-// WithChangeStream turns the ruleset stream on or off; it is on by
+// WithStream turns the ruleset stream on or off; it is on by
 // default. The stream carries nothing but the new ruleset version, so a
 // kill switch reaches the client within two seconds; with it off the
 // safety poll every 30 seconds is the only notice, which is what a proxy
 // that blocks text/event-stream leaves.
-func WithChangeStream(enabled bool) Option {
-	return func(o *options) { o.changeStream = &enabled }
+func WithStream(enabled bool) Option {
+	return func(o *options) { o.stream = &enabled }
 }
 
 // WithRequestTimeout bounds each request; default 10 seconds. For the
@@ -329,7 +331,7 @@ func New(sdkKey, baseURL string, opts ...Option) (*Client, error) {
 	c.fetchSuccess = make(chan struct{}, 1)
 	c.firstConnect = true
 	c.startLoops(o, func(ctx context.Context, loops *sync.WaitGroup) {
-		if o.changeStream == nil || *o.changeStream {
+		if o.stream == nil || *o.stream {
 			loops.Add(1)
 			go func() {
 				defer loops.Done()

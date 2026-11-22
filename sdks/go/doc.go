@@ -29,12 +29,19 @@
 // the held version, and every reconnect is followed by a fetch, because
 // versions may have been missed. The safety poll runs every 5 minutes while
 // the stream is connected and every 30 seconds while it is down or turned
-// off with WithChangeStream(false), which is what a proxy blocking
+// off with WithStream(false), which is what a proxy blocking
 // text/event-stream leaves.
 //
 //	c, err := flagnetic.New(sdkKey, "https://flags.example.com", flagnetic.WithStore("ruleset.json"))
 //	stage := c.Ready(ctxWithTimeout)
 //	defer c.Close(context.Background())
+//
+// # Deprecations
+//
+// When the platform answers the ruleset fetch, the ruleset stream or the
+// events post with a Deprecation header, the client logs deprecation_received
+// once for that operation, with the Sunset when the answer carries one, and
+// the call goes on as before: a deprecation is a notice, never a failure.
 //
 // # Evaluation summaries
 //
