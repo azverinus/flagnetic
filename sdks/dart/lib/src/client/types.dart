@@ -272,6 +272,13 @@ abstract final class LogEvents {
   /// codes where known.
   static const queueDropped = 'queue_dropped';
 
+  /// (warn) An answer carried a `Deprecation` header: the operation will be
+  /// removed in the next major release and still behaves as before. Logged
+  /// once per operation and client. Fields: operation (`evaluate`,
+  /// `postEvents`, `streamRuleset`), and sunset, the `Sunset` header's HTTP
+  /// date, when the answer has one.
+  static const deprecatedOperation = 'deprecated_operation';
+
   /// (warn) An ingest batch failed and goes again, with the same event IDs,
   /// after the delay in the fields. Fields: cause, status where known,
   /// events, retry_in_ms.

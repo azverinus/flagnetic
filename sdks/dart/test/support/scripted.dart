@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flagnetic/flagnetic.dart';
+import 'package:flagnetic/testing.dart';
 import 'package:test/test.dart';
 
 /// A client key as the platform issues them.
@@ -203,10 +204,6 @@ ClientOptions scaledOptions({
   appVersion: appVersion,
   storedUnitSets: storedUnitSets,
   requestTimeout: requestTimeout,
-  closeTimeout: closeTimeout,
-  retryBackoff: retryBackoff,
-  retryBackoffCap: retryBackoffCap,
-  unauthorizedBackoffCap: unauthorizedBackoffCap,
   flushInterval: flushInterval,
   summaryInterval: summaryInterval,
   eventBatchSize: eventBatchSize,
@@ -215,16 +212,22 @@ ClientOptions scaledOptions({
   sendExposures: sendExposures,
   sendSummaries: sendSummaries,
   allowOverrides: allowOverrides,
-  minimumPollInterval: const Duration(milliseconds: 30),
-  minimumRefetchGap: minimumRefetchGap,
   stream: stream,
-  rulesetEventJitter: rulesetEventJitter,
-  random: random,
-  clock: clock,
-  streamBackoff: streamBackoff,
-  streamBackoffCap: streamBackoffCap,
-  streamCloseJitter: streamCloseJitter,
-  streamSilenceTimeout: streamSilenceTimeout,
+  testing: TestingOptions(
+    closeTimeout: closeTimeout,
+    retryBackoff: retryBackoff,
+    retryBackoffCap: retryBackoffCap,
+    unauthorizedBackoffCap: unauthorizedBackoffCap,
+    minimumPollInterval: const Duration(milliseconds: 30),
+    minimumRefetchGap: minimumRefetchGap,
+    rulesetEventJitter: rulesetEventJitter,
+    random: random,
+    clock: clock,
+    streamBackoff: streamBackoff,
+    streamBackoffCap: streamBackoffCap,
+    streamCloseJitter: streamCloseJitter,
+    streamSilenceTimeout: streamSilenceTimeout,
+  ),
 );
 
 /// Reads a scenario context.

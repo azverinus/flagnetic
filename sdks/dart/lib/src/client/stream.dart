@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'backoff.dart';
+import 'deprecation.dart';
 import 'options.dart';
 import 'transport/transport.dart';
 import 'types.dart';
@@ -157,6 +158,7 @@ final class RulesetStream {
   /// stream until [start] opens it again.
   RulesetStream({
     required Uri url,
+    required DeprecationLog deprecations,
     required String sdkKey,
     required StreamSettings settings,
     required Transport transport,
@@ -173,6 +175,7 @@ final class RulesetStream {
     log,
     Random? random,
   }) : _url = url,
+       _deprecations = deprecations,
        _sdkKey = sdkKey,
        _settings = settings,
        _transport = transport,
@@ -185,6 +188,7 @@ final class RulesetStream {
        _log = log;
 
   final Uri _url;
+  final DeprecationLog _deprecations;
   final String _sdkKey;
   final StreamSettings _settings;
   final Transport _transport;
@@ -285,6 +289,7 @@ final class RulesetStream {
       unawaited(stream.body.listen(null).cancel().catchError((Object _) {}));
       return;
     }
+    _deprecations.note('streamRuleset', stream.headers);
     if (stream.status != 200) {
       _running = false;
       // An error body may never end: cancelling releases the connection.

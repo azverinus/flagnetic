@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'backoff.dart';
 import 'context.dart';
+import 'deprecation.dart';
 import 'events.dart';
 import 'ingest.dart';
 import 'log.dart';
@@ -128,7 +129,7 @@ final class FlagneticClient {
 
   /// The keys this connection writes: its own values and its own event queue.
   final StoreKeys _keys;
-  late final Random _jitter = _options.random ?? Random();
+  late final Random _jitter = _options.testing.random ?? Random();
 
   /// The platform the context, exposures and the events envelope name: the
   /// options' choice, else `web` in a browser, where no `User-Agent` names
@@ -170,6 +171,7 @@ final class FlagneticClient {
   // succeeds.
   bool _streamRefused = false;
   bool _schemaLogged = false;
+  late final DeprecationLog _deprecations = DeprecationLog(_log);
   final Set<String> _mismatched = {};
   final Set<String> _ignoredLogged = {};
   final Completer<void> _firstValues = Completer<void>();
@@ -223,6 +225,7 @@ final class FlagneticClient {
     _transport = defaultTransport();
     _ingest = Ingest(
       url: _sdkUrl(_baseUrl, 'events'),
+      deprecations: _deprecations,
       sdkKey: _sdkKey,
       settings: (
         platform: _platform,
@@ -232,9 +235,9 @@ final class FlagneticClient {
         summaryInterval: _options.summaryInterval,
         eventBatchSize: _options.eventBatchSize,
         eventQueueCapacity: _options.eventQueueCapacity,
-        retryBackoff: _options.retryBackoff,
-        retryBackoffCap: _options.retryBackoffCap,
-        unauthorizedBackoffCap: _options.unauthorizedBackoffCap,
+        retryBackoff: _options.testing.retryBackoff,
+        retryBackoffCap: _options.testing.retryBackoffCap,
+        unauthorizedBackoffCap: _options.testing.unauthorizedBackoffCap,
         sendSummaries: _options.sendSummaries,
       ),
       store: _store,
@@ -267,14 +270,15 @@ final class FlagneticClient {
     // failed attempt starts the fetch loop, which then polls.
     _rulesetStream = RulesetStream(
       url: _sdkUrl(_baseUrl, 'stream'),
+      deprecations: _deprecations,
       sdkKey: _sdkKey,
       settings: (
         platform: _options.platform,
         requestTimeout: _options.requestTimeout,
-        backoff: _options.streamBackoff,
-        backoffCap: _options.streamBackoffCap,
-        closeJitter: _options.streamCloseJitter,
-        silenceTimeout: _options.streamSilenceTimeout,
+        backoff: _options.testing.streamBackoff,
+        backoffCap: _options.testing.streamBackoffCap,
+        closeJitter: _options.testing.streamCloseJitter,
+        silenceTimeout: _options.testing.streamSilenceTimeout,
       ),
       transport: _transport!,
       random: _jitter,
@@ -742,7 +746,7 @@ final class FlagneticClient {
       await Future(() async {
         await Future.wait([flush(), _writes]);
         await (_ingest?.writes ?? Future<void>.value());
-      }).timeout(_options.closeTimeout, onTimeout: () {});
+      }).timeout(_options.testing.closeTimeout, onTimeout: () {});
     } on Object catch (e) {
       _internal('close', e);
     } finally {
@@ -996,7 +1000,7 @@ final class FlagneticClient {
   /// reads the newest version, so a second event adds no request.
   void _waitThenEvaluate() {
     if (_rulesetWait != null) return;
-    final wait = _options.rulesetEventJitter * _jitter.nextDouble();
+    final wait = _options.testing.rulesetEventJitter * _jitter.nextDouble();
     if (wait == Duration.zero) {
       _trigger(_Trigger.ruleset);
       return;
@@ -1019,17 +1023,18 @@ final class FlagneticClient {
     return waiter.future;
   }
 
-  DateTime _now() => (_options.clock ?? DateTime.now)();
+  DateTime _now() => (_options.testing.clock ?? DateTime.now)();
 
   bool get _withinRefetchGap {
     final last = _lastAttempt;
-    return last != null && _now().difference(last) < _options.minimumRefetchGap;
+    return last != null &&
+        _now().difference(last) < _options.testing.minimumRefetchGap;
   }
 
   /// The interval between fetches, never below the minimum poll interval.
   Duration get _pollInterval =>
-      _options.pollInterval < _options.minimumPollInterval
-      ? _options.minimumPollInterval
+      _options.pollInterval < _options.testing.minimumPollInterval
+      ? _options.testing.minimumPollInterval
       : _options.pollInterval;
 
   void _scheduleInterval() {
@@ -1085,10 +1090,10 @@ final class FlagneticClient {
     _failures++;
     return fullJitter(
       _failures,
-      _options.retryBackoff,
+      _options.testing.retryBackoff,
       outcome == _Outcome.refused
-          ? _options.unauthorizedBackoffCap
-          : _options.retryBackoffCap,
+          ? _options.testing.unauthorizedBackoffCap
+          : _options.testing.retryBackoffCap,
       _jitter,
     );
   }
@@ -1117,6 +1122,7 @@ final class FlagneticClient {
       return _Outcome.failure;
     }
     if (_closed) return _Outcome.failure;
+    _deprecations.note('evaluate', response.headers);
     final status = response.status;
     if (status != 200) {
       final code = _problemCode(response.body);

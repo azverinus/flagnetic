@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'backoff.dart';
+import 'deprecation.dart';
 import 'events.dart';
 import 'options.dart';
 import 'store.dart';
@@ -85,6 +86,7 @@ final class Ingest {
   /// Without a store the queue lives in memory only.
   Ingest({
     required Uri url,
+    required DeprecationLog deprecations,
     required String sdkKey,
     required IngestSettings settings,
     required Transport transport,
@@ -95,6 +97,7 @@ final class Ingest {
     FlagneticStore? store,
     StoreKeys? keys,
   }) : _url = url,
+       _deprecations = deprecations,
        _sdkKey = sdkKey,
        _settings = settings,
        _store = store,
@@ -106,6 +109,7 @@ final class Ingest {
        _log = log;
 
   final Uri _url;
+  final DeprecationLog _deprecations;
   final String _sdkKey;
   final IngestSettings _settings;
   final FlagneticStore? _store;
@@ -631,6 +635,7 @@ final class Ingest {
     } on TransportException catch (e) {
       return (outcome: _Outcome.retry, status: null, cause: e.kind.name);
     }
+    _deprecations.note('postEvents', response.headers);
     final status = response.status;
     if (status == 202) {
       _reportRejected(batch, response.body);
