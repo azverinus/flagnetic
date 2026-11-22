@@ -47,6 +47,19 @@ client.alias(
 await client.close();
 ```
 
+## What 1.0 promises
+
+From 1.0 the API below changes in a breaking way only in a new major version, and is deprecated in a minor release before it goes. Everything else is internal and may change in any release.
+
+- **Client**: `Flagnetic.client`, and on `FlagneticClient` `ready`, `stage`, `status`, `getBool`, `getString`, `getNumber`, `getInt`, `getJson`, `getDetail`, `allFlags`, `context`, `setContext`, `refresh`, `foreground`, `background`, `isForeground`, `onChange`, `onStage`, `exposure`, `alias`, `flush`, `close`, `sdkKey`, `overrides` and `offline`; the types `FlagneticContext`, `ChangeListener` and `StageListener`.
+- **Options**: `ClientOptions` with `store`, `storedUnitSets`, `bootstrap`, `offline`, `logger`, `platform`, `appVersion`, `pollInterval`, `requestTimeout`, `flushInterval`, `summaryInterval`, `eventBatchSize`, `eventQueueCapacity`, `exposureMemory`, `sendExposures`, `sendSummaries`, `allowOverrides` and `stream`, and `OfflineSource`. The options that only tests replace (retry and stream timings, jitter, random, clock) are `ClientOptions.testing`, `TestingOptions` in `package:flagnetic/testing.dart`, and are not promised.
+- **Results**: `Stage`, `Status`, `Detail`, `Experiment`, `FlagSummary`, `Reasons` and `FallbackCodes` with their members and constant values.
+- **Store**: the `FlagneticStore` interface, `InMemoryStore`, `StoreKeys`, `isLastGoodValuesKey`, `anonymousUnitId` and `anonymousUnitIdKey`, for apps and packages that bring their own store.
+- **Logging**: `Logger`, `LogLevel` and `LogEvents`: an event name and the meaning of its documented fields never change; a release may add events and fields.
+- **Testing and development**: `OfflineMode`, `SummaryRow` and `LocalOverrides`, as returned by `client.offline` and `client.overrides`.
+
+A getter never throws, and an unknown flag, a wrong type or a missing value serves the default you pass. The protocol the client speaks (`/sdk/v1`, `schema_version` 1) is frozen on its own terms: see [Compatibility and support](https://github.com/azverinus/flagnetic/blob/main/docs/compatibility.md). Not promised: anything under `lib/src`, `package:flagnetic/testing.dart`, and the free-text `cause` and `detail` fields of log events.
+
 ## The fallback chain
 
 Values come from, in order: the fresh response, the last good values in the store, the built-in defaults you pass to the getter. `client.stage` and `client.status()` tell which one is serving, and `getDetail` returns the value with why it was served.
