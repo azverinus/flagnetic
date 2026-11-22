@@ -1,6 +1,5 @@
-import 'dart:math';
-
 import 'store.dart';
+import 'testing_options.dart';
 import 'types.dart';
 
 /// The version this package reports in `User-Agent`, the `sdk_version`
@@ -50,8 +49,8 @@ const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
 /// default. A function rather than a getter, so that only the client reads it.
 bool streamEnabled(ClientOptions options) => options.stream ?? !_isWeb;
 
-/// How a client behaves. Every duration is configurable so that a test can
-/// run a whole scenario in milliseconds.
+/// How a client behaves. The timings a test replaces to run a scenario in
+/// milliseconds are in [testing].
 final class ClientOptions {
   /// Client options.
   const ClientOptions({
@@ -63,13 +62,7 @@ final class ClientOptions {
     this.platform,
     this.appVersion,
     this.pollInterval = const Duration(minutes: 5),
-    this.minimumPollInterval = const Duration(seconds: 30),
-    this.minimumRefetchGap = const Duration(seconds: 10),
     this.requestTimeout = const Duration(seconds: 5),
-    this.retryBackoff = const Duration(seconds: 2),
-    this.retryBackoffCap = const Duration(minutes: 5),
-    this.unauthorizedBackoffCap = const Duration(minutes: 15),
-    this.closeTimeout = const Duration(seconds: 2),
     this.flushInterval = const Duration(seconds: 5),
     this.summaryInterval = const Duration(seconds: 60),
     this.eventBatchSize = 100,
@@ -79,13 +72,7 @@ final class ClientOptions {
     this.sendSummaries = true,
     this.allowOverrides = false,
     this.stream,
-    this.rulesetEventJitter = const Duration(seconds: 3),
-    this.random,
-    this.clock,
-    this.streamBackoff = const Duration(seconds: 1),
-    this.streamBackoffCap = const Duration(seconds: 30),
-    this.streamCloseJitter = const Duration(seconds: 2),
-    this.streamSilenceTimeout = const Duration(seconds: 45),
+    this.testing = const TestingOptions(),
   });
 
   /// Where last good values persist; an [InMemoryStore] when null.
@@ -119,34 +106,11 @@ final class ClientOptions {
 
   /// The gap between fetches while they succeed. It runs only while the app
   /// is foregrounded (`FlagneticClient.background` stops it), and never
-  /// falls below [minimumPollInterval].
+  /// falls below `TestingOptions.minimumPollInterval`.
   final Duration pollInterval;
-
-  /// The floor [pollInterval] is clamped to, so a misconfigured interval cannot
-  /// hammer the platform.
-  final Duration minimumPollInterval;
-
-  /// The shortest gap between a fetch and a foreground-triggered refetch.
-  /// A foreground within this gap of the last attempt is dropped, so that
-  /// switching between apps does not fetch on every return. `setContext`,
-  /// `refresh` and a ruleset event are not throttled.
-  final Duration minimumRefetchGap;
 
   /// How long a fetch may take before it is a failure.
   final Duration requestTimeout;
-
-  /// The first retry bound after a failure; each further failure doubles it,
-  /// and the retry waits a random time up to the bound (full jitter).
-  final Duration retryBackoff;
-
-  /// The largest retry bound.
-  final Duration retryBackoffCap;
-
-  /// The largest retry bound while the SDK key is refused (401 or 403).
-  final Duration unauthorizedBackoffCap;
-
-  /// How long `close` may take.
-  final Duration closeTimeout;
 
   /// How often the persisted event queue is sent while the app is
   /// foregrounded, when it holds an exposure or an alias. It also flushes
@@ -196,7 +160,7 @@ final class ClientOptions {
   /// Whether to hold the ruleset stream while the app is in the foreground,
   /// so a kill switch reaches the app within about 5 s: the stream closes in
   /// the background, opens again on `foreground`, and a change waits up to
-  /// [rulesetEventJitter] before the app evaluates.
+  /// `TestingOptions.rulesetEventJitter` before the app evaluates.
   ///
   /// When null the stream is held on iOS, Android and desktop and is off on
   /// the web, where a connection per tab is the app's choice (the browser
@@ -204,35 +168,8 @@ final class ClientOptions {
   /// (five minutes by default) and at every `foreground`.
   final bool? stream;
 
-  /// The longest random wait between a `ruleset` event and the evaluate it
-  /// asks for, so that the apps open when a kill switch is flipped do not
-  /// all evaluate at once. The wait is uniform from zero to this duration;
-  /// zero evaluates at once.
-  final Duration rulesetEventJitter;
-
-  /// The source of the wait after a ruleset event, of the evaluate retry
-  /// backoff and of the stream's reconnect waits; a [Random] when null. A
-  /// test injects a fixed one to pin a wait. The event flush draws its own.
-  final Random? random;
-
-  /// The time the minimum refetch gap is measured against; `DateTime.now`
-  /// when null.
-  final DateTime Function()? clock;
-
-  /// The first reconnect bound after a stream error; each further failure
-  /// doubles it up to [streamBackoffCap], and the attempt waits a random
-  /// time up to the bound (full jitter).
-  final Duration streamBackoff;
-
-  /// The largest reconnect bound after a stream error.
-  final Duration streamBackoffCap;
-
-  /// The longest wait before reconnecting a stable stream the server closed
-  /// or one that fell silent; the wait is a random time up to it. A stream
-  /// the server closes before its first heartbeat backs off instead.
-  final Duration streamCloseJitter;
-
-  /// How long a stream may stay silent before it is reconnected: the server
-  /// sends a heartbeat every 15 s.
-  final Duration streamSilenceTimeout;
+  /// Timing, jitter, randomness and clock, which tests replace to run a
+  /// whole scenario in milliseconds. Not part of the 1.0 promise: see
+  /// `package:flagnetic/testing.dart`.
+  final TestingOptions testing;
 }

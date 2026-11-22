@@ -39,7 +39,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Expose-Headers':
       'ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, '
-      'RateLimit-Reset',
+      'RateLimit-Reset, Deprecation, Sunset',
 };
 
 /// One request the SDK sent, held open until the test answers it.
