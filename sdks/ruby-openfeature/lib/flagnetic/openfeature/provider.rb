@@ -32,6 +32,7 @@ module Flagnetic
       NAME = "flagnetic"
       DEFAULT_UNIT_TYPE = "user"
       DEFAULT_READY_TIMEOUT = 10
+      private_constant :DEFAULT_UNIT_TYPE, :DEFAULT_READY_TIMEOUT
 
       # The tracking event names every Flagnetic provider accepts, and the
       # attributes alias reads.
