@@ -143,6 +143,21 @@ is fresh again and `PROVIDER_ERROR` when the SDK key is revoked. Initialization 
 (default 10) for the first fetch and never fails. `provider.client` is the wrapped client, for local overrides,
 `flush` and the recorder of an offline provider (`Provider("", "", offline=document)`).
 
+## What 1.0 promises
+
+From 1.0 the public API below changes only additively until 2.0: a name is added, never renamed, removed or given another meaning, and a removal is announced first in a minor release and made in a major one. The public API is:
+
+- **Client**: `flagnetic.Client` with its keyword options, the getters `get_bool`, `get_string`, `get_number`, `get_int`, `get_json` and `get_detail`, `ready`, `stage`, `status`, `on_change`, `on_stage`, `exposure`, `alias`, `flush`, `close`, the `aready`, `aflush` and `aclose` forms, `recorder` and `local_overrides`.
+- **Values**: `flagnetic.Context`, `Detail`, `Experiment`, `Stage`, `Status`, `Document` (the accepted forms of an offline ruleset) and, of what `recorder` returns, `Exposure`, `Alias`, `SummaryCount` and `Recorder`.
+- **Local overrides**: `LocalOverrides` and its methods `set`, `remove`, `clear` and `list`.
+- **Errors**: `FlagneticError` and the two it is the base of, `LocalOverridesNotAllowed` and `LocalOverrideRefused`. A bad argument is a `ValueError`; getters never raise.
+- **Logging**: `Logger`, the hook's type, and the event names in `flagnetic.events`, which are the strings operators alert on.
+- **Tests**: the functions of `flagnetic.testing` and the `TestClient` they return.
+- **OpenFeature**: `flagnetic.openfeature.Provider`, its arguments and the flag metadata it fills.
+- **`flagnetic.__version__`.**
+
+Everything else is internal and may change in any release: every module and name starting with an underscore, the modules behind them, and what is not named above. Import the public names from `flagnetic`, `flagnetic.events`, `flagnetic.testing` and `flagnetic.openfeature`.
+
 ## Development
 
 ```bash

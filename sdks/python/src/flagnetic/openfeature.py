@@ -27,11 +27,11 @@ except ImportError as err:  # pragma: no cover - exercised in a subprocess witho
         "flagnetic.openfeature needs the OpenFeature SDK: pip install 'flagnetic[openfeature]'"
     ) from err
 
-from flagnetic import _events
+from flagnetic import events
 from flagnetic._client import Client
 from flagnetic._detail import Detail, Stage
 from flagnetic._eval import Context
-from flagnetic._events import Logger, standard_logger
+from flagnetic.events import Logger, standard_logger
 
 __all__ = ["REASON_METADATA_KEY", "Provider", "reason_of"]
 
@@ -349,7 +349,7 @@ class Provider(AbstractProvider):
         """
         # The event goes first: the client swallows an exception from its logger, which would
         # otherwise also swallow the event.
-        if event == _events.KEY_REVOKED:
+        if event == events.KEY_REVOKED:
             self._revoked = True
             details = ProviderEventDetails(message="flagnetic: sdk key revoked", error_code=ErrorCode.GENERAL)
             self._emit_if_open(self.emit_provider_error, details)
@@ -361,4 +361,4 @@ class Provider(AbstractProvider):
         try:
             emit(details)
         except Exception as err:
-            self._logger(logging.ERROR, _events.LISTENER_FAILED, {"cause": repr(err)})
+            self._logger(logging.ERROR, events.LISTENER_FAILED, {"cause": repr(err)})

@@ -24,6 +24,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ._delivery import API_PATH, send_request
+from ._deprecation import DeprecationNotes
 
 #: This SDK's name in the envelope and in the SDK inventory, as the User-Agent names it.
 SDK_NAME = "flagnetic-python"
@@ -101,6 +102,7 @@ class Ingest:
     def __init__(
         self,
         *,
+        notes: DeprecationNotes,
         base_url: str,
         sdk_key: str,
         agent: str,
@@ -119,6 +121,7 @@ class Ingest:
         self._identity = {"name": SDK_NAME, "version": version, "platform": platform}
         self._schema_version = schema_version
         self._timeout = request_timeout
+        self._notes = notes
         self._lock = threading.Lock()
         self._conn: http.client.HTTPConnection | None = None
 
@@ -166,6 +169,7 @@ class Ingest:
         try:
             send_request(conn, "POST", self._path, headers, body)
             resp = conn.getresponse()
+            self._notes.observe("POST", self._path, resp)
             status = resp.status
             if status == 202:
                 return self._accepted(resp, deadline)
