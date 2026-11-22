@@ -21,6 +21,90 @@ Supported runtimes follow upstream support: Flutter's stable releases of about t
 
 There is no OpenFeature provider for Dart yet.
 
+## Quickstart
+
+**Install.** Add the package to the app:
+
+```bash
+dart pub add flagnetic            # Dart without Flutter
+flutter pub add flagnetic_flutter # a Flutter app
+```
+
+**Key.** Create a client key (`fn_cli_…`) for the environment in the console and pass it to the client; see [SDK keys](keys.md). It ships inside the app, so it can only learn the values served to the context you give it. A server key is refused with an `ArgumentError`.
+
+**Evaluate, context, exposure and shutdown** in one program:
+
+```dart
+import 'package:flagnetic/flagnetic.dart';
+
+Future<void> main() async {
+  final client = Flagnetic.client(
+    'fn_cli_…',
+    baseUrl: Uri.parse('https://flags.example.com'),
+    context: const FlagneticContext(units: {'anonymous': 'd-8f1c'}),
+  );
+
+  // Evaluate: getters are synchronous and never throw. Until the first answer
+  // arrives they serve the default you pass.
+  await client.ready(const Duration(seconds: 2));
+  final showCheckout = client.getBool('checkout', false);
+  print('checkout: $showCheckout');
+
+  // Context: after sign-in, evaluate for the user too. The values held keep
+  // serving until the new answer arrives.
+  await client.setContext(
+    const FlagneticContext(units: {'anonymous': 'd-8f1c', 'user': 'u-1001'}),
+  );
+
+  // Exposure: evaluating never records one. Read the flag where the user sees
+  // what the experiment decided, then record that they saw it: the exposure
+  // reports the most recent evaluation of the flag.
+  if (client.getBool('checkout', false)) {
+    client.exposure('checkout');
+  }
+
+  // Shutdown: sends what is queued, then releases the connections.
+  await client.close();
+}
+```
+
+In a Flutter app, hold the client in a `FlagneticScope` and read a flag with a `FlagBuilder`, which rebuilds when it changes:
+
+```dart
+import 'package:flagnetic_flutter/flagnetic_flutter.dart';
+import 'package:flutter/material.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final store = FlutterStore();
+  final client = Flagnetic.client(
+    'fn_cli_…',
+    baseUrl: Uri.parse('https://flags.example.com'),
+    context: FlagneticContext(
+      units: {'anonymous': await anonymousUnitId(store, 'anonymous')},
+    ),
+    options: ClientOptions(store: store),
+  );
+  runApp(FlagneticScope(client: client, child: const App()));
+}
+
+class App extends StatelessWidget {
+  const App({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    home: FlagBuilder<bool>(
+      flagKey: 'checkout',
+      defaultValue: false,
+      builder: (context, showCheckout, detail) =>
+          Text(showCheckout ? 'New checkout' : 'Basket'),
+    ),
+  );
+}
+```
+
+The package's tests run the first program against a mock server and the second one in a widget test, so neither can drift from the API.
+
 ## Mode
 
 The SDK runs in client mode only: it takes a client key (`fn_cli_…`), posts its context to [remote evaluation](evaluate.md) and serves every flag from the values it was answered, so it learns served values only, with reasons no finer than `targeting_match`. A server key is an `ArgumentError` at construction: it must never ship in an app. Getters are synchronous and never throw; a flag that cannot be served gives the default you pass, with reason `fallback`. Values, the event queue and anonymous unit IDs persist in the store, so a cold start offline serves the last good values and sends the events recorded offline later.
@@ -35,6 +119,8 @@ final client = Flagnetic.client(
 await client.ready(const Duration(seconds: 2)); // Stage.fresh, lastGood or builtIn
 client.getBool('new-checkout', false);
 ```
+
+A `Deprecation` header on any answer is logged once per operation, at warning level, as `operation_deprecated` with the operation (`evaluate`, `events` or `stream`) and the `Sunset` when the answer has one; the call proceeds as before. See [Compatibility and support](../compatibility.md#deprecation-and-removal).
 
 The [packages' READMEs](../../sdks/dart/README.md) cover every option, the log events, the offline test mode, local overrides and the anonymous ID; [`flagnetic_flutter`'s](../../sdks/flutter/README.md) the widgets, the store and the Dev Tools screen.
 

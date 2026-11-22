@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.3.0](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.2.0...sdks/python/v0.3.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430))
+
+### Features
+
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430)) ([f8a28d9](https://github.com/azverinus/flagnetic/commit/f8a28d9640a2edafc0bc4e45409eda22168023a8))
+
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.5...sdks/python/v0.2.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-python:** log deprecated operations, freeze the public API ([#425](https://github.com/azverinus/flagnetic/issues/425))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423))
+
+### Features
+
+* **sdk-python:** log deprecated operations, freeze the public API ([#425](https://github.com/azverinus/flagnetic/issues/425)) ([a48c4d7](https://github.com/azverinus/flagnetic/commit/a48c4d74e0718c5d03bcdb53412c116fe10b5a03))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423)) ([8eb53b9](https://github.com/azverinus/flagnetic/commit/8eb53b97e031010059fe586ebc3ec5cf9cc246de))
+
+
+### Bug Fixes
+
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **sdks:** close the Python and Ruby SDK review findings ([#414](https://github.com/azverinus/flagnetic/issues/414)) ([d02c998](https://github.com/azverinus/flagnetic/commit/d02c998264c98f3a0904f0187d779be749270237))
+* **sdks:** report hook-enriched exposures, refuse bad JS keys ([#422](https://github.com/azverinus/flagnetic/issues/422)) ([3c891f6](https://github.com/azverinus/flagnetic/commit/3c891f688cf37bb3bfc68490a8c1e27a81527002))
+
+
+### Dependencies
+
+* **sdk-python:** Bump the sdk-python group in /sdks/python with 3 updates ([#411](https://github.com/azverinus/flagnetic/issues/411)) ([c7e2ae2](https://github.com/azverinus/flagnetic/commit/c7e2ae20cae912b122c9555de2f2bd00c5f77a40))
+
 ## [0.1.5](https://github.com/azverinus/flagnetic/compare/sdks/python/v0.1.4...sdks/python/v0.1.5) (2026-11-17)
 
 

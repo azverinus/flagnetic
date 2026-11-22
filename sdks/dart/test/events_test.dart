@@ -589,7 +589,7 @@ void main() {
       expect(
         (failed['retry_in_ms']! as int),
         lessThanOrEqualTo(
-          scaledOptions().unauthorizedBackoffCap.inMilliseconds,
+          scaledOptions().testing.unauthorizedBackoffCap.inMilliseconds,
         ),
       );
       expect(run.client.stage, Stage.fresh, reason: 'values keep serving');

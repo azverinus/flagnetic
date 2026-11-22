@@ -7,7 +7,7 @@ description: "Docker Compose, Kubernetes or the binary, TLS and a reverse proxy,
 
 Flagnetic is one binary, `flagnetic`, with the web console built in, and PostgreSQL is the only thing it needs. This guide installs it with Docker Compose or as a binary, puts it behind TLS and a reverse proxy, sizes its PostgreSQL connections and upgrades it. [Operations](operations.md) covers running it once it is up, and the [configuration reference](configuration.md) lists every setting.
 
-Flagnetic 0.5 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.x promises](sdks/compatibility.md#what-0x-promises) before you rely on it.
+Flagnetic 0.6 is a developer preview: try it, build against it, and do not run it where an outage would hurt. See [what 0.x promises](sdks/compatibility.md#what-0x-promises) before you rely on it.
 
 ## What you need
 
@@ -153,8 +153,8 @@ User=flagnetic
 Restart=on-failure
 # Exit code 2 is a configuration error: restarting will not fix it.
 RestartPreventExitStatus=2
-# The drain and the grace period with a margin (5 s + 15 s by default).
-TimeoutStopSec=25s
+# The drain, the grace period and the 10 s cancel (5 s + 15 s + 10 s by default).
+TimeoutStopSec=30s
 
 [Install]
 WantedBy=multi-user.target
@@ -164,7 +164,7 @@ WantedBy=multi-user.target
 
 ## More than one replica
 
-Run as many replicas as you like against one database, each with the same configuration and secret key, behind a load balancer. Every replica serves every API, the console and the SDK API, and runs every background worker; replicas tell each other about changes through PostgreSQL notifications, so **no sticky sessions are needed**, an SDK may reach any replica on each request, and a change made through one replica reaches SDKs on every other within the [declared propagation time](sdks/stream.md#propagation). Route only to ready replicas (`/readyz`), and give each a stop timeout of at least 25 seconds so it can [drain](operations.md#stopping).
+Run as many replicas as you like against one database, each with the same configuration and secret key, behind a load balancer. Every replica serves every API, the console and the SDK API, and runs every background worker; replicas tell each other about changes through PostgreSQL notifications, so **no sticky sessions are needed**, an SDK may reach any replica on each request, and a change made through one replica reaches SDKs on every other within the [declared propagation time](sdks/stream.md#propagation). Route only to ready replicas (`/readyz`), and give each a stop timeout of at least 30 seconds so it can [drain](operations.md#stopping).
 
 Rate limits of the SDK API are counted by each replica on its own: size them for the replica count ([Rate limits on the SDK API](operations.md#rate-limits-on-the-sdk-api)).
 
@@ -243,7 +243,7 @@ with `FLAGNETIC_TRUSTED_PROXIES` set to the nginx host's address and `FLAGNETIC_
 
 Each replica listens on PostgreSQL notification channels (`LISTEN`) to learn of changes made through other replicas: rulesets, SDK keys and auth settings. A connection pooler in transaction or statement mode, such as PgBouncer with `pool_mode = transaction`, hands the listening session to other clients and delivers nothing. Connect Flagnetic to PostgreSQL directly, or through a pooler in **session mode**.
 
-Through a pooler that does not carry `LISTEN`, Flagnetic still works but slowly and late: each listener checks itself every 10 seconds, finds that its own notifications do not come back, and reports itself down (`flagnetic_listener_up` at 0); the replica then trusts no cache and reads PostgreSQL on every SDK request, and the ruleset streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll (every 5 minutes for a Go SDK holding the ruleset stream, by default) and the [declared propagation time](sdks/stream.md#propagation) does not hold. Session mode is required for the 2 seconds.
+Through a pooler that does not carry `LISTEN`, Flagnetic still works but slowly and late: each listener checks itself every 10 seconds, finds that its own notifications do not come back, and reports itself down (`flagnetic_listener_up` at 0); the replica then trusts no cache and reads PostgreSQL on every SDK request, and the ruleset streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll (every 5 minutes for a Go SDK holding the ruleset stream, by default) and the [declared propagation time](sdks/stream.md#propagation) does not hold. Session mode is required for the declared 2 seconds to hold.
 
 ### The connection budget
 

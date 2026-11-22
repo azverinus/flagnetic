@@ -712,7 +712,7 @@ func TestProtocolScenarios(t *testing.T) {
 				opts = append(opts, flagnetic.WithFlushInterval(time.Duration(ms)*time.Millisecond))
 			}
 			opts = append(opts, flagnetic.WithExposures(sc.Given.Options.SendExposures),
-				flagnetic.WithChangeStream(sc.Given.Options.Stream))
+				flagnetic.WithStream(sc.Given.Options.Stream))
 			if sc.Given.Options.AllowOverrides {
 				opts = append(opts, flagnetic.WithLocalOverrides())
 			}

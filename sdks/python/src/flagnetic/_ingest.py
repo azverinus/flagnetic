@@ -169,7 +169,7 @@ class Ingest:
         try:
             send_request(conn, "POST", self._path, headers, body)
             resp = conn.getresponse()
-            self._notes.observe("POST", self._path, resp)
+            self._notes.observe("events", resp)
             status = resp.status
             if status == 202:
                 return self._accepted(resp, deadline)

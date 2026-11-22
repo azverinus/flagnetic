@@ -182,7 +182,7 @@ func runStreamScenario(t *testing.T, file scenarioFile, pollIntervalMS int64, st
 		jitter, slack = func(ceiling time.Duration) time.Duration { return ceiling }, windowTopSlack
 	}
 	c, err := flagnetic.New(serverKey, srv.URL,
-		flagnetic.WithChangeStream(true),
+		flagnetic.WithStream(true),
 		// The stream's scenarios script the ruleset endpoint alone.
 		flagnetic.WithSummaries(false),
 		flagnetic.WithPollInterval(scaled(pollIntervalMS)),

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.4...sdks/dart/v0.2.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430))
+* **sdk-dart:** freeze the 1.0 API, log deprecations, add a quickstart ([#428](https://github.com/azverinus/flagnetic/issues/428))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423))
+
+### Features
+
+* **sdk-dart:** freeze the 1.0 API, log deprecations, add a quickstart ([#428](https://github.com/azverinus/flagnetic/issues/428)) ([dc6facb](https://github.com/azverinus/flagnetic/commit/dc6facb7f0a7df490bbaa3d8630a0a6a0472e52a))
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430)) ([f8a28d9](https://github.com/azverinus/flagnetic/commit/f8a28d9640a2edafc0bc4e45409eda22168023a8))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423)) ([8eb53b9](https://github.com/azverinus/flagnetic/commit/8eb53b97e031010059fe586ebc3ec5cf9cc246de))
+
+
+### Bug Fixes
+
+* **sdks:** close the Dart and Flutter review findings ([#417](https://github.com/azverinus/flagnetic/issues/417)) ([0ef349e](https://github.com/azverinus/flagnetic/commit/0ef349ea9beab8bbd6a1fe54138382aafa3c15f9))
+* **sdks:** close the JavaScript review findings, add summaryInterval ([#413](https://github.com/azverinus/flagnetic/issues/413)) ([f018603](https://github.com/azverinus/flagnetic/commit/f018603be9a9876438b2490c7bc4efefd23fbe71))
+
 ## [0.1.4](https://github.com/azverinus/flagnetic/compare/sdks/dart/v0.1.3...sdks/dart/v0.1.4) (2026-11-17)
 
 
