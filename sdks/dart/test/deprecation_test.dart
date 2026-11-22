@@ -59,7 +59,11 @@ void main() {
       expect(run.client.getBool('checkout', false), isNotNull);
 
       expect(run.logs.fieldsOf(LogEvents.operationDeprecated), [
-        {'operation': 'evaluate', 'deprecation': '@1760000000', 'sunset': sunset},
+        {
+          'operation': 'evaluate',
+          'deprecation': '@1760000000',
+          'sunset': sunset,
+        },
       ]);
       expect(
         run.logs.events
@@ -109,6 +113,17 @@ void main() {
   test('an answer without the header logs nothing', () async {
     final run = await start();
     await (await run.server.next()).respondJson(evaluation);
+    await eventually(() => run.client.stage == Stage.fresh);
+    expect(run.logs.count(LogEvents.operationDeprecated), 0);
+  });
+
+  test('an empty Deprecation header logs nothing', () async {
+    final run = await start();
+    await (await run.server.next()).respond(
+      200,
+      body: jsonEncode(evaluation),
+      headers: {'Content-Type': 'application/json', 'Deprecation': ''},
+    );
     await eventually(() => run.client.stage == Stage.fresh);
     expect(run.logs.count(LogEvents.operationDeprecated), 0);
   });

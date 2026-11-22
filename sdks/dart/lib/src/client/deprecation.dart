@@ -15,11 +15,14 @@ final class DeprecationLog {
   /// operation (`evaluate`, `events` or
   /// `stream`).
   void note(String operation, Map<String, String> headers) {
-    if (!headers.containsKey('deprecation') || !_seen.add(operation)) return;
+    // An empty header names no deprecation, as in every other SDK.
+    final deprecation = headers['deprecation'];
+    if (deprecation == null || deprecation.trim().isEmpty) return;
+    if (!_seen.add(operation)) return;
     final sunset = headers['sunset'];
     _log(LogLevel.warn, LogEvents.operationDeprecated, {
       'operation': operation,
-      'deprecation': headers['deprecation']!,
+      'deprecation': deprecation,
       if (sunset != null && sunset.isNotEmpty) 'sunset': sunset,
     });
   }
