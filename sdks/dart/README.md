@@ -1,6 +1,6 @@
 # flagnetic
 
-Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and has no dependency, Flutter included. A Flutter app adds [`flagnetic_flutter`](https://pub.dev/packages/flagnetic_flutter) for widgets that rebuild when a flag changes, the app lifecycle, a store on every platform and a Dev Tools screen.
+Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and on the web and has no dependency, Flutter included. A Flutter app adds [`flagnetic_flutter`](https://pub.dev/packages/flagnetic_flutter) for widgets that rebuild when a flag changes, the app lifecycle, a store on every platform and a Dev Tools screen.
 
 ```bash
 dart pub add flagnetic            # Dart without Flutter

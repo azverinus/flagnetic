@@ -97,7 +97,7 @@ The same holds the other way round. The server ignores what it does not know in 
 
 ## What the JavaScript SDK declares
 
-`sdks/js/src/version.ts` holds `VERSION`, which the server mode's User-Agent (`flagnetic-js/<version> (<platform>)`), the browser client's context and every events envelope report and which release-please keeps equal to `package.json` and the tag, and `SCHEMA_VERSION_MIN`, `SCHEMA_VERSION_MAX` and `SDK_API_PATH`, exported from every entry point. A test of the SDK fails when the last JavaScript row of the table above is not that range and path, and the release workflow checks `VERSION` against the tag.
+`sdks/js/src/version.ts` holds `VERSION`, which the server mode's User-Agent (`flagnetic-js/<version> (<platform>)`), the browser client's context and every events envelope report and which release-please keeps equal to `package.json` and the tag, and `SCHEMA_VERSION_MIN`, `SCHEMA_VERSION_MAX` and `SDK_API_PATH`, which stay internal. A test of the SDK fails when the last JavaScript row of the table above is not that range and path, and the release workflow checks `VERSION` against the tag.
 
 ## What the Python SDK declares
 

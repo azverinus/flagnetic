@@ -540,6 +540,34 @@ _Avoid_: deprecation error, deprecation exception, deprecation notice
 The latest minor release of the server, which alone receives fixes, security fixes included; they ship in its next patch or the next minor. An SDK's supported version is likewise its latest minor.
 _Avoid_: LTS, maintained branch, release branch
 
+**API freeze**:
+The last change to an SDK's public API before its 1.0: every exported name, option, type and error is listed in its public API report, reviewed by the maintainer, and renamed or removed in one wave while the package is still 0.x. After it, the SDK keeps the compatibility promise.
+_Avoid_: API lock, code freeze, feature freeze
+
+**Public API report**:
+The list of every public declaration of an SDK package with its signature, written for the maintainer's review before the package's first release and again at its API freeze.
+_Avoid_: API dump, API diff, surface report
+
 **Migration**:
 One forward-only change of an instance's database schema, applied in order and once, under a lock that lets only one replica or job apply it. From 1.0 every migration expands before it contracts: it adds what the new release needs and removes only what the previous minor no longer uses, so replicas of the previous minor keep running on the migrated schema.
 _Avoid_: schema update, DDL, upgrade (that is the release's), import (that is a project document's)
+
+**Rolling upgrade**:
+Moving an instance to the next minor release by replacing its replicas one at a time after the migrations ran, while replicas of the previous minor keep serving on the migrated schema. Supported between adjacent minors from 1.0; upgrading from 0.x stops every replica first.
+_Avoid_: zero-downtime deploy, blue-green, hot upgrade, in-place upgrade
+
+**Chart**:
+The Helm chart that installs an instance on Kubernetes, released with the server under the same version. It runs the migrations in one of three migration modes, a Job before the upgrade (the default), an init container in each pod, or the server at its start, and never creates the database or the secret key.
+_Avoid_: Helm package, operator, manifest, deployment (a Kubernetes object it creates)
+
+**Attestation**:
+A signed statement, published with a released artifact (the image, the chart, an SDK package where its registry allows), of which workflow built it from which commit. Verifying it is how an operator checks where an artifact came from.
+_Avoid_: signature (no separate one is made), checksum, provenance file, SBOM (published beside it)
+
+**Performance target**:
+A published p99 latency of one SDK API scenario (remote evaluation, ruleset fetch, events ingest, a change reaching stream subscribers) at a stated arrival rate on stated hardware. CI fails above a ceiling set well over the target, so a runner's noise does not fail it but a regression of a multiple does.
+_Avoid_: SLA, SLO, benchmark (one run, not the promise), budget
+
+**Mirror repository**:
+The public, read-only repository `azverinus/flagnetic-swift` that the Swift package is published through. A release job copies the history of `sdks/swift` into it and tags it with the plain version Swift Package Manager needs; nothing is committed to it by hand and it takes no pull requests.
+_Avoid_: fork, Swift repository (development stays in the monorepo), subtree

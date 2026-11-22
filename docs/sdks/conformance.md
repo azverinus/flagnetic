@@ -45,9 +45,7 @@ The logger hook receives named events, and operators alert on those names, so ev
 | `stream_connected` | The ruleset stream is open. |
 | `stream_dropped` | The ruleset stream ended. |
 
-A server SDK also logs `deprecation_received` when an operation's answer carries a `Deprecation` header: once per operation for each client, at warning level, with the `operation`, the header as `deprecation`, the date it names as `deprecated_since` when it reads as one, and the `sunset` when the answer carries one; the call is never failed for it. It joins the table above once every SDK exports it.
-
-A received `Deprecation` header is logged once per operation as `operation_deprecated`, at warning level, with the fields `operation`, `deprecation` and, when set, `sunset`; the call proceeds. It has no row in the table until every SDK exports it.
+A received `Deprecation` header is logged once per operation, at warning level, with the `operation`, the header as `deprecation` and, when the answer carries one, the `sunset`; the call proceeds and is never failed for it. The name is not yet the same in every SDK: Go logs `deprecation_received` (and the date the header names as `deprecated_since` when it reads as one), JavaScript and Ruby log `operation_deprecated`, and Python and Dart log `deprecated_operation`. It has no row in the table until every SDK exports one name.
 
 The protocol option that switches the ruleset stream on or off is `stream`. Each SDK's tests check that its exported names are the ones in this table and that none of the names it replaced is still logged.
 
