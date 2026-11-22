@@ -382,16 +382,12 @@ module Flagnetic
 
     # deprecation_seen logs a Deprecation header once per operation: the
     # client lives as long as the process, so this is once per operation
-    # and process. deprecated_since is the instant in unix seconds when the
-    # header is the RFC 9745 form (@<seconds>); any other value is passed
-    # on as deprecation, since the call is never refused for it.
+    # and process. The header is passed on as it came, with the Sunset when
+    # there is one, and the call is never refused for it.
     def deprecation_seen(operation, header, sunset)
       return unless @deprecations_mutex.synchronize { @deprecations_logged.add?(operation) }
 
-      since = header[/\A@(\d+)\z/, 1]
-      log(:warn, :deprecation_received, operation: operation,
-                                        **(since ? { deprecated_since: since.to_i } : { deprecation: header }),
-                                        **(sunset ? { sunset: sunset } : {}))
+      log(:warn, :operation_deprecated, operation: operation, deprecation: header, **(sunset ? { sunset: sunset } : {}))
     end
 
     # log_hook adapts Client#log's keyword arguments to the (level, event,

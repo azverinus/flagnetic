@@ -18,8 +18,8 @@ class DeprecationTest < Minitest::Test
     assert c.bool("on", default: false)
     eventually { @server.fetches.size >= 3 }
 
-    assert_equal [[:warn, { operation: "getRuleset", deprecated_since: 1_767_225_600,
-                            sunset: "Wed, 01 Jul 2027 00:00:00 GMT" }]], logged(:deprecation_received)
+    assert_equal [[:warn, { operation: "ruleset", deprecation: "@1767225600",
+                            sunset: "Wed, 01 Jul 2027 00:00:00 GMT" }]], logged(:operation_deprecated)
   end
 
   def test_a_deprecation_without_a_sunset_names_none
@@ -27,10 +27,10 @@ class DeprecationTest < Minitest::Test
     @server.on_ruleset { |_| [304, { "Deprecation" => "@1767225600" }, ""] }
     c = client(stream: false, timing: { poll_down: 0.05 })
     c.ready(timeout: 2)
-    eventually { logged(:deprecation_received).any? }
+    eventually { logged(:operation_deprecated).any? }
 
-    assert_equal [[:warn, { operation: "getRuleset", deprecated_since: 1_767_225_600 }]],
-                 logged(:deprecation_received)
+    assert_equal [[:warn, { operation: "ruleset", deprecation: "@1767225600" }]],
+                 logged(:operation_deprecated)
   end
 
   def test_a_deprecated_events_operation_is_logged_once_and_the_batch_is_still_accepted
@@ -47,7 +47,7 @@ class DeprecationTest < Minitest::Test
     end
 
     assert_equal 2, @server.events_requests.size
-    assert_equal(["postEvents"], logged(:deprecation_received).map { |_, f| f[:operation] })
+    assert_equal(["events"], logged(:operation_deprecated).map { |_, f| f[:operation] })
     assert_empty logged(:events_failed)
   end
 
@@ -58,7 +58,7 @@ class DeprecationTest < Minitest::Test
     c.ready(timeout: 2)
     eventually { @server.stream_requests.size >= 3 }
 
-    assert_equal(["streamRuleset"], logged(:deprecation_received).map { |_, f| f[:operation] })
+    assert_equal(["stream"], logged(:operation_deprecated).map { |_, f| f[:operation] })
   end
 
   def test_a_header_that_does_not_parse_is_still_logged_and_fails_nothing
@@ -67,7 +67,7 @@ class DeprecationTest < Minitest::Test
     c = client(stream: false)
 
     assert_equal :fresh, c.ready(timeout: 2)
-    assert_equal [[:warn, { operation: "getRuleset", deprecation: "soon" }]], logged(:deprecation_received)
+    assert_equal [[:warn, { operation: "ruleset", deprecation: "soon" }]], logged(:operation_deprecated)
   end
 
   def test_an_answer_without_the_header_logs_nothing
@@ -75,13 +75,13 @@ class DeprecationTest < Minitest::Test
     c = client(stream: false)
     c.ready(timeout: 2)
 
-    assert_empty logged(:deprecation_received)
+    assert_empty logged(:operation_deprecated)
   end
 
   def test_a_logger_that_raises_does_not_fail_the_call
     @server.publish(document(1, { "on" => true }))
     @server.on_ruleset { |_| [200, DEPRECATED.merge("ETag" => '"1"'), JSON.generate(document(1, { "on" => true }))] }
-    boom = ->(_level, event, _fields) { raise "boom" if event == :deprecation_received }
+    boom = ->(_level, event, _fields) { raise "boom" if event == :operation_deprecated }
     c = Flagnetic::Client.new(KEY, base_url: @server.base_url, stream: false, timing: FAST, logger: boom)
     @clients << c
 

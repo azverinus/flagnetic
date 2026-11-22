@@ -46,12 +46,12 @@ From 1.0.0 the public API below changes only additively until 2.0: a name, a sig
 - `Flagnetic::LocalOverrides` (`set`, `remove`, `clear`, `list`) and `Flagnetic::Recorder` with the rows it returns.
 - The errors `Flagnetic::Error`, `NotConfigured`, `LocalOverridesNotAllowed`, `LocalOverrideRefused` and `OfflineError`.
 - `Flagnetic.client`, `client=`, `client_builder=` and `client?`.
-- The log events in the table under [Events](#events), with their levels and fields (a release may add a field or an event, never rename or drop one), and the `logger:` contract: a callable receiving `(level, event, fields)` or a standard `Logger`.
+- The log events in the table under [Events](#events), with their levels and fields (a release may add a field or an event, never rename or drop one), and the `logger:` contract: a callable receiving `(level, event, fields)` or a standard `Logger`; `Flagnetic::Logging.adapt` turns that option into a callable, for gems built on this one.
 - `Flagnetic::Testing`: `offline`, `with_flags`, `with_ruleset`, `Helpers` and the offline client's `set` and `reload`.
 - The Rails integration: every `config.flagnetic` setting under [Rails](#rails), and the controller helpers `flagnetic_context` and `flagnetic_anonymous_id`.
 - `Flagnetic::Eval`, the evaluator: `Ruleset.decode` and the ruleset's `evaluate`, `evaluate_all`, `unsupported_rules`, `invalid_conditions` and `version`; `Context`, `Result`, `ExperimentDetail`, `Construct`, `DecodeError`, and `Eval::REASONS` and `ERROR_CODES`.
 
-**Everything else is internal and changes without notice**: every other constant and class under `Flagnetic` (the transport, worker, stream, exposure and summary machinery, the store and the log adapter), the evaluator's hash, date, version and regular expression machinery and the structs a decoded ruleset is made of, the `timing:` option (a seam for this gem's tests), the railtie's methods and any method the list above does not name. They are private constants where Ruby can say so; do not reach them with `const_get` or `send`.
+**Everything else is internal and changes without notice**: every other constant and class under `Flagnetic` (the transport, worker, stream, exposure and summary machinery, the store and the store), the evaluator's hash, date, version and regular expression machinery and the structs a decoded ruleset is made of, the `timing:` option (a seam for this gem's tests), the railtie's methods and any method the list above does not name. They are private constants where Ruby can say so; do not reach them with `const_get` or `send`.
 
 The wire is promised separately: the SDK reads ruleset `schema_version` 1 over `/sdk/v1`, both frozen since 0.1.0 ([compatibility](../../docs/sdks/compatibility.md)). The gem is released as 1.0.0 together with the server's 1.0.0, and supports the latest minor only: fixes, security fixes included, ship in the next release.
 
@@ -155,10 +155,10 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `exposures_off` | warn | |
 | `events_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
 | `client_not_configured` | warn | `rails_env`: the Rails integration found no SDK key and base URL outside production and serves built-in defaults |
-| `deprecation_received` | warn, once per operation and process | `operation` (`getRuleset`, `streamRuleset`, `postEvents`), `deprecated_since` (unix seconds; `deprecation` holds the raw header when it is not that form), `sunset` (the HTTP date, only when sent) |
+| `operation_deprecated` | warn, once per operation and process | `operation` (`ruleset`, `stream`, `events`), `deprecation` (the header as received, e.g. `@1767225600`), `sunset` (the HTTP date, only when sent) |
 | `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `not_serialisable`, `client_error`, `refused_by_the_platform`, `window_too_old`) and what was dropped (`fault` for `not_serialisable`) |
 
-A server that deprecates an operation answers it with a `Deprecation` header (and a `Sunset` header when it names a date): the client logs `deprecation_received` once for each operation and keeps working, so the log is how an application learns it should upgrade the gem before the sunset.
+A server that deprecates an operation answers it with a `Deprecation` header (and a `Sunset` header when it names a date): the client logs `operation_deprecated` once for each operation and keeps working, so the log is how an application learns it should upgrade the gem before the sunset.
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
 

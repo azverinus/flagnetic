@@ -29,8 +29,8 @@ module Flagnetic
 
     attr_reader :stream_uri, :timeout
 
-    # deprecated, when given, is called with an operation's name (its
-    # operationId in api/sdk.yaml) and the raw Deprecation and Sunset header
+    # deprecated, when given, is called with an operation's name (ruleset,
+    # stream or events) and the raw Deprecation and Sunset header
     # values of every answer that carries a Deprecation header; it decides
     # how often to report. A failure of its own never reaches a request.
     def initialize(sdk_key:, base_url:, platform:, timeout:, deprecated: nil, ruleset_limit: RULESET_LIMIT,
@@ -73,7 +73,7 @@ module Flagnetic
         h.request(request) do |response|
           status = response.code.to_i
           retry_after = response["Retry-After"]
-          note_deprecation("postEvents", response)
+          note_deprecation("events", response)
           body = begin
             read_body(response, @answer_limit)
           rescue BodyTooLarge
@@ -100,7 +100,7 @@ module Flagnetic
       http_for(@ruleset_uri, @timeout).start do |h|
         h.request(request) do |response|
           status = response.code.to_i
-          note_deprecation("getRuleset", response)
+          note_deprecation("ruleset", response)
           body = read_body(response, @ruleset_limit)
         end
       end

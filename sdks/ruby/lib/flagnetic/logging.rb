@@ -7,7 +7,7 @@ module Flagnetic
     ruleset_loaded fetch_failed stream_connected stream_dropped stage_changed key_revoked schema_unsupported
     rule_unsupported condition_invalid override_set override_refused local_overrides_allowed type_mismatch
     evaluation_failed listener_failed store_failed worker_failed queue_dropped exposure_skipped events_failed
-    exposures_off client_not_configured deprecation_received
+    exposures_off client_not_configured operation_deprecated
   ].freeze
 
   # LEVELS are the log levels, lowest first.
