@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.3...sdks/ruby/v0.2.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-ruby:** freeze the 1.0 API, log deprecations ([#426](https://github.com/azverinus/flagnetic/issues/426))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423))
+
+### Features
+
+* **sdk-ruby:** freeze the 1.0 API, log deprecations ([#426](https://github.com/azverinus/flagnetic/issues/426)) ([7fe7546](https://github.com/azverinus/flagnetic/commit/7fe754637b690d82e35c5866ed6135aacaeb80b9))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423)) ([8eb53b9](https://github.com/azverinus/flagnetic/commit/8eb53b97e031010059fe586ebc3ec5cf9cc246de))
+
+
+### Bug Fixes
+
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **sdks:** close the Python and Ruby SDK review findings ([#414](https://github.com/azverinus/flagnetic/issues/414)) ([d02c998](https://github.com/azverinus/flagnetic/commit/d02c998264c98f3a0904f0187d779be749270237))
+
 ## [0.1.3](https://github.com/azverinus/flagnetic/compare/sdks/ruby/v0.1.2...sdks/ruby/v0.1.3) (2026-11-17)
 
 
