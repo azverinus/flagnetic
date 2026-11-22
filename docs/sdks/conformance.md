@@ -44,7 +44,7 @@ The logger hook receives named events, and operators alert on those names, so ev
 | `queue_dropped` | Events or summary rows were given up on; `cause` names why. A summary window older than one hour has the cause `window_too_old`. |
 | `stream_connected` | The ruleset stream is open. |
 | `stream_dropped` | The ruleset stream ended. |
-| `deprecation_received` | An operation's answer carried a `Deprecation` header. Logged once per operation and process, at warning level, with the `operation`, the header as `deprecation`, the `sunset` when the answer carries one; the call is never failed for it. |
+| `deprecation_received` | An operation's answer carried a `Deprecation` header. Logged once per operation for each client, at warning level, with the `operation`, the header as `deprecation`, the date it names as `deprecated_since` when it reads as one, and the `sunset` when the answer carries one; the call is never failed for it. |
 
 A received `Deprecation` header is logged once per operation as `operation_deprecated`, at warning level, with the fields `operation`, `deprecation` and, when set, `sunset`; the call proceeds. It has no row in the table until every SDK exports it.
 
