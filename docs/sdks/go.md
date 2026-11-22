@@ -104,7 +104,7 @@ While the stream is connected the client also polls every 5 minutes (`WithPollIn
 
 ## Deprecations
 
-When the platform answers an operation with a `Deprecation` header (see [Compatibility and support](../compatibility.md#deprecation-and-removal)), the client logs `deprecation_received` once per operation (`ruleset`, `stream` or `events`) at warning level, with the `Sunset` when there is one, and the call goes on as before. Alert on that name to learn of a deprecation before a removal.
+When the platform answers an operation with a `Deprecation` header (see [Compatibility and support](../compatibility.md#deprecation-and-removal)), the client logs `operation_deprecated` once per operation (`ruleset`, `stream` or `events`) at warning level, with the `Sunset` when there is one, and the call goes on as before. Alert on that name to learn of a deprecation before a removal.
 
 ## Compatibility
 
