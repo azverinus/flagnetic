@@ -3,12 +3,14 @@
  * ruleset, follows changes through the stream and evaluates flags locally
  * with the evaluator, exactly as the server does.
  */
-export { createServer, FlagneticServer, LocalOverrideRefused, LocalOverrides, LocalOverridesNotAllowed, type Status } from "./server/client.js";
+export { createServer, LocalOverrideRefused, LocalOverridesNotAllowed, type Status } from "./server/client.js";
 export { consoleLogger } from "./server/logger.js";
 export { LOG_EVENTS } from "./server/types.js";
 export { serializeBootstrap } from "./internal/bootstrap.js";
-export { Recorder, type SummaryCount } from "./server/recorder.js";
-export { testServer, testServerFromValues, TestServer } from "./server/testing.js";
+export { testServer, testServerFromValues } from "./server/testing.js";
+export type { FlagneticServer, LocalOverrides } from "./server/client.js";
+export type { Recorder, SummaryCount } from "./server/recorder.js";
+export type { TestServer } from "./server/testing.js";
 export type {
   Detail,
   DetailErrorCode,
@@ -24,7 +26,6 @@ export type {
 } from "./server/types.js";
 export type { ServedFlagDocument, ValuesDocument, ValuesOptions } from "./server/values.js";
 export type { AliasLink, QueuedEvent } from "./internal/events.js";
-export { BUCKETS, bucket, murmur3 } from "./evaluator/bucket.js";
 export {
   decodeRuleset,
   REASONS,
@@ -39,7 +40,6 @@ export {
 } from "./evaluator/evaluate.js";
 export {
   RulesetDecodeError,
-  SCHEMA_VERSION,
   type AttributeDocument,
   type ConditionDocument,
   type EnvironmentDocument,
@@ -55,4 +55,4 @@ export {
   type VariationDocument,
   type WeightDocument,
 } from "./evaluator/ruleset.js";
-export { SCHEMA_VERSION_MAX, SCHEMA_VERSION_MIN, SDK_API_PATH, VERSION } from "./version.js";
+export { VERSION } from "./version.js";

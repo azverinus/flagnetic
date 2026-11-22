@@ -6,4 +6,4 @@
  */
 export type { Context, ErrorCode, ExperimentDetail, Reason, Result } from "./evaluator/evaluate.js";
 export type { JsonValue } from "./evaluator/ruleset.js";
-export { SCHEMA_VERSION_MAX, SCHEMA_VERSION_MIN, SDK_API_PATH, VERSION } from "./version.js";
+export { VERSION } from "./version.js";

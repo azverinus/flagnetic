@@ -83,7 +83,6 @@ const esm = await import(`${pkg.name}/server`);
 const cjs = require(`${pkg.name}/server`);
 assert.deepEqual(esm.decodeRuleset(doc).evaluate("f", {}), want);
 assert.deepEqual(cjs.decodeRuleset(doc).evaluate("f", {}), want);
-assert.equal(esm.bucket("a3f9c2e17b4d0e58", "u_10482"), cjs.bucket("a3f9c2e17b4d0e58", "u_10482"));
 assert.equal(esm.VERSION, pkg.version);
 
 // The browser entry point never carries the evaluator: not the hash, the
