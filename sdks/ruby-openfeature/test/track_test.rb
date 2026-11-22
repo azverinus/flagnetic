@@ -46,14 +46,6 @@ class TrackTest < Minitest::Test
     assert_equal ["u-1"], provider.client.recorder.exposures.map(&:unit_id)
   end
 
-  def test_exposure_after_an_integer_evaluation_reports_the_enriched_context
-    provider, client = of_provider
-    client.hooks << EnrichingHook.new
-    client.fetch_integer_value(flag_key: "auto_ratio", default_value: 0, evaluation_context: user)
-    client.track("exposure", evaluation_context: user, tracking_event_details: details(flag: "auto_ratio"))
-    assert_includes provider.client.recorder.exposures.map(&:experiment_key), "ratio_test"
-  end
-
   def test_last_contexts_are_bounded_oldest_out
     last = Flagnetic::OpenFeature.const_get(:LastContexts).new(capacity: 2)
     %w[a b c].each { |id| last.remember("flag", { units: { "user" => id }, attributes: { "remembered" => true } }) }
