@@ -226,7 +226,7 @@ func waitFor[T any](t *testing.T, ready func() (T, bool), what string) T {
 // safety poll far enough away that only the stream causes a fetch.
 func newStreaming(t *testing.T, baseURL string, opts ...flagnetic.Option) *flagnetic.Client {
 	t.Helper()
-	opts = append([]flagnetic.Option{flagnetic.WithChangeStream(true), flagnetic.WithSummaries(false),
+	opts = append([]flagnetic.Option{flagnetic.WithStream(true), flagnetic.WithSummaries(false),
 		flagnetic.WithPollInterval(time.Hour)}, opts...)
 	c, err := flagnetic.New(serverKey, baseURL, opts...)
 	if err != nil {
@@ -758,7 +758,7 @@ func TestCloseDuringTheReconnectBackoffReturnsPromptly(t *testing.T) {
 	// Nothing listens there: every connect fails at once, so both loops
 	// spend their time in a backoff an hour long.
 	c, err := flagnetic.New(serverKey, "http://127.0.0.1:1",
-		flagnetic.WithChangeStream(true), flagnetic.WithSummaries(false),
+		flagnetic.WithStream(true), flagnetic.WithSummaries(false),
 		flagnetic.WithJitter(func(time.Duration) time.Duration { return time.Hour }))
 	if err != nil {
 		t.Fatal(err)

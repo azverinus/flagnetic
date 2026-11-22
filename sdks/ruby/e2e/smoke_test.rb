@@ -112,7 +112,7 @@ class SmokeTest < Minitest::Test
   end
 
   def ruleset_status(base_url)
-    uri = URI("#{base_url}#{Flagnetic::SDK_API_PATH}/ruleset")
+    uri = URI("#{base_url}/sdk/v1/ruleset")
     Net::HTTP.get_response(uri, "Authorization" => "Bearer #{SEED["server_key"]}").code
   end
 

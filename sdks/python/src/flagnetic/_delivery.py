@@ -24,7 +24,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
 from urllib.parse import urlsplit
 
-from . import _events
+from . import events
+from ._deprecation import DeprecationNotes
 from ._sse import ChunkedDecoder, EventStreamParser, Frame, StreamError
 
 if TYPE_CHECKING:
@@ -239,8 +240,10 @@ class Delivery:
         schema_version: int,
         reporter: Reporter | None = None,
         ingest: Ingest | None = None,
+        notes: DeprecationNotes,
     ) -> None:
         self._host = host
+        self._notes = notes
         self._reporter = reporter
         # The reporter's connection to the events endpoint, cut at close like the ruleset's.
         self._ingest = ingest
@@ -389,7 +392,7 @@ class Delivery:
         self._crash_kinds.add(kind)
         with contextlib.suppress(Exception):
             self._host.log(
-                logging.ERROR, _events.EVALUATION_FAILED, flag="", cause=f"delivery thread: {err!r}"
+                logging.ERROR, events.EVALUATION_FAILED, flag="", cause=f"delivery thread: {err!r}"
             )
 
     def _recover(self) -> None:
@@ -536,6 +539,7 @@ class Delivery:
                 return _FETCH_CLOSING
             send_request(conn, "GET", self._ruleset_path, headers)
             resp = conn.getresponse()
+            self._notes.observe("ruleset", resp)
             status = resp.status
             if status == 304:
                 if held:
@@ -635,6 +639,7 @@ class Delivery:
                 return
             send_request(conn, "GET", self._stream_path, headers)
             resp = conn.getresponse()
+            self._notes.observe("stream", resp)
         except TimeoutError as err:
             conn.close()
             self._first_attempt_done = True
@@ -657,7 +662,7 @@ class Delivery:
             host.key_revoked(resp.status)
             host.log(
                 logging.WARNING,
-                _events.STREAM_DROPPED,
+                events.STREAM_DROPPED,
                 cause=CAUSE_UNAUTHORIZED,
                 error=f"stream: {resp.status} {resp.reason}",
                 reconnect=False,
@@ -685,7 +690,7 @@ class Delivery:
         now = time.monotonic()
         self._last_data = now
         self._stream_stable = False
-        host.log(logging.INFO, _events.STREAM_CONNECTED, last_event_id=last_event_id)
+        host.log(logging.INFO, events.STREAM_CONNECTED, last_event_id=last_event_id)
         if not self._first_connect:
             # Versions may have been missed while the stream was down.
             self._wake_fetch = True
@@ -695,7 +700,7 @@ class Delivery:
         fields: dict[str, Any] = {"cause": cause, "error": str(err), "reconnect": True}
         if status:
             fields["status"] = status
-        self._host.log(logging.WARNING, _events.STREAM_DROPPED, **fields)
+        self._host.log(logging.WARNING, events.STREAM_DROPPED, **fields)
         self._stream_failures += 1
         self._next_stream = time.monotonic() + full_jitter(
             backoff_ceiling(self._stream_failures, self._waits.retry_base, self._waits.stream_retry_cap)
@@ -765,7 +770,7 @@ class Delivery:
             # stream at once is backed off from instead of reconnected to every other second.
             cause, errored = CAUSE_CLOSED_EARLY, True
         level = logging.WARNING if errored or cause != CAUSE_SERVER_CLOSED else logging.INFO
-        self._host.log(level, _events.STREAM_DROPPED, cause=cause, error=error, reconnect=True)
+        self._host.log(level, events.STREAM_DROPPED, cause=cause, error=error, reconnect=True)
         now = time.monotonic()
         self._drop_stream_connection()
         # The fetch scheduled while the stream was up may be a poll interval away; without the

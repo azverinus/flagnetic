@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from flagnetic import _events
+from flagnetic import events
 
 from conformance import ROOT
 
@@ -14,7 +14,7 @@ TABLE = ROOT.parent / "docs" / "sdks" / "conformance.md"
 
 # The names the shared ones replaced: a client logging them would break an alert written against
 # the table.
-REPLACED = ("sse_connected", "sse_dropped")
+REPLACED = ("sse_connected", "sse_dropped", "deprecation_received", "deprecated_operation")
 
 
 def shared_names() -> list[str]:
@@ -31,7 +31,7 @@ def shared_names() -> list[str]:
 
 def exported() -> set[str]:
     """The string constants the events module names in upper case: the names a client logs."""
-    return {value for name, value in vars(_events).items() if name.isupper() and isinstance(value, str)}
+    return {value for name, value in vars(events).items() if name.isupper() and isinstance(value, str)}
 
 
 def test_the_shared_log_names_are_exported() -> None:

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# Flagnetic is the Ruby SDK; see lib/flagnetic.rb.
 module Flagnetic
   VERSION = "0.1.3"
 
@@ -13,4 +14,5 @@ module Flagnetic
   SCHEMA_VERSION_MIN = 1
   SCHEMA_VERSION_MAX = 1
   SDK_API_PATH = "/sdk/v1"
+  private_constant :SCHEMA_VERSION_MIN, :SCHEMA_VERSION_MAX, :SDK_API_PATH
 end

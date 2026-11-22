@@ -33,6 +33,17 @@ module Flagnetic
   # list. Strings compare byte-wise; numbers are IEEE 754
   # doubles; regular expressions follow the policy in Regex. A unit type
   # named as an attribute is a string attribute holding that unit's ID.
+  #
+  # The public surface is Ruleset (decode, evaluate, evaluate_all,
+  # unsupported_rules, invalid_conditions, version), Context, Result,
+  # ExperimentDetail, Construct, DecodeError, REASONS and ERROR_CODES.
+  # Everything else, the hash, date, version and regular expression
+  # machinery and the structs a decoded ruleset is made of, is internal
+  # and changes without notice.
   module Eval
+    private_constant :Murmur3, :Semver, :Instant, :Regex, :Operators, :Values, :Index, :Compiler, :Evaluation,
+                     :Document, :UnicodeTables, :Environment, :Attribute, :Segment, :Condition, :Flag, :Variation,
+                     :Prerequisite, :Override, :Rule, :Serve, :Weight, :BUCKETS, :SCHEMA_VERSION, :SCOPE,
+                     :CONDITION_KINDS, :SERVE_KINDS
   end
 end

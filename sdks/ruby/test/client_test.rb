@@ -329,7 +329,7 @@ class ClientTest < Minitest::Test
     eventually { logged(:stream_connected).size == 2 }
     names = @log_mutex.synchronize { @logged.map { |e| e[1] } }.uniq
     assert_empty names - Flagnetic::EVENTS
-    assert(names.all? { |n| Flagnetic::LEVELS.include?(@logged.find { |e| e[1] == n }[0]) })
+    assert(names.all? { |n| Flagnetic.const_get(:LEVELS).include?(@logged.find { |e| e[1] == n }[0]) })
   end
 
   # --- offline ------------------------------------------------------------

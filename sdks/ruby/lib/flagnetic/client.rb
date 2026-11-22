@@ -44,7 +44,7 @@ module Flagnetic
     ).freeze
     MIN_POLL_INTERVAL = 30
     TYPES = %w[boolean string number json].freeze
-    private_constant :Timing, :DEFAULT_TIMING, :TYPES
+    private_constant :Timing, :DEFAULT_TIMING, :TYPES, :MIN_POLL_INTERVAL
 
     # new constructs a client for a server key and the base URL of the
     # instance. It fails loudly (ArgumentError) only for a client key and
@@ -319,6 +319,8 @@ module Flagnetic
       @once = {}
       @unsupported_logged = {}
       @invalid_logged = {}
+      @deprecations_mutex = Mutex.new
+      @deprecations_logged = Set.new
       @pid = Process.pid
       @closed = false
     end
@@ -353,7 +355,7 @@ module Flagnetic
     def start_online(sdk_key, base_url, store:, stream:, platform:)
       @stream_enabled = stream
       @transport = Transport.new(sdk_key: sdk_key, base_url: base_url, platform: platform,
-                                 timeout: @timing.request_timeout)
+                                 timeout: @timing.request_timeout, deprecated: method(:deprecation_seen))
       build_reporters(@transport, nil)
       @store = store && FileStore.new(store, sdk_key)
       load_store if @store
@@ -376,6 +378,16 @@ module Flagnetic
       @exposures = Exposures.new(transport: transport, timing: @timing, log: method(:log_hook),
                                  record: recorder&.method(:record_event), platform: @platform,
                                  app_version: @app_version, wake: -> { @worker&.wake })
+    end
+
+    # deprecation_seen logs a Deprecation header once per operation: the
+    # client lives as long as the process, so this is once per operation
+    # and process. The header is passed on as it came, with the Sunset when
+    # there is one, and the call is never refused for it.
+    def deprecation_seen(operation, header, sunset)
+      return unless @deprecations_mutex.synchronize { @deprecations_logged.add?(operation) }
+
+      log(:warn, :operation_deprecated, operation: operation, deprecation: header, **(sunset ? { sunset: sunset } : {}))
     end
 
     # log_hook adapts Client#log's keyword arguments to the (level, event,

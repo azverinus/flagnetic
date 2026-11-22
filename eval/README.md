@@ -58,6 +58,12 @@ The algorithm and the operator semantics are documented on the package (`go doc 
 
 An SDK walks `conformance/fixtures`, decodes each file's `ruleset` with its own evaluator, evaluates every case and compares the result with `expect` key for key, with no file or case skipped. Two files hold vectors instead of a ruleset: `murmur3.json` for the hash and buckets, `regex.json` for the `matches` operator. A fixture's `unsupported` key is the decode report its ruleset must produce. [`../conformance/README.md`](../conformance/README.md) describes the formats.
 
+## What 1.0 promises
+
+From 1.0.0 the following changes only additively until 2.0, with deprecations announced in a minor release: `Decode`; `Ruleset` with `Evaluate`, `EvaluateAll`, `Flag`, `Protected` and `UnsupportedRules`; `Context`; `Result` and its JSON form; `ExperimentDetail`; `Reason` and `ErrorCode` with their constants, which only grow; and the constants `SchemaVersion`, `ScopeServer` and `Buckets`. The algorithm itself is the conformance suite's, and changes only through a fixture.
+
+The other exported names (the types that mirror the document, such as `Flag`, `Variation`, `Rule`, `Serve`, `Segment`, `Condition`, `Environment`, `Attribute`, `Override`, `Prerequisite`, `Weight`, `Construct` and `ConstructKind`, and the helpers `Bucket`, `Murmur3`, `CheckOperator`, `ParseSemver` and `Semver`) are exported because the Flagnetic server and the conformance tests are other modules. They change when the ruleset format grows, and may change in any release otherwise; build on the list above.
+
 ## Tests
 
 ```bash

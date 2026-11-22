@@ -1,4 +1,7 @@
-"""The log events of a client and the hook that receives them."""
+"""The log events of a client and the hook that receives them.
+
+Public: the names below are the strings operators alert on, exported as constants.
+"""
 
 from __future__ import annotations
 
@@ -74,6 +77,11 @@ OVERRIDE_SET = "override_set"
 #: warning: a local override was refused or dropped. Fields: flag, cause (not_allowed,
 #: protected_environment), and environment for a protected one.
 OVERRIDE_REFUSED = "override_refused"
+#: warning: a response carried a Deprecation header, so the operation it answers is deprecated;
+#: logged once per operation, and the call is never failed. Fields: operation ("ruleset", "stream"
+#: or "events"), deprecation (the header as received), and sunset (the Sunset header as
+#: received) when the response carried one.
+OPERATION_DEPRECATED = "operation_deprecated"
 
 
 def standard_logger(level: int, event: str, fields: Mapping[str, Any]) -> None:

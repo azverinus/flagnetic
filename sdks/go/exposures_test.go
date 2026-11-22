@@ -698,7 +698,7 @@ func TestTheQueueFlushesOnItsInterval(t *testing.T) {
 func TestCloseFlushesTheQueue(t *testing.T) {
 	m := newExperimentMock(t)
 	c, err := flagnetic.New(serverKey, m.URL,
-		flagnetic.WithChangeStream(false), flagnetic.WithSummaries(false),
+		flagnetic.WithStream(false), flagnetic.WithSummaries(false),
 		flagnetic.WithExposureTick(make(chan time.Time)))
 	if err != nil {
 		t.Fatalf("New: %v", err)

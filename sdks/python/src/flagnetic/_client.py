@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, TypeAlias
 from urllib.parse import urlsplit
 
-from . import _events, _store
+from . import _store, events
 from ._changes import changed_flags
 from ._delivery import (
     CAUSE_PARSE,
@@ -34,9 +34,9 @@ from ._delivery import (
     Waits,
     user_agent,
 )
+from ._deprecation import DeprecationNotes
 from ._detail import Detail, Experiment, Stage, Status
 from ._eval import SCHEMA_VERSION, Context, Ruleset, RulesetError, decode, evaluate, parse
-from ._events import Logger, standard_logger
 from ._ingest import Ingest, event_id
 from ._overrides import LocalOverride, LocalOverrides
 from ._reporting import (
@@ -53,6 +53,7 @@ from ._reporting import (
     fingerprint,
 )
 from ._version import __version__
+from .events import Logger, standard_logger
 
 #: A ruleset document as the ruleset endpoint serves it: JSON text, its UTF-8 bytes, or the parsed object.
 Document: TypeAlias = bytes | str | Mapping[str, Any]
@@ -257,9 +258,9 @@ class Client:
         self._source: Callable[[], Document] | None = None
         self._store_path: Path | None = None
         if allow_overrides:
-            self._log(logging.WARNING, _events.LOCAL_OVERRIDES_ALLOWED)
+            self._log(logging.WARNING, events.LOCAL_OVERRIDES_ALLOWED)
         if not send_exposures:
-            self._log(logging.WARNING, _events.EXPOSURES_OFF)
+            self._log(logging.WARNING, events.EXPOSURES_OFF)
 
         if offline is not None:
             self._source = offline if callable(offline) else (lambda: offline)
@@ -310,7 +311,9 @@ class Client:
             unauthorized_cap=waits.unauthorized_cap,
         )
         agent = user_agent(__version__, self._platform)
+        notes = DeprecationNotes(self._log)
         ingest = Ingest(
+            notes=notes,
             base_url=online.base_url,
             sdk_key=online.sdk_key,
             agent=agent,
@@ -355,6 +358,7 @@ class Client:
             schema_version=SCHEMA_VERSION,
             reporter=reporter,
             ingest=ingest if reporter is not None else None,
+            notes=notes,
         )
         self._delivery = delivery
         delivery.start()
@@ -417,14 +421,14 @@ class Client:
         try:
             detail = self._detail(loaded, context, key, requested, default)
         except Exception as err:
-            self._log(logging.ERROR, _events.EVALUATION_FAILED, flag=key, cause=repr(err))
+            self._log(logging.ERROR, events.EVALUATION_FAILED, flag=key, cause=repr(err))
             detail = self._fallback(loaded, default, _ERROR_GENERAL)
         try:
             self._count(key, detail.variation, detail.reason)
             if self._send_exposures and loaded is not None:
                 self._served_detail(loaded, context, key, detail)
         except Exception as err:
-            self._log(logging.ERROR, _events.EVALUATION_FAILED, operation="report", flag=key, cause=repr(err))
+            self._log(logging.ERROR, events.EVALUATION_FAILED, operation="report", flag=key, cause=repr(err))
         return detail
 
     def _count(self, flag: str, variation: str, reason: str) -> None:
@@ -539,7 +543,7 @@ class Client:
             self._mismatched.add(key)
         self._log(
             logging.WARNING,
-            _events.TYPE_MISMATCH,
+            events.TYPE_MISMATCH,
             flag=key,
             flag_type=flag_type,
             requested_type="number" if requested == _INT64 else requested,
@@ -625,17 +629,17 @@ class Client:
             if not self._send_exposures:
                 return
             if key in self._overrides._by_key and not self._protected():
-                self._log(logging.DEBUG, _events.EXPOSURE_SKIPPED, flag=key, cause="local_override")
+                self._log(logging.DEBUG, events.EXPOSURE_SKIPPED, flag=key, cause="local_override")
                 return
             served = self._served.recall(key, _fingerprint(context))
             if served is None:
                 cause = "no_detail" if self._served.ever_carried(key) else "no_experiment"
-                self._log(logging.DEBUG, _events.EXPOSURE_SKIPPED, flag=key, cause=cause)
+                self._log(logging.DEBUG, events.EXPOSURE_SKIPPED, flag=key, cause=cause)
                 return
             self._emit(context, key, served.reason, served.ruleset_version, served.experiment)
         except Exception as err:
             self._log(
-                logging.ERROR, _events.EVALUATION_FAILED, operation="exposure", flag=key, cause=repr(err)
+                logging.ERROR, events.EVALUATION_FAILED, operation="exposure", flag=key, cause=repr(err)
             )
 
     def alias(self, from_unit_type: str, from_unit_id: str, to_unit_type: str, to_unit_id: str) -> None:
@@ -648,7 +652,7 @@ class Client:
             if self._send_exposures:
                 self._record(alias_of(from_unit_type, from_unit_id, to_unit_type, to_unit_id))
         except Exception as err:
-            self._log(logging.ERROR, _events.EVALUATION_FAILED, operation="alias", cause=repr(err))
+            self._log(logging.ERROR, events.EVALUATION_FAILED, operation="alias", cause=repr(err))
 
     def _emit(
         self, context: Context, key: str, reason: str, ruleset_version: int, experiment: Experiment
@@ -691,7 +695,7 @@ class Client:
                 # Nothing sends the queue any more: what is added now would sit in it unreported.
                 if not self._closed_logged:
                     self._closed_logged = True
-                    self._log(logging.WARNING, _events.EXPOSURE_SKIPPED, cause="closed")
+                    self._log(logging.WARNING, events.EXPOSURE_SKIPPED, cause="closed")
                 return
             self._queue.record(event._wire())
 
@@ -834,7 +838,7 @@ class Client:
         self._schema_logged = True
         self._log(
             logging.ERROR,
-            _events.SCHEMA_UNSUPPORTED,
+            events.SCHEMA_UNSUPPORTED,
             schema_version=schema_version,
             supported=[SCHEMA_VERSION],
         )
@@ -847,7 +851,7 @@ class Client:
         self._loaded = _Loaded(ruleset, raw, received_at)
         self._log(
             logging.INFO,
-            _events.RULESET_LOADED,
+            events.RULESET_LOADED,
             source=source,
             ruleset_version=ruleset.version,
             flags=len(ruleset.flags),
@@ -873,7 +877,7 @@ class Client:
             self._unsupported_logged[key] = ruleset.version
             self._log(
                 logging.ERROR,
-                _events.RULE_UNSUPPORTED,
+                events.RULE_UNSUPPORTED,
                 flag=key,
                 constructs=[f"{c.kind} {c.name}" for c in constructs],
                 ruleset_version=ruleset.version,
@@ -892,7 +896,7 @@ class Client:
             self._invalid_logged[key] = ruleset.version
             self._log(
                 logging.ERROR,
-                _events.CONDITION_INVALID,
+                events.CONDITION_INVALID,
                 flag=key,
                 conditions=reasons,
                 ruleset_version=ruleset.version,
@@ -912,7 +916,7 @@ class Client:
             document, written = found
             ruleset, raw = self._decode(document)
         except (OSError, Rejected, _store.StoreRefused) as err:
-            self._log(logging.WARNING, _events.STORE_FAILED, path=str(path), op="load", cause=str(err))
+            self._log(logging.WARNING, events.STORE_FAILED, path=str(path), op="load", cause=str(err))
             return
         # The file was written when the ruleset was received, so its age shows through received_at.
         self._swap(ruleset, raw, "store", datetime.fromtimestamp(written, UTC))
@@ -926,7 +930,7 @@ class Client:
             _store.write(self._store_path, online.sdk_key, document)
         except OSError as err:
             self._log(
-                logging.WARNING, _events.STORE_FAILED, path=str(self._store_path), op="save", cause=str(err)
+                logging.WARNING, events.STORE_FAILED, path=str(self._store_path), op="save", cause=str(err)
             )
 
     def _set_stage(self, stage: Stage) -> None:
@@ -937,7 +941,7 @@ class Client:
         self._stage = stage
         self._log(
             logging.INFO if stage == Stage.FRESH else logging.WARNING,
-            _events.STAGE_CHANGED,
+            events.STAGE_CHANGED,
             **{"from": previous.value, "to": stage.value},
         )
         with self._lock:
@@ -957,7 +961,7 @@ class Client:
         try:
             listener(argument)
         except Exception as err:
-            self._log(logging.ERROR, _events.LISTENER_FAILED, cause=repr(err))
+            self._log(logging.ERROR, events.LISTENER_FAILED, cause=repr(err))
 
 
 class _Host:
@@ -994,7 +998,7 @@ class _Host:
         fields: dict[str, Any] = {"cause": cause, "error": error}
         if status:
             fields["status"] = status
-        client._log(logging.WARNING, _events.FETCH_FAILED, **fields)
+        client._log(logging.WARNING, events.FETCH_FAILED, **fields)
         if client._stale_since is None:
             client._stale_since = datetime.now(UTC)
         if client._stage == Stage.FRESH:
@@ -1005,7 +1009,7 @@ class _Host:
         client = self._client
         if not client._revoked:
             client._revoked = True
-            client._log(logging.ERROR, _events.KEY_REVOKED, status=status)
+            client._log(logging.ERROR, events.KEY_REVOKED, status=status)
 
     def log(self, level: int, event: str, **fields: Any) -> None:
         self._client._log(level, event, **fields)

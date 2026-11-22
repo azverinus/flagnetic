@@ -16,6 +16,7 @@ import pytest
 
 import flagnetic
 from flagnetic import _ingest
+from flagnetic._deprecation import DeprecationNotes
 from mock_server import MockServer, Request, Response
 from protocol import SDK_KEY, read, read_json
 
@@ -87,6 +88,7 @@ def test_a_forked_child_serves_a_fresh_ruleset_and_sends_its_own_events() -> Non
 @pytest.mark.skipif(not hasattr(os, "fork"), reason="the platform has no fork")
 def test_a_forked_child_lets_go_of_a_request_whose_lock_a_parent_thread_held() -> None:
     ingest = _ingest.Ingest(
+        notes=DeprecationNotes(lambda *_a, **_k: None),
         base_url="http://127.0.0.1:1",
         sdk_key=SDK_KEY,
         agent="test",

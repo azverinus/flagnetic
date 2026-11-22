@@ -1,6 +1,6 @@
 # flagnetic
 
-Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and has no dependency, Flutter included. A Flutter app adds [`flagnetic_flutter`](https://pub.dev/packages/flagnetic_flutter) for widgets that rebuild when a flag changes, the app lifecycle, a store on every platform and a Dev Tools screen.
+Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and on the web and has no dependency, Flutter included. A Flutter app adds [`flagnetic_flutter`](https://pub.dev/packages/flagnetic_flutter) for widgets that rebuild when a flag changes, the app lifecycle, a store on every platform and a Dev Tools screen.
 
 ```bash
 dart pub add flagnetic            # Dart without Flutter
@@ -46,6 +46,20 @@ client.alias(
 );
 await client.close();
 ```
+
+## What 1.0 promises
+
+From 1.0 the API below changes in a breaking way only in a new major version, and is deprecated in a minor release before it goes. Everything else is internal and may change in any release.
+
+- **Client**: `Flagnetic.client`, and on `FlagneticClient` `ready`, `stage`, `status`, `getBool`, `getString`, `getNumber`, `getInt`, `getJson`, `getDetail`, `allFlags`, `context`, `setContext`, `refresh`, `foreground`, `background`, `isForeground`, `onChange`, `onStage`, `exposure`, `alias`, `flush`, `close`, `sdkKey`, `overrides` and `offline`; the types `FlagneticContext`, `ChangeListener` and `StageListener`.
+- **Options**: `ClientOptions` with `store`, `storedUnitSets`, `bootstrap`, `offline`, `logger`, `platform`, `appVersion`, `pollInterval`, `requestTimeout`, `flushInterval`, `summaryInterval`, `eventBatchSize`, `eventQueueCapacity`, `exposureMemory`, `sendExposures`, `sendSummaries`, `allowOverrides` and `stream`, and `OfflineSource`. The options that only tests replace (retry and stream timings, jitter, random, clock) are `ClientOptions.testing`, `TestingOptions` in `package:flagnetic/testing.dart`, and are not promised.
+- **Results**: `Stage`, `Status`, `Detail`, `Experiment`, `FlagSummary`, `Reasons` and `FallbackCodes` with their members and constant values.
+- **Store**: the `FlagneticStore` interface, `InMemoryStore`, `StoreKeys`, `isLastGoodValuesKey`, `anonymousUnitId` and `anonymousUnitIdKey`, for apps and packages that bring their own store.
+- **Logging**: `Logger`, `LogLevel` and `LogEvents`: an event name and the meaning of its documented fields never change; a release may add events and fields.
+- **Testing and development**: `OfflineMode`, `SummaryRow` and `LocalOverrides`, as returned by `client.offline` and `client.overrides`.
+- **Errors**: `Flagnetic.client` throws an `ArgumentError` for a server key or a key that cannot be an HTTP header; `client.overrides` throws a `StateError` without `allowOverrides`; `LocalOverrides.set` throws an `ArgumentError` for a value that does not fit the flag's type. These are the errors the package promises; a failure of the network, the server or the store is logged and never thrown.
+
+A getter never throws, and an unknown flag, a wrong type or a missing value serves the default you pass. The protocol the client speaks (`/sdk/v1`, `schema_version` 1) is frozen on its own terms: see [Compatibility and support](https://github.com/azverinus/flagnetic/blob/main/docs/compatibility.md). Not promised: anything under `lib/src`, `package:flagnetic/testing.dart`, and the free-text `cause` and `detail` fields of log events.
 
 ## The fallback chain
 

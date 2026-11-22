@@ -9,8 +9,8 @@ Every Flagnetic SDK is in its 0.x line and speaks the same protocol: `/sdk/v1`, 
 
 | Language | Install | Mode | Key | Runtimes | A change reaches it within |
 |---|---|---|---|---|---|
-| [Go](../../sdks/go/README.md) | `go get github.com/azverinus/flagnetic/sdks/go` | server | server | Go 1.26 or newer | 2 s at p99 streaming, 30 s polling |
-| [Go, OpenFeature](../../sdks/go-openfeature/README.md) | `go get github.com/azverinus/flagnetic/sdks/go-openfeature` | server | server | as the Go SDK | as the Go SDK |
+| [Go](go.md) | `go get github.com/azverinus/flagnetic/sdks/go` | server | server | Go 1.26 or newer | 2 s at p99 streaming, 30 s polling |
+| [Go, OpenFeature](go.md) | `go get github.com/azverinus/flagnetic/sdks/go-openfeature` | server | server | as the Go SDK | as the Go SDK |
 | [JavaScript](javascript.md) | `npm install flagnetic` | server, browser client | server (`flagnetic/server`), client (`flagnetic/client`, `flagnetic/react`) | Node 22 and later; browsers that run ES2022; React 18 and later | server: 2 s at p99 streaming, 30 s polling; browser: 300 s, at once when the tab is shown again |
 | [Ruby](ruby.md) | `bundle add flagnetic` | server | server | Ruby ≥ 3.3; Rails ≥ 8.0 for the integration | 2 s at p99 streaming, 30 s polling |
 | [Ruby, OpenFeature](ruby.md) | `bundle add flagnetic-openfeature` | server | server | Ruby ≥ 3.4 | as `flagnetic` |

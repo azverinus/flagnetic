@@ -217,7 +217,7 @@ func TestAKillSwitchThroughOneReplicaReachesAnSDKStreamingFromTheOtherWithinTwoS
 			t.Errorf("restore the seed: %v", err)
 		}
 	})
-	client := goSDK(t, seed().ServerKey, seed().Replicas.B, flagnetic.WithChangeStream(true))
+	client := goSDK(t, seed().ServerKey, seed().Replicas.B, flagnetic.WithStream(true))
 	if stage := client.Ready(ctxWithin(t, 10*time.Second)); stage != flagnetic.StageFresh {
 		t.Fatalf("ready = %s, want fresh", stage)
 	}

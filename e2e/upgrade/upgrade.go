@@ -139,7 +139,7 @@ func Run(ctx context.Context, o Options) (Report, error) {
 		return rep, fmt.Errorf("seed: %w", err)
 	}
 	seed := state.Seed
-	client, err := flagnetic.New(seed.ServerKey, o.URL, flagnetic.WithChangeStream(true), flagnetic.WithSummaries(false), flagnetic.WithExposures(false))
+	client, err := flagnetic.New(seed.ServerKey, o.URL, flagnetic.WithStream(true), flagnetic.WithSummaries(false), flagnetic.WithExposures(false))
 	if err != nil {
 		return rep, fmt.Errorf("start the SDK: %w", err)
 	}
