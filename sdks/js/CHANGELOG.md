@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.5...sdks/js/v0.2.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-js:** freeze the 1.0 API, log deprecations, add quickstart ([#424](https://github.com/azverinus/flagnetic/issues/424))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423))
+
+### Features
+
+* **sdk-js:** freeze the 1.0 API, log deprecations, add quickstart ([#424](https://github.com/azverinus/flagnetic/issues/424)) ([5c52394](https://github.com/azverinus/flagnetic/commit/5c5239489630c360a635ea9572cfca38c547dcf7))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423)) ([8eb53b9](https://github.com/azverinus/flagnetic/commit/8eb53b97e031010059fe586ebc3ec5cf9cc246de))
+
+
+### Bug Fixes
+
+* **eval:** close the evaluator and conformance findings ([#393](https://github.com/azverinus/flagnetic/issues/393)) ([7005803](https://github.com/azverinus/flagnetic/commit/70058031748337765046b86c8af7ab7e149258e8))
+* **sdks:** close the JavaScript review findings, add summaryInterval ([#413](https://github.com/azverinus/flagnetic/issues/413)) ([f018603](https://github.com/azverinus/flagnetic/commit/f018603be9a9876438b2490c7bc4efefd23fbe71))
+* **sdks:** report hook-enriched exposures, refuse bad JS keys ([#422](https://github.com/azverinus/flagnetic/issues/422)) ([3c891f6](https://github.com/azverinus/flagnetic/commit/3c891f688cf37bb3bfc68490a8c1e27a81527002))
+
+
+### Dependencies
+
+* **sdk-js:** Bump typescript-eslint from 8.72.2 to 8.73.0 ([#410](https://github.com/azverinus/flagnetic/issues/410)) ([c6863a6](https://github.com/azverinus/flagnetic/commit/c6863a6dddcfef069ebfa853f418bb5db2619c6f))
+
 ## [0.1.5](https://github.com/azverinus/flagnetic/compare/sdks/js/v0.1.4...sdks/js/v0.1.5) (2026-11-17)
 
 
