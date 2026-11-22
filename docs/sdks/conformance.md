@@ -32,6 +32,21 @@ Wrap the evaluator in getters that never throw or panic: a missing flag, a type 
 
 Your runner should fail when a scenario of a mode you support runs nowhere, as the Go SDK's `TestEveryServerScenarioIsCovered` does, and write the scenarios that passed to a report from which `.github/scripts/behaviour-matrix.sh` builds your column of the [behaviour matrix](behaviour-matrix.md).
 
+## Log names
+
+The logger hook receives named events, and operators alert on those names, so every SDK uses the same ones. An SDK exports them in its own style (Go `Event` constants, Ruby `Flagnetic::EVENTS`, the JavaScript `LogEvent` union, Dart `LogEvents`, Python module constants) but the strings are these, and no SDK logs a name outside this list for the same concept:
+
+| Name | When |
+|---|---|
+| `events_failed` | A batch of events failed and is sent again with the same event IDs. |
+| `exposures_off` | `send_exposures` is off, so no exposure or alias leaves the client. |
+| `evaluation_failed` | An internal failure was caught at the API boundary. |
+| `queue_dropped` | Events or summary rows were given up on; `cause` names why. A summary window older than one hour has the cause `window_too_old`. |
+| `stream_connected` | The ruleset stream is open. |
+| `stream_dropped` | The ruleset stream ended. |
+
+The protocol option that switches the ruleset stream on or off is `stream`. Each SDK's tests check that its exported names are the ones in this table and that none of the names it replaced is still logged.
+
 ## 4. OpenFeature
 
 A provider maps Flagnetic reasons to OpenFeature reasons by [`conformance/openfeature/reasons.json`](../../conformance/openfeature/reasons.json), and carries the Flagnetic reason in the flag metadata under the key the file names, so dashboards agree across languages.

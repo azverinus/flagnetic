@@ -11,7 +11,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -197,7 +197,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },

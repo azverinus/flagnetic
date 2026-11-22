@@ -9,7 +9,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -359,7 +359,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -691,6 +691,1228 @@
             },
             "status": 200
           }
+        }
+      ]
+    },
+    {
+      "covers": "stream: dropped after a heartbeat and not reconnecting → the safety poll keeps fetching at its interval, not at the interval of a held stream",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "stream": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a stream that drops after being connected and stays down brings the next fetch within the safety poll",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
+          "stream_close": true
+        },
+        {
+          "note": "a routine close waits 0–2 s; the stream stays down",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 503
+          }
+        },
+        {
+          "note": "first failure: backoff from 1 s",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 503
+          }
+        },
+        {
+          "note": "second failure: the backoff doubles",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 503
+          }
+        },
+        {
+          "note": "third failure: the backoff doubles again",
+          "request": {
+            "delay_ms": {
+              "max": 4000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 503
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the safety poll, 30 s after the last fetch although the stream is down, brings the change",
+          "request": {
+            "delay_ms": {
+              "max": 7000,
+              "min": 5000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "fourth failure: 8 s after the third",
+          "request": {
+            "delay_ms": {
+              "max": 3000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "2"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "note": "every connect checks for a missed version",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        }
+      ]
+    },
+    {
+      "covers": "stream: refused 401/403 while the fetch succeeds → closed until the next successful fetch, then opened again",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "stream": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a stream refused 401/403 while the fetch succeeds is opened again after the next successful fetch",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
+          "stream_close": true
+        },
+        {
+          "note": "refused: the stream stays closed while nothing else is",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/403-key_kind_not_allowed.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 403
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the poll, 30 s after the last fetch: the fetch is not refused",
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 12000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "note": "opened again after the first successful fetch since the refusal",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "note": "every connect checks for a missed version",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "note": "a kill switch: the stream works again",
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: refused 401/403 while the evaluation succeeds → closed until the next successful evaluation, then opened again",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "stream": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: a stream refused 401/403 while the evaluation succeeds is opened again after the next successful evaluation",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
+          "stream_close": true
+        },
+        {
+          "note": "refused: the stream stays closed while nothing else is",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/403-key_kind_not_allowed.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 403
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the poll, 30 s after the last evaluation: the evaluation is not refused",
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 12000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "opened again after the first successful evaluation since the refusal",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "note": "every connect checks for a missed version",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "note": "a kill switch: the stream works again",
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 3000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: refused 401/403 while the fetch is refused too → no stream request until a fetch succeeds",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "stream": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a stream refused 401/403 stays closed while the fetch is refused too",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
+          "stream_close": true
+        },
+        {
+          "note": "refused: the stream stays closed",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "the poll is refused too: the stream is not tried",
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 12000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the key is restored",
+          "request": {
+            "delay_ms": {
+              "max": 4000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "note": "opened again after the first successful fetch since the refusal",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "note": "every connect checks for a missed version",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        }
+      ]
+    },
+    {
+      "covers": "stream: refused 401/403 while the evaluation is refused too → no stream request until an evaluation succeeds",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "stream": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: a stream refused 401/403 stays closed while the evaluation is refused too",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
+          "stream_close": true
+        },
+        {
+          "note": "refused: the stream stays closed",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "the poll is refused too: the stream is not tried",
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 12000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 4000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the key is restored",
+          "request": {
+            "delay_ms": {
+              "max": 8000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "opened again after the first successful evaluation since the refusal",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "note": "every connect checks for a missed version",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
         }
       ]
     }

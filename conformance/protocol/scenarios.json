@@ -350,7 +350,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -659,7 +659,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         },
         "stored": "server/ruleset.json"
@@ -734,7 +734,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -1127,7 +1127,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -1242,7 +1242,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -1412,7 +1412,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -1554,7 +1554,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -1804,7 +1804,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -1931,7 +1931,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -2009,7 +2009,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -2087,7 +2087,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": true,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -2210,7 +2210,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -2255,7 +2255,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -2438,7 +2438,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": true,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -2593,7 +2593,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -2887,7 +2887,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         },
         "stored": "server/evaluation.json"
@@ -2961,7 +2961,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -3350,7 +3350,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -3458,7 +3458,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -3619,7 +3619,7 @@
           "poll_interval_ms": 3600000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": true,
+          "stream": true,
           "summary_interval_ms": 3600000
         }
       },
@@ -3753,7 +3753,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -3828,7 +3828,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -3903,7 +3903,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": true,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -4023,7 +4023,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -4068,7 +4068,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": false,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -4248,7 +4248,7 @@
           "poll_interval_ms": 30000,
           "send_exposures": true,
           "send_summaries": true,
-          "sse": false,
+          "stream": false,
           "summary_interval_ms": 3600000
         }
       },
@@ -4387,6 +4387,249 @@
               "Content-Type": "application/json"
             },
             "status": 202
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: evaluation below the event's version → retry 1, 2, 4 s; version never downgrades",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "stream": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: an evaluation below the event's version is retried after 1, 2 and 4 seconds and never downgrades",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "note": "the replica is behind",
+          "request": {
+            "delay_ms": {
+              "max": 3000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 1000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 3000,
+              "min": 2000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 5000,
+              "min": 4000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 10000,
+            "path": "/sdk/v1/evaluate"
+          }
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "note": "a heartbeat: the stream is stable",
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "closed by the server after a heartbeat",
+          "stream_close": true
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "2"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "a lower version never replaces the held one",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
           }
         }
       ]

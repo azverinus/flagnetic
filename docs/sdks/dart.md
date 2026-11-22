@@ -44,8 +44,8 @@ The [packages' READMEs](../../sdks/dart/README.md) cover every option, the log e
 |---|---|
 | in the foreground on iOS, Android or desktop, holding the [ruleset stream](stream.md) (the default) | within 5 seconds at the 99th percentile |
 | in the background | at its next resume, which refetches unless the last attempt was less than 10 seconds ago |
-| with `ClientOptions(sse: false)`, or behind a proxy that blocks `text/event-stream` | within 5 minutes, its poll interval, and at every resume |
-| on the web, where the stream is opt-in (`sse: true`) | within 5 minutes, and at once when the page is shown again or its network comes back |
+| with `ClientOptions(stream: false)`, or behind a proxy that blocks `text/event-stream` | within 5 minutes, its poll interval, and at every resume |
+| on the web, where the stream is opt-in (`stream: true`) | within 5 minutes, and at once when the page is shown again or its network comes back |
 
 The stream carries only the news that the ruleset changed: each app then waits a random 0–3 seconds before it evaluates, so the apps open at a kill switch do not all ask at once. The 99th percentile is what the end-to-end smoke measures on every pull request that changes the package.
 
