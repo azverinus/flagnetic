@@ -12,7 +12,7 @@ environment:
   flutter: '>=3.35.0'
 
 dependencies:
-  flagnetic: ^0.1.0
+  flagnetic: ^0.2.0
   flutter:
     sdk: flutter
   path_provider: ^2.1.5
