@@ -549,8 +549,16 @@ func TestAnAttemptThatOutlivesItsLeaseIsNotRecorded(t *testing.T) {
 	if w := subscription(t, admin, p.Key, created.Id); w.ConsecutiveFailures != 0 || w.LastSuccessAt == nil {
 		t.Errorf("the subscription is %+v after a success the late replica must not undo", w)
 	}
-	if len(first.Logs.Find("webhook delivery attempt not recorded: the lease was lost")) != 1 {
-		t.Error("the late replica did not log the lost lease")
+	// Other tests leave deliveries in the shared database that the round also
+	// attempts, so the delivery this test queued is the one counted.
+	lost := 0
+	for _, r := range first.Logs.Find("webhook delivery attempt not recorded: the lease was lost") {
+		if r.Attrs["delivery"] == queued.Id.String() {
+			lost++
+		}
+	}
+	if lost != 1 {
+		t.Errorf("the late replica logged the lost lease of the delivery %d times, want once", lost)
 	}
 }
 

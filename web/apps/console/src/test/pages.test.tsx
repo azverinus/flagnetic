@@ -14,7 +14,13 @@ import {
 import { fakeServer, problem } from "@/test/fake-server";
 import { activateForTests, renderRoute } from "@/test/render";
 
-beforeAll(() => activateForTests("en"));
+// The first render of a route loads the whole route tree, which on a loaded
+// runner takes longer than a test is allowed; loading it here keeps that cost
+// out of whichever test happens to run first.
+beforeAll(async () => {
+  activateForTests("en");
+  await import("@/routeTree.gen");
+}, 60_000);
 
 const project: Project = {
   id: "0192a000-0000-7000-8000-000000000100",

@@ -68,9 +68,22 @@ func asRead(t *testing.T, e management.AuditEntry) string {
 	return raw(v)
 }
 
+// instanceWebhooks lists the instance's subscriptions.
+func instanceWebhooks(t *testing.T, c *management.ClientWithResponses) []management.Webhook {
+	t.Helper()
+	res := do(c.ListInstanceWebhooksWithResponse(t.Context()))
+	if res.JSON200 == nil {
+		t.Fatalf("GET /webhooks = %d: %s", res.StatusCode(), res.Body)
+	}
+	return res.JSON200.Items
+}
+
 func TestAnInstanceSubscriptionTakesAuditEntryAloneAndNoEnvironment(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	// The instance's subscriptions are shared by every test of the package,
+	// so what a refusal must not add is counted against what the list held.
+	before := len(instanceWebhooks(t, admin))
 	for name, tc := range map[string]struct {
 		events       []string
 		environments *[]string
@@ -89,8 +102,8 @@ func TestAnInstanceSubscriptionTakesAuditEntryAloneAndNoEnvironment(t *testing.T
 	insecure := instanceArchive("http://receiver.example/archive")
 	res := do(admin.CreateInstanceWebhookWithResponse(t.Context(), insecure))
 	assertProblem(t, "plain http", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "insecure_url")
-	if list := do(admin.ListInstanceWebhooksWithResponse(t.Context())); list.JSON200 == nil || len(list.JSON200.Items) != 0 {
-		t.Fatalf("after refusals, list = %d: %s", list.StatusCode(), list.Body)
+	if n := len(instanceWebhooks(t, admin)); n != before {
+		t.Fatalf("after refusals, the list holds %d subscriptions, want the %d it held", n, before)
 	}
 
 	created := createInstanceWebhook(t, admin, instanceArchive("https://receiver.example/archive"))
@@ -144,9 +157,9 @@ func TestAnInstanceSubscriptionTakesAuditEntryAloneAndNoEnvironment(t *testing.T
 	if res := do(admin.GetWebhookWithResponse(t.Context(), p.Key, created.Id)); res.StatusCode() != http.StatusNotFound {
 		t.Errorf("the instance's subscription under a project = %d, want 404", res.StatusCode())
 	}
-	if list := do(admin.ListInstanceWebhooksWithResponse(t.Context())); list.JSON200 == nil || len(list.JSON200.Items) != 1 ||
-		list.JSON200.Items[0].Id != created.Id {
-		t.Fatalf("list = %d: %s", list.StatusCode(), list.Body)
+	listed := instanceWebhooks(t, admin)
+	if len(listed) != before+1 || !slices.ContainsFunc(listed, func(w management.Webhook) bool { return w.Id == created.Id }) {
+		t.Fatalf("the list holds %d subscriptions, want the %d it held and %s", len(listed), before, created.Id)
 	}
 
 	if res := do(admin.DeleteInstanceWebhookWithResponse(t.Context(), created.Id)); res.StatusCode() != http.StatusNoContent {
@@ -202,9 +215,13 @@ func TestAnInstanceSubscriptionReceivesTheEntriesThatNameNoProject(t *testing.T)
 	}
 	booleanFlag(t, admin, p.Key, "checkout")
 	fanOut(t, srv)
+	// The entries are read before the delivery round: that round also takes
+	// the due deliveries other tests left in the shared database, and a
+	// subscription disabled for its failures writes an entry the round
+	// itself creates, after the fan-out that queued this test's deliveries.
+	instance := instanceEntriesSince(t, admin, marker.Id)
 	deliver(t, srv)
 
-	instance := instanceEntriesSince(t, admin, marker.Id)
 	if !slices.ContainsFunc(instance, func(e management.AuditEntry) bool { return e.Action == "member.updated" }) {
 		t.Fatalf("no member.updated among the instance's entries %+v", instance)
 	}
