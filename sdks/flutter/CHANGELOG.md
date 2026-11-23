@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/flutter/v0.1.2...sdks/flutter/v0.2.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-dart:** freeze the 1.0 API, log deprecations, add a quickstart ([#428](https://github.com/azverinus/flagnetic/issues/428))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423))
+
+### Features
+
+* **sdk-dart:** freeze the 1.0 API, log deprecations, add a quickstart ([#428](https://github.com/azverinus/flagnetic/issues/428)) ([dc6facb](https://github.com/azverinus/flagnetic/commit/dc6facb7f0a7df490bbaa3d8630a0a6a0472e52a))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423)) ([8eb53b9](https://github.com/azverinus/flagnetic/commit/8eb53b97e031010059fe586ebc3ec5cf9cc246de))
+
+
+### Bug Fixes
+
+* **sdks:** close the Dart and Flutter review findings ([#417](https://github.com/azverinus/flagnetic/issues/417)) ([0ef349e](https://github.com/azverinus/flagnetic/commit/0ef349ea9beab8bbd6a1fe54138382aafa3c15f9))
+
+
+### Dependencies
+
+* **sdks:** Require the 0.2 SDKs in the providers and Flutter ([#434](https://github.com/azverinus/flagnetic/issues/434)) ([d694493](https://github.com/azverinus/flagnetic/commit/d69449310e590777209b5207cfe79cdcc5253842))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/flutter/v0.1.1...sdks/flutter/v0.1.2) (2026-11-17)
 
 
