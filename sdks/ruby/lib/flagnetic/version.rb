@@ -2,7 +2,7 @@
 
 # Flagnetic is the Ruby SDK; see lib/flagnetic.rb.
 module Flagnetic
-  VERSION = "0.1.3"
+  VERSION = "0.2.0"
 
   # The schema_version range of the documents this SDK reads and the SDK API
   # path it speaks. A ruleset outside the range is a fallback chain failure,
