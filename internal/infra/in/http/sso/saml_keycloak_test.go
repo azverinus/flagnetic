@@ -38,7 +38,10 @@ func (e env) createSAMLAt(t *testing.T, metadataURL string, change func(*managem
 
 func TestSigningInThroughKeycloakProvisionsAMemberAndOpensASessionForTheProvider(t *testing.T) {
 	kc := testkit.StartKeycloak(t)
-	e := start(t)
+	// Keycloak's people have the same emails in every test, and a provider
+	// that does not link by email refuses one a member already holds, so a
+	// database where an earlier test signed Ada in would not provision her.
+	e := startFresh(t)
 	p := e.createKeycloak(t, kc, nil)
 	ada := kc.Users[0]
 	b := testkit.NewBrowser(t, e.srv.URL)
@@ -77,7 +80,7 @@ func TestSigningInThroughKeycloakProvisionsAMemberAndOpensASessionForTheProvider
 
 func TestAPersonKeycloakKnowsOutsideTheProvidersDomainsIsNotProvisioned(t *testing.T) {
 	kc := testkit.StartKeycloak(t)
-	e := start(t)
+	e := startFresh(t)
 	p := e.createKeycloak(t, kc, func(b *management.AuthProviderCreate) { b.LinkByEmail = ptr(true) })
 	alan := kc.Users[2] // alan@saml.example.org
 	b := testkit.NewBrowser(t, e.srv.URL)
@@ -94,7 +97,7 @@ func TestAPersonKeycloakKnowsOutsideTheProvidersDomainsIsNotProvisioned(t *testi
 
 func TestAnUnsignedRequestIsAcceptedByKeycloakToo(t *testing.T) {
 	kc := testkit.StartKeycloak(t)
-	e := start(t)
+	e := startFresh(t) // no member holds Grace's email yet, which this provider does not link by
 	p := e.createKeycloak(t, kc, func(b *management.AuthProviderCreate) { b.SignRequests = ptr(false) })
 	grace := kc.Users[1]
 	b := testkit.NewBrowser(t, e.srv.URL)

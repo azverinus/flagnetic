@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -456,12 +457,20 @@ func TestACopyOfARefusedEventIsRefusedNotADuplicate(t *testing.T) {
 	}
 }
 
+// unpartitionedDays hands each run of the test a day far beyond any a test's
+// clock reaches, so no earlier test or earlier run, in whatever order they
+// go, has created its partition: one that exists is not attached again and
+// takes no lock, and a run on such a day would pass whether or not creating
+// a partition gives up.
+var unpartitionedDays atomic.Int32
+
 func TestCreatingAPartitionGivesUpRatherThanStallInserts(t *testing.T) {
 	testkit.StartServer(t)
 	pool := testkit.Pool(t)
 	testkit.HoldEvaluationSummariesOpenForReading(t, pool)
 	start := time.Now()
-	err := pgevents.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
+	day := protocolTime.AddDate(50, 0, int(unpartitionedDays.Add(1)))
+	err := pgevents.NewStore(pool).CreateEventPartitions(t.Context(), day, 0)
 	if err == nil {
 		t.Fatal("a partition was attached while a reader held its parent")
 	}

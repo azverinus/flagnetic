@@ -20,17 +20,26 @@ import (
 // SeedAuditEntries writes n entries of the instance's audit log in one
 // statement, each carrying an `after` document of about payload bytes: a
 // volume the API would take n changes to make, which a download test needs
-// to be large. The entries are system entries of no project.
+// to be large. The entries are system entries of no project. The padding is
+// words, not one repeated character: the audit guard looks for every secret
+// the package's tests recorded, and a test that sent a password of a few
+// thousand x's would otherwise find it inside the padding.
 func SeedAuditEntries(t testing.TB, pool *pgxpool.Pool, n, payload int) {
 	t.Helper()
 	_, err := pool.Exec(t.Context(), `
 INSERT INTO audit_entries (id, occurred_at, actor_kind, actor_id, actor_name, action, entity_kind, entity_id, entity_key, after)
 SELECT gen_random_uuid(), $1, 'system', 'seed', 'seed', 'seed.created', 'seed', 'seed-' || g, 'seed-' || g,
        jsonb_build_object('padding', $2::text)
-FROM generate_series(1, $3) AS g`, Start.Add(-time.Hour), strings.Repeat("x", payload), n)
+FROM generate_series(1, $3) AS g`, Start.Add(-time.Hour), padding(payload), n)
 	if err != nil {
 		t.Fatalf("seeding the audit log: %v", err)
 	}
+}
+
+// padding returns n bytes of filler no secret a test records can be found in.
+func padding(n int) string {
+	const word = "seed padding "
+	return strings.Repeat(word, n/len(word)+1)[:n]
 }
 
 // PointSCIMTokenAtProvider moves a SCIM token to another provider: a
