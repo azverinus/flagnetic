@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/go-openfeature/v0.1.1...sdks/go-openfeature/v0.2.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-go:** freeze the Go API, log deprecations, add a quickstart ([#427](https://github.com/azverinus/flagnetic/issues/427))
+
+### Features
+
+* **sdk-go:** freeze the Go API, log deprecations, add a quickstart ([#427](https://github.com/azverinus/flagnetic/issues/427)) ([8a18e41](https://github.com/azverinus/flagnetic/commit/8a18e412a718588bde884cf0570f9ea95fca1536))
+
+
+### Bug Fixes
+
+* **sdks:** close the Go SDK and provider review findings ([#406](https://github.com/azverinus/flagnetic/issues/406)) ([3d12bd8](https://github.com/azverinus/flagnetic/commit/3d12bd8eb37c8daa4547ef381512d16aedca243b))
+* **sdks:** report hook-enriched exposures, refuse bad JS keys ([#422](https://github.com/azverinus/flagnetic/issues/422)) ([3c891f6](https://github.com/azverinus/flagnetic/commit/3c891f688cf37bb3bfc68490a8c1e27a81527002))
+
+
+### Dependencies
+
+* **sdk-go-openfeature:** Bump the Go SDK from 0.1.0 to 0.1.1 ([#404](https://github.com/azverinus/flagnetic/issues/404)) ([9226485](https://github.com/azverinus/flagnetic/commit/92264857f0f33fe6b8ed6baec68d0e858d842404))
+* **sdks:** Require the 0.2 SDKs in the providers and Flutter ([#434](https://github.com/azverinus/flagnetic/issues/434)) ([d694493](https://github.com/azverinus/flagnetic/commit/d69449310e590777209b5207cfe79cdcc5253842))
+
 ## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/go-openfeature/v0.1.0...sdks/go-openfeature/v0.1.1) (2026-11-11)
 
 
