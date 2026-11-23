@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/sdks/go/v0.1.2...sdks/go/v0.2.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430))
+* **sdk-go:** freeze the Go API, log deprecations, add a quickstart ([#427](https://github.com/azverinus/flagnetic/issues/427))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423))
+
+### Features
+
+* **sdk-go:** freeze the Go API, log deprecations, add a quickstart ([#427](https://github.com/azverinus/flagnetic/issues/427)) ([8a18e41](https://github.com/azverinus/flagnetic/commit/8a18e412a718588bde884cf0570f9ea95fca1536))
+* **sdks:** one operation_deprecated log name in every SDK ([#430](https://github.com/azverinus/flagnetic/issues/430)) ([f8a28d9](https://github.com/azverinus/flagnetic/commit/f8a28d9640a2edafc0bc4e45409eda22168023a8))
+* **sdks:** pin delivery in conformance, one set of log names ([#423](https://github.com/azverinus/flagnetic/issues/423)) ([8eb53b9](https://github.com/azverinus/flagnetic/commit/8eb53b97e031010059fe586ebc3ec5cf9cc246de))
+
+
+### Bug Fixes
+
+* **sdk-go:** require eval 0.2.0 ([#433](https://github.com/azverinus/flagnetic/issues/433)) ([6f8c87b](https://github.com/azverinus/flagnetic/commit/6f8c87bde4536ae63e5eeb0dbb804e8dc78a1aed))
+* **sdks:** close the Go SDK and provider review findings ([#406](https://github.com/azverinus/flagnetic/issues/406)) ([3d12bd8](https://github.com/azverinus/flagnetic/commit/3d12bd8eb37c8daa4547ef381512d16aedca243b))
+
 ## [0.1.2](https://github.com/azverinus/flagnetic/compare/sdks/go/v0.1.1...sdks/go/v0.1.2) (2026-11-17)
 
 
