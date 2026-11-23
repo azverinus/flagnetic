@@ -6,7 +6,7 @@
   "sdks/ruby": "0.2.0",
   "sdks/js": "0.2.0",
   "sdks/python": "0.3.0",
-  "sdks/ruby-openfeature": "0.1.1",
+  "sdks/ruby-openfeature": "0.2.0",
   "sdks/dart": "0.2.0",
   "sdks/flutter": "0.1.2"
 }
