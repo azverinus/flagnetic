@@ -457,9 +457,11 @@ func TestACopyOfARefusedEventIsRefusedNotADuplicate(t *testing.T) {
 	}
 }
 
-// unpartitionedDays hands each test a day far beyond any a test's clock
-// reaches, so no earlier test, in whatever order they run, has created its
-// partition: one that exists is not attached again and takes no lock.
+// unpartitionedDays hands each run of the test a day far beyond any a test's
+// clock reaches, so no earlier test or earlier run, in whatever order they
+// go, has created its partition: one that exists is not attached again and
+// takes no lock, and a run on such a day would pass whether or not creating
+// a partition gives up.
 var unpartitionedDays atomic.Int32
 
 func TestCreatingAPartitionGivesUpRatherThanStallInserts(t *testing.T) {
