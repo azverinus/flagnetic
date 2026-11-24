@@ -643,7 +643,7 @@ jobs:
       - name: Run the harness and the Go SDK against two replicas
         working-directory: e2e
         run: go test -count=1 -v ./...
-      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1
         if: env.RUBY_SMOKE == 'true'
         with:
           ruby-version: "4.0"
@@ -719,7 +719,7 @@ jobs:
         if: env.SDK_PYTHON == 'true'
         with:
           python-version: 3.x
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         if: env.SDK_PYTHON == 'true'
       # Its own `up`, seeded again with new keys: the smokes before it end
       # by revoking theirs. The smoke writes its kill-switch line to the job
